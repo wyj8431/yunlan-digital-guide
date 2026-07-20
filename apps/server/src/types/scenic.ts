@@ -1,0 +1,58 @@
+export type ScenicAreaInfo = {
+  id: string;
+  name: string;
+  description: string;
+  openingHours: string;
+  ticketInfo: string;
+};
+
+export type ScenicSpot = {
+  id: string;
+  name: string;
+  summary: string;
+  story: string;
+  recommendedDurationMinutes: number;
+};
+
+export type RouteStep = {
+  spotId: string;
+  title: string;
+  durationMinutes: number;
+  description: string;
+};
+
+export type ScenicRoute = {
+  id: string;
+  name: string;
+  duration: string;
+  description: string;
+  steps: RouteStep[];
+};
+
+export type ScenicService = {
+  id: string;
+  name: string;
+  type: 'visitor-center' | 'parking' | 'restroom' | 'food' | 'medical';
+  description: string;
+};
+
+export type ScenicFaq = {
+  question: string;
+  answer: string;
+};
+
+export type ScenicData = {
+  scenicArea: ScenicAreaInfo;
+  spots: ScenicSpot[];
+  routes: ScenicRoute[];
+  services: ScenicService[];
+  faqs: ScenicFaq[];
+};
+
+export type ScenicAreaSummary = {
+  scenicArea: ScenicAreaInfo;
+  spots: Pick<ScenicSpot, 'id' | 'name' | 'summary'>[];
+  routes: Pick<ScenicRoute, 'id' | 'name' | 'duration' | 'description'>[];
+  services: ScenicService[];
+  quickQuestions: string[];
+};

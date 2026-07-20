@@ -1,2 +1,9 @@
 .superpowers/
 .worktrees/
+.npm-cache/
+node_modules/
+dist/
+coverage/
+.env
+*.local
+dev-server.*.log

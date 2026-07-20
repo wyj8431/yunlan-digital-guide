@@ -1,0 +1,168 @@
+{
+  "scenicArea": {
+    "id": "yunlan-town",
+    "name": "云岚古镇",
+    "description": "一座以水巷、古桥、茶坊、灯巷和戏台文化为特色的虚拟古镇。",
+    "openingHours": "09:00-21:00",
+    "ticketInfo": "成人票 60 元，儿童与老人按景区规则优惠。"
+  },
+  "spots": [
+    {
+      "id": "south-gate",
+      "name": "南门牌坊",
+      "summary": "云岚古镇的入口地标，牌坊纹样记录着古镇水路商贸的起源。",
+      "story": "南门牌坊建在古镇南侧水陆交汇处。相传早年商船沿云岚河停靠，茶叶、丝绸和木雕都从这里进入镇中。牌坊上的云纹和水纹象征古镇因水而兴。",
+      "recommendedDurationMinutes": 20
+    },
+    {
+      "id": "yunlan-bridge",
+      "name": "云岚古桥",
+      "summary": "横跨内河的石拱桥，是古镇最适合听故事和拍照的位置。",
+      "story": "云岚古桥以青石砌成，桥身微拱。传说镇上的第一家茶坊就开在桥边，往来商旅常在桥头交换消息，因此这里也被称作古镇的消息口。",
+      "recommendedDurationMinutes": 30
+    },
+    {
+      "id": "tea-lane",
+      "name": "茶坊小巷",
+      "summary": "保留老茶坊和手作铺的巷子，适合休息与体验非遗。",
+      "story": "茶坊小巷两侧是低矮木楼，午后常有茶香。巷内的老茶坊会演示云岚烘茶和木印法制作，是了解古镇生活气息的地方。",
+      "recommendedDurationMinutes": 40
+    },
+    {
+      "id": "river-lantern-lane",
+      "name": "河畔灯巷",
+      "summary": "沿河灯笼与白墙黛瓦相映，是傍晚拍照的推荐点。",
+      "story": "河畔灯巷在傍晚最有氛围。过去居民会在节庆时把手写愿望挂在灯笼下，灯影映在水面上，被称为云岚夜色。",
+      "recommendedDurationMinutes": 35
+    },
+    {
+      "id": "rain-listening-stage",
+      "name": "听雨戏台",
+      "summary": "古镇公共演艺空间，适合收尾休息并了解地方戏曲。",
+      "story": "听雨戏台面向一片小广场。雨天时瓦檐落雨声会和戏腔混在一起，因此得名。现在这里常安排评弹、折子戏和民俗小演出。",
+      "recommendedDurationMinutes": 45
+    }
+  ],
+  "routes": [
+    {
+      "id": "half-day-classic",
+      "name": "半日经典路线",
+      "duration": "约 3 小时",
+      "description": "覆盖古镇入口、古桥、茶坊、灯巷和戏台，适合第一次到访。",
+      "steps": [
+        {
+          "spotId": "south-gate",
+          "title": "从南门牌坊进入",
+          "durationMinutes": 20,
+          "description": "先了解古镇整体历史和水路商贸起源。"
+        },
+        {
+          "spotId": "yunlan-bridge",
+          "title": "登上云岚古桥",
+          "durationMinutes": 30,
+          "description": "在桥头听古镇商旅故事，并拍摄河道视角。"
+        },
+        {
+          "spotId": "tea-lane",
+          "title": "走进茶坊小巷",
+          "durationMinutes": 45,
+          "description": "体验烘茶香气和木印手作。"
+        },
+        {
+          "spotId": "river-lantern-lane",
+          "title": "傍晚漫步河畔灯巷",
+          "durationMinutes": 35,
+          "description": "欣赏灯影与水面倒影，是路线中最适合拍照的一段。"
+        },
+        {
+          "spotId": "rain-listening-stage",
+          "title": "在听雨戏台收尾",
+          "durationMinutes": 45,
+          "description": "看一段小演出或在广场休息，结束半日游。"
+        }
+      ]
+    },
+    {
+      "id": "family-easy",
+      "name": "亲子轻松路线",
+      "duration": "约 2 小时",
+      "description": "少走回头路，优先安排休息和体验点，适合带孩子慢慢逛。",
+      "steps": [
+        {
+          "spotId": "south-gate",
+          "title": "南门牌坊集合",
+          "durationMinutes": 15,
+          "description": "确认游览方向和服务点位置。"
+        },
+        {
+          "spotId": "tea-lane",
+          "title": "茶坊小巷体验手作",
+          "durationMinutes": 45,
+          "description": "安排轻量互动体验，孩子更容易参与。"
+        },
+        {
+          "spotId": "river-lantern-lane",
+          "title": "河畔灯巷拍照",
+          "durationMinutes": 30,
+          "description": "沿河慢行，避开拥挤路段。"
+        },
+        {
+          "spotId": "rain-listening-stage",
+          "title": "听雨戏台休息",
+          "durationMinutes": 30,
+          "description": "在开阔广场休整，也方便就近补水和如厕。"
+        }
+      ]
+    }
+  ],
+  "services": [
+    {
+      "id": "visitor-center",
+      "name": "游客中心",
+      "type": "visitor-center",
+      "description": "提供咨询、寄存和失物招领。"
+    },
+    {
+      "id": "south-parking",
+      "name": "南门停车场",
+      "type": "parking",
+      "description": "靠近南门牌坊，适合自驾游客入园。"
+    },
+    {
+      "id": "bridge-restroom",
+      "name": "古桥公共厕所",
+      "type": "restroom",
+      "description": "位于云岚古桥东侧，沿主路步行可达。"
+    },
+    {
+      "id": "snack-street",
+      "name": "小吃街",
+      "type": "food",
+      "description": "提供茶点、汤面和地方小吃。"
+    },
+    {
+      "id": "medical-station",
+      "name": "医务服务点",
+      "type": "medical",
+      "description": "提供基础急救和临时休息协助。"
+    }
+  ],
+  "faqs": [
+    {
+      "question": "云岚古镇几点开放？",
+      "answer": "云岚古镇开放时间为 09:00-21:00。"
+    },
+    {
+      "question": "半日游从哪里开始比较好？",
+      "answer": "建议从南门牌坊开始，顺路游览古桥、茶坊小巷、河畔灯巷和听雨戏台。"
+    },
+    {
+      "question": "适合亲子游吗？",
+      "answer": "适合。亲子轻松路线会减少折返，并优先安排茶坊体验和戏台休息。"
+    },
+    {
+      "question": "哪里适合傍晚拍照？",
+      "answer": "河畔灯巷适合傍晚拍照，灯笼、河面和白墙黛瓦会形成层次。"
+    }
+  ]
+}
