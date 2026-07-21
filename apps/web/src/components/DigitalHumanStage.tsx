@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { useXfyunVirtualHuman } from '../hooks/useXfyunVirtualHuman';
+import { QUALITY_PROFILES } from '../lab/lip-sync/performance/qualityController';
+import { disposeObject3D } from '../lib/three/disposeObject3D';
 import type { SpeechDriver } from '../types/virtualHuman';
 
 const DIGITAL_HUMAN_MODEL_URL = '/models/Thanh.glb';
@@ -56,7 +58,7 @@ export function DigitalHumanStage({
     }
 
     let disposed = false;
-    let frameId = 0;
+    let frameId: number | null = null;
     let mixer: THREE.AnimationMixer | null = null;
     let modelRoot: THREE.Object3D | null = null;
     let modelBaseY = 0;
@@ -70,10 +72,11 @@ export function DigitalHumanStage({
 
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
-      alpha: true,
-      preserveDrawingBuffer: true
+      alpha: true
     });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(
+      Math.min(window.devicePixelRatio || 1, QUALITY_PROFILES.medium.pixelRatioCap)
+    );
     renderer.setSize(host.clientWidth, host.clientHeight, false);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -161,7 +164,30 @@ export function DigitalHumanStage({
       renderer.setSize(width, height, false);
     }
 
+    function scheduleFrame() {
+      if (disposed || document.hidden || frameId !== null) {
+        return;
+      }
+
+      frameId = requestAnimationFrame(render);
+    }
+
+    function stopFrameLoop() {
+      if (frameId === null) {
+        return;
+      }
+
+      cancelAnimationFrame(frameId);
+      frameId = null;
+    }
+
     function render() {
+      frameId = null;
+
+      if (disposed || document.hidden) {
+        return;
+      }
+
       const delta = clock.getDelta();
       const elapsed = clock.getElapsedTime();
       mixer?.update(delta);
@@ -174,23 +200,35 @@ export function DigitalHumanStage({
 
       halo.rotation.z = elapsed * 0.16;
       renderer.render(scene, camera);
-      frameId = requestAnimationFrame(render);
+      scheduleFrame();
+    }
+
+    function handleVisibilityChange() {
+      if (document.hidden) {
+        stopFrameLoop();
+        return;
+      }
+
+      scheduleFrame();
     }
 
     const resizeObserver = new ResizeObserver(resize);
     resizeObserver.observe(stageHost);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     resize();
     render();
 
     return () => {
       disposed = true;
-      cancelAnimationFrame(frameId);
+      stopFrameLoop();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       resizeObserver.disconnect();
       mixer?.stopAllAction();
-      renderer.dispose();
       if (renderer.domElement.parentElement === host) {
         host.removeChild(renderer.domElement);
       }
+      disposeObject3D(scene);
+      renderer.dispose();
     };
   }, []);
 
