@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { AudioAnalysisFrame } from '../audio/audioSource';
-import { LipSyncRenderer } from '../three/LipSyncRenderer';
+import { LipSyncRenderer, type LipSyncDebugFrame } from '../three/LipSyncRenderer';
 import { DEFAULT_PERFORMANCE_SNAPSHOT, useLipSyncLabStore } from '../store/useLipSyncLabStore';
 
 const DEFAULT_MODEL_URL = '/models/Thanh.glb';
@@ -15,11 +15,13 @@ const SILENT_AUDIO_FRAME: AudioAnalysisFrame = {
 type LipSyncStageProps = {
   modelUrl?: string;
   getAudioFrame?: () => AudioAnalysisFrame;
+  onDebugFrame?: (frame: LipSyncDebugFrame) => void;
 };
 
 export function LipSyncStage({
   modelUrl = DEFAULT_MODEL_URL,
-  getAudioFrame = () => SILENT_AUDIO_FRAME
+  getAudioFrame = () => SILENT_AUDIO_FRAME,
+  onDebugFrame
 }: LipSyncStageProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const rendererRef = useRef<LipSyncRenderer | null>(null);
@@ -39,6 +41,7 @@ export function LipSyncStage({
       getConfig: () => useLipSyncLabStore.getState().config,
       getQualityTier: () => useLipSyncLabStore.getState().qualityTier,
       onMetrics: (metrics) => useLipSyncLabStore.getState().setMetrics(metrics),
+      onDebugFrame,
       onReady: () => setStatus('ready'),
       onError: () => {
         useLipSyncLabStore.getState().setMetrics(DEFAULT_PERFORMANCE_SNAPSHOT);
@@ -56,7 +59,7 @@ export function LipSyncStage({
       renderer.dispose();
       rendererRef.current = null;
     };
-  }, [getAudioFrame, modelUrl]);
+  }, [getAudioFrame, modelUrl, onDebugFrame]);
 
   return (
     <section className="lip-sync-stage" aria-label="本地 3D 数字人口型预览">

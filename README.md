@@ -53,6 +53,14 @@ LLM_API_KEY=replace-with-your-api-key
 LLM_MODEL=gpt-4o-mini
 ```
 
+## Phase 3A Lip Sync Lab
+
+- Lab URL: `http://localhost:5173/lab/lip-sync`
+- Isolated test URL: `http://127.0.0.1:5174/lab/lip-sync?phase3a-debug=1`
+- Smoke check: `npm --workspace apps/web run test -- phase3a.browser.test.js`
+- Benchmark mode: set `PHASE3A_BROWSER_MODE=bench`, then run the same test command.
+- Performance report: `docs/performance/phase-3a-test-procedure.md`
+
 ## 文档
 
 - 设计规格：`docs/superpowers/specs/2026-07-19-yunlan-ancient-town-digital-guide-design.md`

@@ -15,8 +15,16 @@ export type LipSyncRendererOptions = {
   getConfig: () => MouthSignalConfig;
   getQualityTier: () => RenderQualityTier;
   onMetrics: (metrics: PerformanceSnapshot) => void;
+  onDebugFrame?: (frame: LipSyncDebugFrame) => void;
   onReady: () => void;
   onError: (message: string) => void;
+};
+
+export type LipSyncDebugFrame = {
+  currentMouthOpen: number;
+  audioStartTimestamp: number | null;
+  mouthResponseTimestamp: number | null;
+  metrics: PerformanceSnapshot;
 };
 
 const MODEL_HEIGHT = 1.82;
@@ -50,6 +58,8 @@ export class LipSyncRenderer {
   private wasPlaying = false;
   private mouthController: MouthMorphController | null = null;
   private qualityTier: RenderQualityTier;
+  private audioStartTimestamp: number | null = null;
+  private mouthResponseTimestamp: number | null = null;
 
   constructor(private readonly options: LipSyncRendererOptions) {
     this.qualityTier = options.getQualityTier();
@@ -164,24 +174,39 @@ export class LipSyncRenderer {
     }
 
     const frame = this.options.getAudioFrame();
+    const config = this.options.getConfig();
     const deltaMs = this.lastTimestamp > 0 ? timestamp - this.lastTimestamp : 16.7;
     this.lastTimestamp = timestamp;
 
     if (frame.playing && !this.wasPlaying) {
+      this.audioStartTimestamp = null;
+      this.mouthResponseTimestamp = null;
+    }
+
+    if (frame.playing && frame.rms > config.threshold && this.audioStartTimestamp === null) {
       this.monitor.markAudioStart(timestamp);
+      this.audioStartTimestamp = timestamp;
     }
 
     this.wasPlaying = frame.playing;
-    this.mouthOpen = nextMouthSignal(this.mouthOpen, frame.rms, deltaMs, this.options.getConfig());
+    this.mouthOpen = nextMouthSignal(this.mouthOpen, frame.rms, deltaMs, config);
     this.mouthController?.setOpen(this.mouthOpen);
 
-    if (this.mouthOpen > RESPONSE_THRESHOLD) {
+    if (this.mouthOpen > RESPONSE_THRESHOLD && this.mouthResponseTimestamp === null) {
       this.monitor.markMouthResponse(timestamp);
+      this.mouthResponseTimestamp = timestamp;
     }
 
     this.monitor.recordFrame(timestamp);
     this.monitor.setRendererInfo(this.renderer.info);
-    this.options.onMetrics(this.monitor.snapshot());
+    const metrics = this.monitor.snapshot();
+    this.options.onMetrics(metrics);
+    this.options.onDebugFrame?.({
+      currentMouthOpen: this.mouthOpen,
+      audioStartTimestamp: this.audioStartTimestamp,
+      mouthResponseTimestamp: this.mouthResponseTimestamp,
+      metrics
+    });
     this.renderer.render(this.scene, this.camera);
     this.scheduleFrame();
   }
@@ -190,6 +215,8 @@ export class LipSyncRenderer {
     if (document.hidden) {
       window.cancelAnimationFrame(this.frameId);
       this.mouthController?.reset();
+      this.audioStartTimestamp = null;
+      this.mouthResponseTimestamp = null;
       return;
     }
 
