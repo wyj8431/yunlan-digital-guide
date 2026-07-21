@@ -9,6 +9,18 @@ export type MouthSignalConfig = {
 export type LabAudioSource =
   { kind: 'preset' } | { kind: 'file'; file: File } | { kind: 'url'; url: string };
 
+export type RenderQualityTier = 'low' | 'medium' | 'high';
+
+export type PerformanceSnapshot = {
+  averageFps: number;
+  p95FrameMs: number;
+  mouthResponseMs: number | null;
+  drawCalls: number;
+  triangles: number;
+  heapMb: number | null;
+  qualityTier: RenderQualityTier;
+};
+
 export const DEFAULT_MOUTH_SIGNAL_CONFIG: MouthSignalConfig = {
   threshold: 0.08,
   sensitivity: 2,
