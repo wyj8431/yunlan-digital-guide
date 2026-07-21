@@ -257,7 +257,7 @@ async function assertRouteCleanup(page) {
 
 async function smokeCheck(page) {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto(TARGET_URL, { waitUntil: 'networkidle' });
+  await page.goto(TARGET_URL, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.lip-sync-stage canvas');
 
   await ensureCanvasVariance(page);
@@ -288,7 +288,7 @@ async function smokeCheck(page) {
   await assertStageStableDuringSliderChanges(page);
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.lip-sync-stage canvas');
   await assertLayout(page, 'mobile');
 
@@ -297,7 +297,7 @@ async function smokeCheck(page) {
 
 async function benchmarkSession(page, label, viewport, durationMs) {
   await page.setViewportSize(viewport);
-  await page.goto(TARGET_URL, { waitUntil: 'networkidle' });
+  await page.goto(TARGET_URL, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.lip-sync-stage canvas');
   await clickPlay(page);
 
