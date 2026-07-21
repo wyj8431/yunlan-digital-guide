@@ -9,6 +9,7 @@ export default tseslint.config(
       '**/dist/**',
       '**/coverage/**',
       '**/node_modules/**',
+      'apps/web/public/libs/**',
       '.superpowers/**',
       '.worktrees/**'
     ]

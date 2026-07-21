@@ -1,6 +1,10 @@
 import request from 'supertest';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../src/app';
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe('server api', () => {
   it('returns health status', async () => {
@@ -36,6 +40,48 @@ describe('server api', () => {
       .expect(400)
       .expect(({ body }) => {
         expect(body).toEqual({ code: 'EMPTY_MESSAGE', message: '请输入想咨询的导游问题。' });
+      });
+  });
+
+  it('returns virtual human fallback config when xfyun is not enabled', async () => {
+    vi.stubEnv('XFYUN_VIRTUAL_HUMAN_ENABLED', 'false');
+    const app = createApp();
+
+    await request(app.callback())
+      .get('/api/virtual-human/config')
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({
+          enabled: false,
+          provider: 'three-fallback'
+        });
+      });
+  });
+
+  it('returns a portrait full-body config when xfyun is enabled', async () => {
+    vi.stubEnv('XFYUN_VIRTUAL_HUMAN_ENABLED', 'true');
+    vi.stubEnv('XFYUN_VIRTUAL_HUMAN_APP_ID', 'app-id');
+    vi.stubEnv('XFYUN_VIRTUAL_HUMAN_API_KEY', 'api-key');
+    vi.stubEnv('XFYUN_VIRTUAL_HUMAN_API_SECRET', 'api-secret');
+    vi.stubEnv('XFYUN_VIRTUAL_HUMAN_SERVICE_ID', 'service-id');
+    vi.stubEnv('XFYUN_VIRTUAL_HUMAN_AVATAR_ID', 'avatar-id');
+    const app = createApp();
+
+    await request(app.callback())
+      .get('/api/virtual-human/config')
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({
+          enabled: true,
+          provider: 'xfyun-vms',
+          serviceId: 'service-id',
+          startConfig: {
+            avatarId: 'avatar-id',
+            width: 720,
+            height: 1280,
+            isSsl: true
+          }
+        });
       });
   });
 });

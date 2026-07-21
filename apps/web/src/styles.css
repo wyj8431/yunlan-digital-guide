@@ -27,7 +27,9 @@ input {
 .app-shell {
   display: grid;
   grid-template-columns: minmax(360px, 43vw) minmax(420px, 1fr);
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
+  overflow: hidden;
   background:
     linear-gradient(90deg, rgba(238, 243, 237, 0.98), rgba(224, 235, 225, 0.92)),
     url('https://images.unsplash.com/photo-1549880338-65ddcdfd017b?auto=format&fit=crop&w=1600&q=80');
@@ -46,12 +48,18 @@ input {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  min-height: 100vh;
+  height: 100%;
+  min-height: 0;
   padding: 32px;
   overflow-y: auto;
+  overscroll-behavior: contain;
   border-right: 1px solid rgba(42, 70, 56, 0.14);
   background: rgba(246, 249, 245, 0.84);
   backdrop-filter: blur(12px);
+}
+
+.guide-panel > * {
+  flex-shrink: 0;
 }
 
 .eyebrow {
@@ -204,44 +212,286 @@ h1 {
 }
 
 .digital-human-panel {
+  position: relative;
   min-width: 0;
-  min-height: 100vh;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(36, 54, 45, 0.1), rgba(36, 54, 45, 0.34)),
+    url('https://images.unsplash.com/photo-1508804185872-d7badad00f7d?auto=format&fit=crop&w=1400&q=80');
+  background-position: center;
+  background-size: cover;
 }
 
 .digital-human-stage {
   position: relative;
-  min-height: 100vh;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(232, 220, 199, 0.34), transparent 28%),
+    radial-gradient(circle at 62% 50%, rgba(192, 142, 58, 0.2), transparent 34%),
+    radial-gradient(circle at 24% 30%, rgba(139, 157, 131, 0.28), transparent 36%),
+    linear-gradient(130deg, rgba(96, 108, 56, 0.34), rgba(36, 54, 45, 0.7));
 }
 
-.three-host {
+.digital-human-stage::before {
   position: absolute;
+  z-index: 0;
   inset: 0;
+  content: '';
+  background:
+    linear-gradient(rgba(232, 220, 199, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(232, 220, 199, 0.1) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.7), transparent 84%);
+  pointer-events: none;
+}
+
+.digital-human-stage::after {
+  position: absolute;
+  z-index: 0;
+  right: 10%;
+  bottom: 0;
+  left: 10%;
+  height: 30%;
+  border-radius: 999px 999px 0 0;
+  background: rgba(232, 220, 199, 0.16);
+  filter: blur(22px);
+  content: '';
+  pointer-events: none;
+}
+
+.model-stage {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+}
+
+.model-stage::before {
+  position: absolute;
+  width: min(66vw, 680px);
+  aspect-ratio: 1;
+  border: 1px solid rgba(232, 220, 199, 0.28);
+  border-radius: 50%;
+  box-shadow:
+    inset 0 0 80px rgba(232, 220, 199, 0.14),
+    0 0 90px rgba(192, 142, 58, 0.16);
+  content: '';
+  pointer-events: none;
+  animation: model-orbit 8s linear infinite;
+}
+
+.model-host {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 520px;
+  background:
+    radial-gradient(ellipse at 50% 82%, rgba(36, 54, 45, 0.44), transparent 25%),
+    radial-gradient(circle at 50% 46%, rgba(232, 220, 199, 0.16), transparent 36%);
+}
+
+.xfyun-stream-host {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+
+.xfyun-stream-host canvas,
+.xfyun-stream-host video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.model-host canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.model-host::after {
+  position: absolute;
+  inset: 0 12%;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(232, 220, 199, 0.32) 48%,
+    transparent 58%
+  );
+  content: '';
+  opacity: 0.34;
+  transform: translateY(-100%);
+  pointer-events: none;
+  animation: model-scan 4.2s ease-in-out infinite;
+}
+
+.model-status {
+  position: absolute;
+  right: clamp(24px, 7vw, 76px);
+  bottom: clamp(28px, 6vh, 64px);
+  z-index: 2;
+  display: grid;
+  gap: 4px;
+  border: 1px solid rgba(232, 220, 199, 0.24);
+  border-radius: 8px;
+  background: rgba(36, 54, 45, 0.64);
+  padding: 10px 12px;
+  color: #e8dcc7;
+  box-shadow: 0 18px 42px rgba(36, 54, 45, 0.24);
+  backdrop-filter: blur(14px);
+}
+
+.model-status span {
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.model-status strong {
+  font-size: 1rem;
+}
+
+.model-status small {
+  max-width: 22ch;
+  color: rgba(232, 220, 199, 0.78);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.is-speaking .model-host {
+  background:
+    radial-gradient(ellipse at 50% 82%, rgba(36, 54, 45, 0.48), transparent 25%),
+    radial-gradient(circle at 50% 46%, rgba(192, 142, 58, 0.22), transparent 36%);
+}
+
+.has-xfyun-human .xfyun-stream-host {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.has-xfyun-human .model-host {
+  opacity: 0;
+}
+
+@keyframes model-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes model-scan {
+  0%,
+  32% {
+    transform: translateY(-100%);
+  }
+
+  58%,
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+.guide-identity {
+  position: absolute;
+  top: 28px;
+  left: 28px;
+  z-index: 2;
+  display: grid;
+  gap: 3px;
+  max-width: min(280px, calc(100% - 56px));
+  border: 1px solid rgba(96, 108, 56, 0.2);
+  border-radius: 18px;
+  background: rgba(232, 220, 199, 0.72);
+  padding: 12px 14px;
+  color: #24362d;
+  box-shadow: 0 18px 46px rgba(36, 54, 45, 0.16);
+  backdrop-filter: blur(14px);
+}
+
+.guide-identity span {
+  color: #606c38;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.guide-identity strong {
+  font-size: 1.02rem;
 }
 
 .stage-caption {
   position: absolute;
   left: 24px;
   bottom: 24px;
-  border: 1px solid rgba(42, 70, 56, 0.18);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.72);
-  padding: 10px 12px;
-  color: #315548;
+  z-index: 2;
+  max-width: min(320px, calc(100% - 48px));
+  border: 1px solid rgba(96, 108, 56, 0.24);
+  border-radius: 18px;
+  background: rgba(232, 220, 199, 0.78);
+  padding: 12px 14px;
+  color: #24362d;
+  box-shadow: 0 18px 52px rgba(36, 54, 45, 0.18);
+  backdrop-filter: blur(14px);
 }
 
 @media (max-width: 860px) {
   .app-shell {
     grid-template-columns: 1fr;
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
   }
 
   .guide-panel {
+    height: auto;
     min-height: auto;
+    overflow-y: visible;
     border-right: 0;
     padding: 24px;
   }
 
   .digital-human-panel,
   .digital-human-stage {
-    min-height: 56vh;
+    height: auto;
+    min-height: 68vh;
+  }
+
+  .model-stage {
+    inset: 0;
+  }
+
+  .model-stage::before {
+    width: min(92vw, 420px);
+  }
+
+  .model-host {
+    min-height: 68vh;
+  }
+
+  .model-status {
+    right: 18px;
+    bottom: 76px;
+    max-width: calc(100% - 36px);
+  }
+
+  .guide-identity {
+    top: 18px;
+    left: 18px;
+    max-width: calc(100% - 36px);
+  }
+
+  .stage-caption {
+    right: 18px;
+    bottom: 18px;
+    left: 18px;
+    max-width: none;
   }
 }

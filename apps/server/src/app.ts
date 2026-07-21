@@ -4,12 +4,14 @@ import Koa from 'koa';
 import bodyParser from 'koa-bodyparser';
 import { createGuideRouter } from './modules/guide/guide.routes.js';
 import { createScenicRouter } from './modules/scenic/scenic.routes.js';
+import { createVirtualHumanRouter } from './modules/virtual-human/virtual-human.routes.js';
 
 export function createApp(): Koa {
   const app = new Koa();
   const router = new Router();
   const guideRouter = createGuideRouter();
   const scenicRouter = createScenicRouter();
+  const virtualHumanRouter = createVirtualHumanRouter();
 
   router.get('/api/health', (ctx) => {
     ctx.body = { ok: true, service: 'yunlan-guide-api' };
@@ -23,6 +25,8 @@ export function createApp(): Koa {
   app.use(scenicRouter.allowedMethods());
   app.use(guideRouter.routes());
   app.use(guideRouter.allowedMethods());
+  app.use(virtualHumanRouter.routes());
+  app.use(virtualHumanRouter.allowedMethods());
 
   return app;
 }

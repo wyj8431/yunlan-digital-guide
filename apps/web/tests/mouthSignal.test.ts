@@ -22,10 +22,11 @@ describe('nextMouthSignal', () => {
   });
 
   it('opens on attack and releases gradually', () => {
-    const opened = nextMouthSignal(0, 0.5, 16, DEFAULT_MOUTH_SIGNAL_CONFIG);
-    const released = nextMouthSignal(opened, 0, 16, DEFAULT_MOUTH_SIGNAL_CONFIG);
+    const opened = nextMouthSignal(0, 0.5, 32, DEFAULT_MOUTH_SIGNAL_CONFIG);
+    const released = nextMouthSignal(opened, 0, 32, DEFAULT_MOUTH_SIGNAL_CONFIG);
 
     expect(opened).toBeGreaterThan(0);
+    expect(opened).toBeLessThan(0.84);
     expect(released).toBeGreaterThan(0);
     expect(released).toBeLessThan(opened);
   });
