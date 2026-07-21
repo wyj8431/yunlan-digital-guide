@@ -6,6 +6,9 @@ export type MouthSignalConfig = {
   releaseMs: number;
 };
 
+export type LabAudioSource =
+  { kind: 'preset' } | { kind: 'file'; file: File } | { kind: 'url'; url: string };
+
 export const DEFAULT_MOUTH_SIGNAL_CONFIG: MouthSignalConfig = {
   threshold: 0.08,
   sensitivity: 2,
