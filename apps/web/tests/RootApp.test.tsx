@@ -6,6 +6,10 @@ vi.mock('../src/App', () => ({
   App: () => <div>guide-app</div>
 }));
 
+vi.mock('../src/lab/lip-sync/components/LipSyncStage', () => ({
+  LipSyncStage: () => <section aria-label="本地 3D 数字人口型预览" />
+}));
+
 describe('RootApp', () => {
   afterEach(() => {
     cleanup();
