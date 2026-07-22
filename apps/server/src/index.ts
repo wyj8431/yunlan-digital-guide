@@ -1,9 +1,14 @@
+import { createServer } from 'node:http';
 import { createApp } from './app.js';
 import { readEnv } from './config/env.js';
+import { attachGuideWebSocketServer } from './modules/guide/guide.websocket.js';
 
 const env = readEnv();
 const app = createApp();
+const server = createServer(app.callback());
 
-app.listen(env.port, () => {
+attachGuideWebSocketServer(server);
+
+server.listen(env.port, () => {
   console.log(`Yunlan guide API listening on http://localhost:${env.port}`);
 });

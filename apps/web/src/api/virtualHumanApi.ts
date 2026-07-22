@@ -4,7 +4,14 @@ async function readJson<T>(response: Response): Promise<T> {
   const body = (await response.json()) as unknown;
 
   if (!response.ok) {
-    throw new Error('虚拟人配置加载失败');
+    const message =
+      typeof body === 'object' &&
+      body !== null &&
+      'message' in body &&
+      typeof body.message === 'string'
+        ? body.message
+        : '虚拟人配置加载失败';
+    throw new Error(message);
   }
 
   return body as T;

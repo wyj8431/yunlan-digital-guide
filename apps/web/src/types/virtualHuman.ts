@@ -9,10 +9,15 @@ export type VirtualHumanConfig =
       provider: 'xfyun-vms';
       serviceId: string;
       sdkScriptUrl: string;
+      signedUrl: string;
+      actions: Array<{
+        id: string;
+        label: string;
+      }>;
       startConfig: {
         appId: string;
-        apiKey: string;
-        apiSecret: string;
+        apiKey?: string;
+        apiSecret?: string;
         avatarId: string;
         width: 720;
         height: 1280;

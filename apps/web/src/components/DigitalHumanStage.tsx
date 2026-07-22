@@ -1,9 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
+import { ChevronDown, PersonStanding, RefreshCw } from 'lucide-react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { useXfyunVirtualHuman } from '../hooks/useXfyunVirtualHuman';
 import { QUALITY_PROFILES } from '../lab/lip-sync/performance/qualityController';
+import {
+  createMouthMorphController,
+  type MouthMorphController
+} from '../lab/lip-sync/three/mouthMorphController';
 import { disposeObject3D } from '../lib/three/disposeObject3D';
+import { GUIDE_SPEECH_PLAYBACK_EVENT, isGuideSpeechPlaybackEvent } from '../lib/guideSpeechSync';
+import type { GuideSpeechTimeline } from '../types/guide';
 import type { SpeechDriver } from '../types/virtualHuman';
 
 const DIGITAL_HUMAN_MODEL_URL = '/models/Thanh.glb';
@@ -11,10 +18,26 @@ const XFYUN_STREAM_DOM_ID = 'xfyun-virtual-human-stream';
 const GUIDE_BASE_ROTATION_Y = 0.16;
 const GUIDE_FOOT_Y = -0.98;
 const GUIDE_STAGE_HEIGHT = 1.82;
+const FALLBACK_ACTIONS = [
+  { id: 'A_LH_introduced_O', label: '介绍' },
+  { id: 'A_RLH_introduced_O', label: '双手介绍' },
+  { id: 'A_RH_introduced_O', label: '右手介绍' },
+  { id: 'A_RH_introduced1_O', label: '右手介绍2' },
+  { id: 'A_RLH_welcome_O', label: '欢迎' },
+  { id: 'A_RLH_emphasize_O', label: '双手强调' },
+  { id: 'A_RH_emphasize_O', label: '右手强调' },
+  { id: 'A_RH_emphasize2_O', label: '右手强调2' },
+  { id: 'A_RH_good_O', label: '夸奖' },
+  { id: 'A_RH_encourage_O', label: '加油' },
+  { id: 'A_RH_hello_O', label: '打招呼' },
+  { id: 'A_RH_bye_O', label: '再见' },
+  { id: 'A_H_listen_C', label: '倾听点头' }
+];
 
 type DigitalHumanStageProps = {
   speaking: boolean;
   answerText?: string;
+  speechTimeline?: GuideSpeechTimeline | null;
   onSpeechDriverChange?: (driver: SpeechDriver) => void;
 };
 
@@ -31,9 +54,31 @@ function fitModelToStage(model: THREE.Object3D) {
   model.position.set(-center.x * scale, GUIDE_FOOT_Y - bounds.min.y * scale, -center.z * scale);
 }
 
+export function getTimelineMouthOpen(
+  timeline: GuideSpeechTimeline | null,
+  elapsedMs: number
+): number {
+  if (!timeline || elapsedMs < 0 || elapsedMs > timeline.durationMs + 120) {
+    return 0;
+  }
+
+  const cue = timeline.visemes.find((item) => elapsedMs >= item.startMs && elapsedMs <= item.endMs);
+
+  if (!cue) {
+    return 0;
+  }
+
+  const cueDurationMs = Math.max(1, cue.endMs - cue.startMs);
+  const progress = Math.min(1, Math.max(0, (elapsedMs - cue.startMs) / cueDurationMs));
+  const ease = Math.sin(progress * Math.PI);
+
+  return cue.mouthOpen * (0.55 + ease * 0.45);
+}
+
 export function DigitalHumanStage({
   speaking,
   answerText,
+  speechTimeline,
   onSpeechDriverChange
 }: DigitalHumanStageProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -43,12 +88,56 @@ export function DigitalHumanStage({
     onSpeechDriverChange
   });
   const effectiveSpeaking = virtualHuman.speaking || speaking;
+  const xfyunPending = virtualHuman.status === 'loading';
+  const xfyunUnavailable = virtualHuman.status === 'error' && virtualHuman.config?.enabled;
   const speakingRef = useRef(effectiveSpeaking);
+  const speechTimelineRef = useRef<GuideSpeechTimeline | null>(null);
+  const speechTimelineStartedAtRef = useRef<number | null>(null);
   const [modelState, setModelState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const [selectedActionId, setSelectedActionId] = useState(FALLBACK_ACTIONS[0].id);
+  const [actionMessage, setActionMessage] = useState('');
+  const actionOptions =
+    virtualHuman.config?.enabled && virtualHuman.config.actions.length > 0
+      ? virtualHuman.config.actions
+      : FALLBACK_ACTIONS;
+  const selectedAction =
+    actionOptions.find((action) => action.id === selectedActionId) ?? actionOptions[0];
 
   useEffect(() => {
     speakingRef.current = effectiveSpeaking;
   }, [effectiveSpeaking]);
+
+  useEffect(() => {
+    speechTimelineRef.current = speechTimeline ?? null;
+    speechTimelineStartedAtRef.current =
+      speechTimeline && typeof performance !== 'undefined' ? performance.now() : null;
+  }, [speechTimeline]);
+
+  useEffect(() => {
+    const handlePlayback = (event: Event) => {
+      if (!isGuideSpeechPlaybackEvent(event)) {
+        return;
+      }
+
+      const timeline = speechTimelineRef.current;
+
+      if (!timeline || timeline.text !== event.detail.text || typeof performance === 'undefined') {
+        return;
+      }
+
+      if (event.detail.phase === 'start') {
+        speechTimelineStartedAtRef.current = performance.now();
+      } else {
+        speechTimelineStartedAtRef.current = null;
+      }
+    };
+
+    window.addEventListener(GUIDE_SPEECH_PLAYBACK_EVENT, handlePlayback);
+    return () => {
+      window.removeEventListener(GUIDE_SPEECH_PLAYBACK_EVENT, handlePlayback);
+    };
+  }, []);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -61,6 +150,7 @@ export function DigitalHumanStage({
     let frameId: number | null = null;
     let mixer: THREE.AnimationMixer | null = null;
     let modelRoot: THREE.Object3D | null = null;
+    let mouthController: MouthMorphController | null = null;
     let modelBaseY = 0;
 
     const scene = new THREE.Scene();
@@ -137,6 +227,7 @@ export function DigitalHumanStage({
 
         scene.add(model);
         modelRoot = model;
+        mouthController = createMouthMorphController(model);
 
         if (gltf.animations.length > 0) {
           mixer = new THREE.AnimationMixer(model);
@@ -193,7 +284,21 @@ export function DigitalHumanStage({
       mixer?.update(delta);
 
       if (modelRoot) {
-        const speakingMotion = speakingRef.current ? Math.sin(elapsed * 7.5) * 0.018 : 0;
+        const timeline = speechTimelineRef.current;
+        const timelineStartedAt = speechTimelineStartedAtRef.current;
+        const timelineElapsedMs =
+          timelineStartedAt === null || typeof performance === 'undefined'
+            ? 0
+            : performance.now() - timelineStartedAt;
+        const timelineMouthOpen = getTimelineMouthOpen(timeline, timelineElapsedMs);
+        const speakingMotion =
+          timelineMouthOpen > 0
+            ? timelineMouthOpen * 0.026
+            : speakingRef.current
+              ? Math.sin(elapsed * 7.5) * 0.018
+              : 0;
+
+        mouthController?.setOpen(timelineMouthOpen);
         modelRoot.rotation.y = GUIDE_BASE_ROTATION_Y + Math.sin(elapsed * 0.52) * 0.045;
         modelRoot.position.y = modelBaseY + Math.sin(elapsed * 1.15) * 0.006 + speakingMotion;
       }
@@ -223,6 +328,7 @@ export function DigitalHumanStage({
       stopFrameLoop();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       resizeObserver.disconnect();
+      mouthController?.reset();
       mixer?.stopAllAction();
       if (renderer.domElement.parentElement === host) {
         host.removeChild(renderer.domElement);
@@ -232,10 +338,35 @@ export function DigitalHumanStage({
     };
   }, []);
 
+  async function handleActionSelect(actionId: string) {
+    const action = actionOptions.find((item) => item.id === actionId);
+    setSelectedActionId(actionId);
+    setActionsOpen(false);
+    setActionMessage('');
+
+    if (!virtualHuman.active) {
+      setActionMessage('讯飞虚拟人接入后可切换动作。');
+      return;
+    }
+
+    try {
+      await virtualHuman.triggerAction(actionId);
+      setActionMessage(action ? `${action.label}动作已切换` : '动作已切换');
+    } catch {
+      setActionMessage('当前数字人暂不支持该动作。');
+    }
+  }
+
   return (
     <div
       className={`digital-human-stage ${effectiveSpeaking ? 'is-speaking' : 'is-idle'} ${
-        virtualHuman.active ? 'has-xfyun-human' : 'has-local-human'
+        virtualHuman.active
+          ? 'has-xfyun-human'
+          : xfyunPending
+            ? 'is-xfyun-connecting'
+            : xfyunUnavailable
+              ? 'is-xfyun-unavailable'
+              : 'has-local-human'
       }`}
       aria-label="云岚古镇年轻数字导游舞台"
     >
@@ -255,15 +386,69 @@ export function DigitalHumanStage({
           <span>
             {virtualHuman.active
               ? '讯飞虚拟人'
-              : modelState === 'ready'
-                ? '3D 数字人模型'
-                : modelState === 'error'
-                  ? '模型加载失败'
-                  : '正在加载3D数字人'}
+              : xfyunPending || xfyunUnavailable
+                ? '讯飞虚拟人'
+                : modelState === 'ready'
+                  ? '3D 数字人模型'
+                  : modelState === 'error'
+                    ? '模型加载失败'
+                    : '正在加载3D数字人'}
           </span>
-          <strong>{effectiveSpeaking ? '讲解中' : '待机中'}</strong>
+          <strong>
+            {xfyunPending
+              ? '接入中'
+              : xfyunUnavailable
+                ? '接入异常'
+                : effectiveSpeaking
+                  ? '讲解中'
+                  : '待机中'}
+          </strong>
           <small>{virtualHuman.message}</small>
+          {xfyunUnavailable ? (
+            <button
+              type="button"
+              className="xfyun-retry-button"
+              onClick={virtualHuman.retry}
+              aria-label="重新接入讯飞虚拟人"
+            >
+              <RefreshCw size={14} aria-hidden="true" />
+              <span>重新接入讯飞</span>
+            </button>
+          ) : null}
         </div>
+      </div>
+
+      <div className="avatar-action-switcher">
+        <button
+          type="button"
+          className="avatar-action-trigger"
+          aria-expanded={actionsOpen}
+          aria-controls="avatar-action-menu"
+          disabled={virtualHuman.acting}
+          onClick={() => setActionsOpen((open) => !open)}
+        >
+          <PersonStanding size={18} aria-hidden="true" />
+          <span>{virtualHuman.acting ? '切换中' : selectedAction.label}</span>
+          <ChevronDown size={16} aria-hidden="true" />
+        </button>
+
+        {actionsOpen ? (
+          <div id="avatar-action-menu" className="avatar-action-menu" role="menu">
+            {actionOptions.map((action) => (
+              <button
+                key={action.id}
+                type="button"
+                className={action.id === selectedAction.id ? 'is-selected' : ''}
+                role="menuitem"
+                onClick={() => void handleActionSelect(action.id)}
+              >
+                {action.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {actionMessage ? <small>{actionMessage}</small> : null}
       </div>
 
       <div className="stage-caption">

@@ -1,6 +1,7 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { DigitalHumanStage } from '../src/components/DigitalHumanStage';
+import { DigitalHumanStage, getTimelineMouthOpen } from '../src/components/DigitalHumanStage';
+import type { GuideSpeechTimeline } from '../src/types/guide';
 
 const testState = vi.hoisted(() => ({
   rendererOptions: [] as Array<Record<string, unknown>>,
@@ -186,7 +187,7 @@ describe('DigitalHumanStage', () => {
         json: async () => ({
           enabled: false,
           provider: 'three-fallback',
-          reason: '测试环境使用本地3D数字人'
+          reason: '测试环境使用本地 3D 数字人'
         })
       })
     );
@@ -235,17 +236,33 @@ describe('DigitalHumanStage', () => {
 
     expect(screen.getByLabelText('云岚古镇年轻数字导游舞台')).toBeInTheDocument();
     expect(await screen.findByText('3D 数字人模型')).toBeInTheDocument();
-    expect(await screen.findByText('测试环境使用本地3D数字人')).toBeInTheDocument();
+    expect(await screen.findByText('测试环境使用本地 3D 数字人')).toBeInTheDocument();
     expect(screen.getByText('年轻导游')).toBeInTheDocument();
-    expect(screen.getByText('云岚古镇数字导游')).toBeInTheDocument();
+    expect(screen.getByText('云岚古镇')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '介绍' })).toBeInTheDocument();
     expect(document.querySelector('canvas')).toBeInTheDocument();
-    expect(document.querySelector('svg')).not.toBeInTheDocument();
   });
 
   it('announces narration state while speaking', () => {
     render(<DigitalHumanStage speaking />);
 
     expect(screen.getByText('正在讲解云岚古镇')).toBeInTheDocument();
+  });
+
+  it('reads mouth openness from a speech timeline cue', () => {
+    const timeline: GuideSpeechTimeline = {
+      text: '你好',
+      durationMs: 900,
+      source: 'estimated',
+      visemes: [
+        { startMs: 0, endMs: 200, viseme: 'aa', mouthOpen: 0.8 },
+        { startMs: 200, endMs: 320, viseme: 'mouth-closed', mouthOpen: 0 }
+      ]
+    };
+
+    expect(getTimelineMouthOpen(timeline, 100)).toBeGreaterThan(0.4);
+    expect(getTimelineMouthOpen(timeline, 260)).toBe(0);
+    expect(getTimelineMouthOpen(timeline, 1100)).toBe(0);
   });
 
   it('pauses the frame loop while hidden and resumes on visibility change', () => {

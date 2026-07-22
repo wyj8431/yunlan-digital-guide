@@ -1,0 +1,124 @@
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { QuestionInput } from '../src/components/QuestionInput';
+
+const VOICE_INPUT_LABEL = '\u8bed\u97f3\u8f93\u5165';
+const STOP_VOICE_INPUT_LABEL = '\u505c\u6b62\u8bed\u97f3\u8f93\u5165';
+const UNSUPPORTED_HINT =
+  '\u5f53\u524d\u6d4f\u89c8\u5668\u4e0d\u652f\u6301\u8bed\u97f3\u8f93\u5165\uff0c\u53ef\u4ee5\u76f4\u63a5\u6253\u5b57\u63d0\u95ee\u3002';
+const INTRO_QUESTION = '\u8bf7\u4ecb\u7ecd\u4e00\u4e0b\u53e4\u9547\u666f\u533a';
+const ROUTE_QUESTION = '\u5e2e\u6211\u89c4\u5212\u4e00\u6761\u8def\u7ebf';
+const TICKET_QUESTION = '\u95e8\u7968\u591a\u5c11\u94b1';
+
+let activeRecognition: MockSpeechRecognition | null = null;
+
+class MockSpeechRecognition {
+  lang = '';
+  continuous = false;
+  interimResults = false;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null = null;
+  onend: ((event: Event) => void) | null = null;
+  onerror: ((event: Event) => void) | null = null;
+  onnomatch: ((event: Event) => void) | null = null;
+  onspeechend: ((event: Event) => void) | null = null;
+  onaudioend: ((event: Event) => void) | null = null;
+  start = vi.fn(() => {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    activeRecognition = this;
+  });
+  stop = vi.fn(() => {
+    this.onend?.(new Event('end'));
+  });
+  abort = vi.fn();
+
+  emitResult(transcript: string, isFinal = true) {
+    const result = {
+      isFinal,
+      length: 1,
+      0: { transcript, confidence: 0.99 }
+    } as unknown as SpeechRecognitionResult;
+
+    const event = {
+      resultIndex: 0,
+      results: {
+        length: 1,
+        0: result
+      }
+    } as unknown as SpeechRecognitionEvent;
+
+    this.onresult?.(event);
+  }
+}
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  activeRecognition = null;
+});
+
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+  delete window.SpeechRecognition;
+  delete window.webkitSpeechRecognition;
+  activeRecognition = null;
+});
+
+describe('QuestionInput', () => {
+  it('submits recognized speech as a question when recognition ends', () => {
+    const onAsk = vi.fn();
+    window.SpeechRecognition = MockSpeechRecognition as unknown as typeof window.SpeechRecognition;
+
+    render(<QuestionInput disabled={false} onAsk={onAsk} />);
+
+    fireEvent.click(screen.getByRole('button', { name: VOICE_INPUT_LABEL }));
+    act(() => {
+      activeRecognition?.emitResult(INTRO_QUESTION);
+      activeRecognition?.onend?.(new Event('end'));
+    });
+
+    expect(onAsk).toHaveBeenCalledWith(INTRO_QUESTION);
+  });
+
+  it('auto-sends after a short silence even if the browser does not end recognition', () => {
+    const onAsk = vi.fn();
+    window.SpeechRecognition = MockSpeechRecognition as unknown as typeof window.SpeechRecognition;
+
+    render(<QuestionInput disabled={false} onAsk={onAsk} />);
+
+    fireEvent.click(screen.getByRole('button', { name: VOICE_INPUT_LABEL }));
+    act(() => {
+      activeRecognition?.emitResult(ROUTE_QUESTION);
+    });
+
+    expect(screen.getByDisplayValue(ROUTE_QUESTION)).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(1300);
+    });
+
+    expect(onAsk).toHaveBeenCalledWith(ROUTE_QUESTION);
+  });
+
+  it('submits the current transcript when the user taps stop', () => {
+    const onAsk = vi.fn();
+    window.SpeechRecognition = MockSpeechRecognition as unknown as typeof window.SpeechRecognition;
+
+    render(<QuestionInput disabled={false} onAsk={onAsk} />);
+
+    fireEvent.click(screen.getByRole('button', { name: VOICE_INPUT_LABEL }));
+    act(() => {
+      activeRecognition?.emitResult(TICKET_QUESTION, false);
+    });
+    fireEvent.click(screen.getByRole('button', { name: STOP_VOICE_INPUT_LABEL }));
+
+    expect(onAsk).toHaveBeenCalledWith(TICKET_QUESTION);
+  });
+
+  it('shows a helpful hint when speech recognition is unavailable', () => {
+    const onAsk = vi.fn();
+
+    render(<QuestionInput disabled={false} onAsk={onAsk} />);
+
+    expect(screen.getByText(UNSUPPORTED_HINT)).toBeInTheDocument();
+  });
+});

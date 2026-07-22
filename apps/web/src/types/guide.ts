@@ -18,6 +18,7 @@ export type ChatMessage = {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  streaming?: boolean;
 };
 
 export type RouteCard = {
@@ -27,8 +28,25 @@ export type RouteCard = {
   description: string;
 };
 
+export type GuideViseme = 'sil' | 'aa' | 'ee' | 'oo' | 'ih' | 'oh' | 'mouth-open' | 'mouth-closed';
+
+export type GuideVisemeCue = {
+  startMs: number;
+  endMs: number;
+  viseme: GuideViseme;
+  mouthOpen: number;
+};
+
+export type GuideSpeechTimeline = {
+  text: string;
+  durationMs: number;
+  visemes: GuideVisemeCue[];
+  source: 'estimated';
+};
+
 export type GuideChatResponse = {
   answer: string;
   cards: RouteCard[];
-  source: 'llm';
+  source: 'llm' | 'local-fallback';
+  speechTimeline: GuideSpeechTimeline;
 };

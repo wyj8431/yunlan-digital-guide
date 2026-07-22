@@ -1,3 +1,5 @@
+const QUICK_QUESTIONS_LABEL = '\u5feb\u6377\u95ee\u9898';
+
 type QuickQuestionsProps = {
   questions: string[];
   disabled: boolean;
@@ -6,7 +8,7 @@ type QuickQuestionsProps = {
 
 export function QuickQuestions({ questions, disabled, onAsk }: QuickQuestionsProps) {
   return (
-    <div className="quick-questions" aria-label="快捷问题">
+    <div className="quick-questions" aria-label={QUICK_QUESTIONS_LABEL}>
       {questions.map((question) => (
         <button key={question} type="button" disabled={disabled} onClick={() => onAsk(question)}>
           {question}

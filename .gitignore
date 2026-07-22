@@ -11,6 +11,10 @@ codex-dev-*.log
 .codex-vite-*.log
 .playwright-preview*.png
 .playwright-*.png
+.codex-run/
+.playwright-mcp/
+layout-mobile-*.png
+yunlan-*.png
 tmp/
 apps/web/public/models/CesiumMan.glb
 apps/web/public/models/xbot.glb

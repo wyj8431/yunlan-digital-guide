@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { fetchScenicArea } from './api/guideApi';
 import { DigitalHumanStage } from './components/DigitalHumanStage';
 import { GuidePanel } from './components/GuidePanel';
+import { ScenicPanel } from './components/ScenicPanel';
 import { useGuideChat } from './hooks/useGuideChat';
 import { useSpeechSynthesis } from './hooks/useSpeechSynthesis';
 import type { ScenicAreaSummary } from './types/guide';
@@ -14,6 +15,7 @@ export function App() {
   const [speechDriver, setSpeechDriver] = useState<SpeechDriver>('browser');
   const chat = useGuideChat();
   const speech = useSpeechSynthesis();
+  const { speak, speaking } = speech;
 
   useEffect(() => {
     fetchScenicArea()
@@ -23,9 +25,9 @@ export function App() {
 
   useEffect(() => {
     if (chat.latestAnswer && speechDriver === 'browser') {
-      speech.speak(chat.latestAnswer);
+      speak(chat.latestAnswer);
     }
-  }, [chat.latestAnswer, speech, speechDriver]);
+  }, [chat.latestAnswer, speak, speechDriver]);
 
   if (loadError) {
     return <main className="app-shell app-centered">{loadError}</main>;
@@ -40,18 +42,21 @@ export function App() {
       <GuidePanel
         scenicArea={scenicArea}
         messages={chat.messages}
-        routeCards={chat.routeCards}
         loading={chat.loading}
         error={chat.error}
         onAsk={chat.ask}
       />
+
       <section className="digital-human-panel" aria-label="3D 数字人展示区">
         <DigitalHumanStage
-          speaking={speech.speaking}
+          speaking={speaking || chat.loading}
           answerText={chat.latestAnswer}
+          speechTimeline={chat.speechTimeline}
           onSpeechDriverChange={setSpeechDriver}
         />
       </section>
+
+      <ScenicPanel scenicArea={scenicArea} routeCards={chat.routeCards} />
     </main>
   );
 }

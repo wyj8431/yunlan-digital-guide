@@ -1,43 +1,33 @@
-import type { ChatMessage, RouteCard, ScenicAreaSummary } from '../types/guide';
+import type { ChatMessage, ScenicAreaSummary } from '../types/guide';
 import { ChatMessages } from './ChatMessages';
 import { QuestionInput } from './QuestionInput';
 import { QuickQuestions } from './QuickQuestions';
-import { RouteCards } from './RouteCards';
+
+const GUIDE_PANEL_LABEL = 'AI \u6570\u5b57\u5bfc\u6e38\u95ee\u7b54';
+const GUIDE_PANEL_TITLE = '\u5bf9\u8bdd\u5bfc\u89c8';
 
 type GuidePanelProps = {
   scenicArea: ScenicAreaSummary;
   messages: ChatMessage[];
-  routeCards: RouteCard[];
   loading: boolean;
   error: string | null;
   onAsk: (question: string) => void;
 };
 
-export function GuidePanel({
-  scenicArea,
-  messages,
-  routeCards,
-  loading,
-  error,
-  onAsk
-}: GuidePanelProps) {
+export function GuidePanel({ scenicArea, messages, loading, error, onAsk }: GuidePanelProps) {
   return (
-    <section className="guide-panel" aria-label="AI 数字导游问答">
-      <header>
-        <p className="eyebrow">AI 数字导游</p>
-        <h1>{scenicArea.scenicArea.name}</h1>
-        <p className="intro">{scenicArea.scenicArea.description}</p>
-        <div className="meta-row">
-          <span>{scenicArea.scenicArea.openingHours}</span>
-          <span>{scenicArea.scenicArea.ticketInfo}</span>
+    <section className="guide-panel" aria-label={GUIDE_PANEL_LABEL}>
+      <header className="guide-panel-header">
+        <div>
+          <h2>{GUIDE_PANEL_TITLE}</h2>
+          <p>AI Guide Chat</p>
         </div>
       </header>
 
-      <QuickQuestions questions={scenicArea.quickQuestions} disabled={loading} onAsk={onAsk} />
       <ChatMessages messages={messages} />
       {error ? <p className="error-text">{error}</p> : null}
+      <QuickQuestions questions={scenicArea.quickQuestions} disabled={loading} onAsk={onAsk} />
       <QuestionInput disabled={loading} onAsk={onAsk} />
-      <RouteCards cards={routeCards} />
     </section>
   );
 }
