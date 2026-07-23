@@ -4,6 +4,7 @@ import { readEnv } from '../../config/env.js';
 import {
   createGuideStreamResponse,
   GuideServiceError,
+  normalizeGuideImage,
   type GuideChatResponse
 } from './guide.service.js';
 import type { GuideSpeechTimeline } from './speech-timeline.js';
@@ -13,6 +14,7 @@ const GUIDE_CHAT_STREAM_PATH = '/api/guide/chat/stream';
 type GuideStreamRequest = {
   type?: unknown;
   message?: unknown;
+  image?: unknown;
 };
 
 type GuideStreamEvent =
@@ -67,6 +69,7 @@ export function attachGuideWebSocketServer(server: HttpServer): WebSocketServer 
 
         const response = await createGuideStreamResponse({
           message: request.message,
+          image: normalizeGuideImage(request.image),
           env: readEnv(),
           onDelta: (delta) => sendEvent(socket, { type: 'delta', delta }),
           signal: controller.signal

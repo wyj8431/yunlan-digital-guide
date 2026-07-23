@@ -1,11 +1,12 @@
-import { Mic, Send, Square } from 'lucide-react';
+import { ImagePlus, Mic, Send, Square, X } from 'lucide-react';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import type { MutableRefObject } from 'react';
 import { transcribeSpeechAudio } from '../api/speechApi';
+import type { GuideImageAttachment } from '../types/guide';
 
 type QuestionInputProps = {
   disabled: boolean;
-  onAsk: (question: string) => void;
+  onAsk: (question: string, image?: GuideImageAttachment | null) => void;
 };
 
 type VoiceState = 'idle' | 'listening' | 'processing' | 'unsupported' | 'error';
@@ -19,6 +20,7 @@ const NO_SPEECH_TIMEOUT_MS = 7000;
 const SILENCE_AUTO_SEND_MS = 1300;
 const MANUAL_STOP_FALLBACK_MS = 700;
 const VOICE_RMS_THRESHOLD = 0.025;
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 
 const HINT_READY =
   '\u53ef\u4ee5\u76f4\u63a5\u8f93\u5165\uff0c\u4e5f\u53ef\u4ee5\u6309\u9ea6\u514b\u98ce\u8bf4\u5b8c\u81ea\u52a8\u53d1\u9001\u3002';
@@ -57,6 +59,39 @@ const INPUT_LABEL = '\u5411\u6570\u5b57\u5bfc\u6e38\u63d0\u95ee';
 const VOICE_INPUT_LABEL = '\u8bed\u97f3\u8f93\u5165';
 const STOP_VOICE_INPUT_LABEL = '\u505c\u6b62\u8bed\u97f3\u8f93\u5165';
 const SEND_QUESTION_LABEL = '\u53d1\u9001\u95ee\u9898';
+const ATTACH_IMAGE_LABEL = '上传图片';
+const IMAGE_FILE_INPUT_LABEL = '选择图片文件';
+const REMOVE_IMAGE_LABEL = '移除图片';
+const HINT_IMAGE_READY = '图片已添加，可以输入问题并发送。';
+const HINT_IMAGE_TOO_LARGE = '图片太大，请压缩到 4MB 以内再发送。';
+const HINT_IMAGE_UNSUPPORTED = '仅支持 PNG、JPG 或 WebP 图片。';
+
+function isSupportedImage(file: File): boolean {
+  return ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'].includes(file.type);
+}
+
+async function readImageAttachment(file: File): Promise<GuideImageAttachment> {
+  if (!isSupportedImage(file)) {
+    throw new Error(HINT_IMAGE_UNSUPPORTED);
+  }
+
+  if (file.size > MAX_IMAGE_BYTES) {
+    throw new Error(HINT_IMAGE_TOO_LARGE);
+  }
+
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ''));
+    reader.onerror = () => reject(new Error(HINT_IMAGE_UNSUPPORTED));
+    reader.readAsDataURL(file);
+  });
+
+  return {
+    name: file.name,
+    mimeType: file.type,
+    dataUrl
+  };
+}
 
 function chooseRecorderMimeType(): string {
   if (typeof MediaRecorder === 'undefined') {
@@ -74,8 +109,10 @@ function chooseRecorderMimeType(): string {
 
 export function QuestionInput({ disabled, onAsk }: QuestionInputProps) {
   const [question, setQuestion] = useState('');
+  const [image, setImage] = useState<GuideImageAttachment | null>(null);
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
   const [voiceHint, setVoiceHint] = useState(HINT_READY);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -140,15 +177,23 @@ export function QuestionInput({ disabled, onAsk }: QuestionInputProps) {
     interimTranscriptRef.current = '';
   }
 
-  function submitQuestion(nextQuestion: string, nextHint = HINT_SENT) {
+  function submitQuestion(
+    nextQuestion: string,
+    nextHint = HINT_SENT,
+    nextImage: GuideImageAttachment | null = image
+  ) {
     const trimmed = nextQuestion.trim();
 
-    if (!trimmed) {
+    if (!trimmed && !nextImage) {
       return;
     }
 
-    onAsk(trimmed);
+    onAsk(trimmed, nextImage);
     setQuestion('');
+    setImage(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
     setVoiceHint(nextHint);
   }
 
@@ -423,6 +468,33 @@ export function QuestionInput({ disabled, onAsk }: QuestionInputProps) {
     submitQuestion(question);
   }
 
+  async function handleImageChange(file: File | undefined) {
+    if (!file) {
+      return;
+    }
+
+    try {
+      const attachment = await readImageAttachment(file);
+      setImage(attachment);
+      setVoiceHint(HINT_IMAGE_READY);
+    } catch (caught) {
+      setImage(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      setVoiceState('error');
+      setVoiceHint(caught instanceof Error ? caught.message : HINT_IMAGE_UNSUPPORTED);
+    }
+  }
+
+  function removeImage() {
+    setImage(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    setVoiceHint(HINT_READY);
+  }
+
   useEffect(() => {
     if (!voiceSupported) {
       setVoiceState('unsupported');
@@ -473,6 +545,14 @@ export function QuestionInput({ disabled, onAsk }: QuestionInputProps) {
     <div className="question-input-shell">
       <form className="question-input" onSubmit={handleSubmit}>
         <input
+          ref={fileInputRef}
+          className="question-image-input"
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          onChange={(event) => void handleImageChange(event.target.files?.[0])}
+          aria-label={IMAGE_FILE_INPUT_LABEL}
+        />
+        <input
           value={question}
           disabled={disabled || voiceState === 'processing'}
           onChange={(event) => setQuestion(event.target.value)}
@@ -480,6 +560,15 @@ export function QuestionInput({ disabled, onAsk }: QuestionInputProps) {
           aria-label={INPUT_LABEL}
         />
         <div className="question-actions">
+          <button
+            type="button"
+            disabled={disabled || voiceState === 'processing'}
+            onClick={() => fileInputRef.current?.click()}
+            aria-label={ATTACH_IMAGE_LABEL}
+            title={ATTACH_IMAGE_LABEL}
+          >
+            <ImagePlus size={16} />
+          </button>
           <button
             type="button"
             disabled={disabled || !voiceSupported || voiceState === 'processing'}
@@ -491,13 +580,27 @@ export function QuestionInput({ disabled, onAsk }: QuestionInputProps) {
           </button>
           <button
             type="submit"
-            disabled={disabled || voiceState === 'processing' || !question.trim()}
+            disabled={disabled || voiceState === 'processing' || (!question.trim() && !image)}
             aria-label={SEND_QUESTION_LABEL}
           >
             <Send size={16} />
           </button>
         </div>
       </form>
+      {image ? (
+        <div className="question-image-preview">
+          <img src={image.dataUrl} alt="" />
+          <span>{image.name ?? '已选择图片'}</span>
+          <button
+            type="button"
+            onClick={removeImage}
+            aria-label={REMOVE_IMAGE_LABEL}
+            title={REMOVE_IMAGE_LABEL}
+          >
+            <X size={14} />
+          </button>
+        </div>
+      ) : null}
       <p className={`question-status question-status--${voiceState}`} aria-live="polite">
         {voiceHint}
       </p>

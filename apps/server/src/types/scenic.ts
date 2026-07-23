@@ -4,6 +4,10 @@ export type ScenicAreaInfo = {
   description: string;
   openingHours: string;
   ticketInfo: string;
+  location?: string;
+  sourceName?: string;
+  sourceUrl?: string;
+  sourceUpdatedAt?: string;
 };
 
 export type ScenicSpot = {
@@ -32,7 +36,7 @@ export type ScenicRoute = {
 export type ScenicService = {
   id: string;
   name: string;
-  type: 'visitor-center' | 'parking' | 'restroom' | 'food' | 'medical';
+  type: 'visitor-center' | 'parking' | 'restroom' | 'food' | 'transport' | 'booking';
   description: string;
 };
 

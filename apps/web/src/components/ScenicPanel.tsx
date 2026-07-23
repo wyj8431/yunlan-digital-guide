@@ -12,15 +12,15 @@ const TOUR_VIDEO_SRC = 'https://www.w3schools.com/html/mov_bbb.mp4';
 const gallery = [
   {
     src: 'https://images.unsplash.com/photo-1508804185872-d7badad00f7d?auto=format&fit=crop&w=960&q=80',
-    alt: '古镇水巷'
+    alt: '乌镇水巷'
   },
   {
     src: 'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=960&q=80',
-    alt: '青石古桥'
+    alt: '乌镇石桥'
   },
   {
     src: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=960&q=80',
-    alt: '河畔夜灯'
+    alt: '西栅夜景'
   }
 ];
 
@@ -43,10 +43,10 @@ export function ScenicPanel({ scenicArea, routeCards }: ScenicPanelProps) {
       <section className="scenic-summary">
         <div className="scenic-location">
           <MapPin size={14} aria-hidden="true" />
-          <span>Yunlan, China</span>
+          <span>{scenicArea.scenicArea.location ?? 'Wuzhen, China'}</span>
         </div>
         <h1>{scenicArea.scenicArea.name}</h1>
-        <h2>Yunlan Ancient Town</h2>
+        <h2>Wuzhen Scenic Area</h2>
         <p>{scenicArea.scenicArea.description}</p>
 
         <div className="scenic-meta">

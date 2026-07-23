@@ -368,11 +368,11 @@ export function DigitalHumanStage({
               ? 'is-xfyun-unavailable'
               : 'has-local-human'
       }`}
-      aria-label="云岚古镇年轻数字导游舞台"
+      aria-label="乌镇景区年轻数字导游舞台"
     >
       <div className="guide-identity">
         <span>年轻导游</span>
-        <strong>云岚古镇</strong>
+        <strong>乌镇景区</strong>
       </div>
 
       <div className="model-stage">
@@ -452,7 +452,7 @@ export function DigitalHumanStage({
       </div>
 
       <div className="stage-caption">
-        {effectiveSpeaking ? '正在讲解云岚古镇' : '云岚古镇数字导游'}
+        {effectiveSpeaking ? '正在讲解乌镇景区' : '乌镇景区数字导游'}
       </div>
     </div>
   );

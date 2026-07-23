@@ -2,12 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { getScenicAreaSummary, loadScenicData } from '../src/modules/scenic/scenic-data';
 
 describe('scenic data', () => {
-  it('loads Yunlan town data with required content counts', () => {
+  it('loads real Wuzhen scenic data with required content counts', () => {
     const data = loadScenicData();
 
-    expect(data.scenicArea.name).toBe('云岚古镇');
+    expect(data.scenicArea.name).toBe('乌镇景区');
+    expect(data.scenicArea.sourceUrl).toContain('ewuzhen.com');
     expect(data.spots).toHaveLength(5);
-    expect(data.routes).toHaveLength(2);
+    expect(data.routes).toHaveLength(3);
     expect(data.services).toHaveLength(5);
     expect(data.faqs.length).toBeGreaterThanOrEqual(4);
   });
@@ -15,12 +16,19 @@ describe('scenic data', () => {
   it('returns a public summary without long story fields', () => {
     const summary = getScenicAreaSummary();
 
-    expect(summary.scenicArea.id).toBe('yunlan-town');
+    expect(summary.scenicArea.id).toBe('wuzhen-scenic-area');
     expect(summary.spots[0]).toEqual({
-      id: 'south-gate',
-      name: '南门牌坊',
-      summary: '云岚古镇的入口地标，牌坊纹样记录着古镇水路商贸的起源。'
+      id: 'xizha-street',
+      name: '西栅老街',
+      summary: '西栅是乌镇夜游和水乡慢行的核心区域，白墙黛瓦、河道石桥和灯影水巷集中。'
     });
     expect('story' in summary.spots[0]).toBe(false);
+  });
+
+  it('includes onboarding and regional recommendation quick questions', () => {
+    const summary = getScenicAreaSummary();
+
+    expect(summary.quickQuestions).toContain('先介绍一下你自己');
+    expect(summary.quickQuestions).toContain('推荐几个国内热门地区的景区和路线');
   });
 });

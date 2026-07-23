@@ -1,4 +1,9 @@
-import type { GuideChatResponse, GuideSpeechTimeline, ScenicAreaSummary } from '../types/guide';
+import type {
+  GuideChatResponse,
+  GuideImageAttachment,
+  GuideSpeechTimeline,
+  ScenicAreaSummary
+} from '../types/guide';
 
 async function readJson<T>(response: Response): Promise<T> {
   const body = (await response.json()) as unknown;
@@ -22,11 +27,14 @@ export async function fetchScenicArea(): Promise<ScenicAreaSummary> {
   return readJson<ScenicAreaSummary>(response);
 }
 
-export async function askGuide(message: string): Promise<GuideChatResponse> {
+export async function askGuide(
+  message: string,
+  image?: GuideImageAttachment | null
+): Promise<GuideChatResponse> {
   const response = await fetch('/api/guide/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message })
+    body: JSON.stringify({ message, image })
   });
 
   return readJson<GuideChatResponse>(response);
@@ -73,12 +81,13 @@ function parseGuideStreamEvent(raw: string): GuideChatStreamEvent {
 
 export function streamGuideAnswer(
   message: string,
+  image: GuideImageAttachment | null | undefined,
   handlers: GuideChatStreamHandlers
 ): GuideChatStreamController {
   if (typeof WebSocket === 'undefined') {
     let closed = false;
 
-    void askGuide(message)
+    void askGuide(message, image)
       .then((response) => {
         if (closed) {
           return;
@@ -105,7 +114,7 @@ export function streamGuideAnswer(
   let completed = false;
 
   socket.addEventListener('open', () => {
-    socket.send(JSON.stringify({ type: 'ask', message }));
+    socket.send(JSON.stringify({ type: 'ask', message, image }));
   });
 
   socket.addEventListener('message', (event) => {

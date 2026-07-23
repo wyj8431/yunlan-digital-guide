@@ -49,6 +49,12 @@ export function ChatMessages({ messages }: ChatMessagesProps) {
           className={`message message-${message.role} ${message.streaming ? 'message-streaming' : ''}`}
         >
           <span>{message.role === 'user' ? 'Visitor' : 'Digital Guide'}</span>
+          {message.imagePreviewUrl ? (
+            <figure className="message-image">
+              <img src={message.imagePreviewUrl} alt={message.imageName ?? '用户上传图片'} />
+              {message.imageName ? <figcaption>{message.imageName}</figcaption> : null}
+            </figure>
+          ) : null}
           <p aria-live={message.streaming ? 'polite' : undefined}>
             {message.content}
             {message.streaming ? <i className="typewriter-caret" aria-hidden="true" /> : null}

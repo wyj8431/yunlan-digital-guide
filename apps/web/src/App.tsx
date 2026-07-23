@@ -34,7 +34,7 @@ export function App() {
   }
 
   if (!scenicArea) {
-    return <main className="app-shell app-centered">正在加载云岚古镇资料...</main>;
+    return <main className="app-shell app-centered">正在加载乌镇景区资料...</main>;
   }
 
   return (

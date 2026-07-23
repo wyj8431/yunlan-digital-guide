@@ -234,11 +234,11 @@ describe('DigitalHumanStage', () => {
   it('presents the refined young guide identity while idle', async () => {
     render(<DigitalHumanStage speaking={false} />);
 
-    expect(screen.getByLabelText('云岚古镇年轻数字导游舞台')).toBeInTheDocument();
+    expect(screen.getByLabelText('乌镇景区年轻数字导游舞台')).toBeInTheDocument();
     expect(await screen.findByText('3D 数字人模型')).toBeInTheDocument();
     expect(await screen.findByText('测试环境使用本地 3D 数字人')).toBeInTheDocument();
     expect(screen.getByText('年轻导游')).toBeInTheDocument();
-    expect(screen.getByText('云岚古镇')).toBeInTheDocument();
+    expect(screen.getByText('乌镇景区')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '介绍' })).toBeInTheDocument();
     expect(document.querySelector('canvas')).toBeInTheDocument();
   });
@@ -246,7 +246,7 @@ describe('DigitalHumanStage', () => {
   it('announces narration state while speaking', () => {
     render(<DigitalHumanStage speaking />);
 
-    expect(screen.getByText('正在讲解云岚古镇')).toBeInTheDocument();
+    expect(screen.getByText('正在讲解乌镇景区')).toBeInTheDocument();
   });
 
   it('reads mouth openness from a speech timeline cue', () => {

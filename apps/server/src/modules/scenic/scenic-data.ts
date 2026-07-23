@@ -2,10 +2,12 @@ import scenicData from '../../data/yunlan-town.json' with { type: 'json' };
 import type { ScenicAreaSummary, ScenicData } from '../../types/scenic.js';
 
 const quickQuestions = [
-  '帮我规划一条半日游路线',
-  '云岚古镇有哪些适合拍照的地方？',
-  '带孩子游览怎么安排？',
-  '古镇几点开放，门票多少钱？'
+  '先介绍一下你自己',
+  '推荐几个国内热门地区的景区和路线',
+  '帮我规划一条乌镇半日游路线',
+  '乌镇有哪些适合拍照的地方？',
+  '带孩子游览乌镇怎么安排？',
+  '乌镇几点开放，门票多少钱？'
 ];
 
 export function loadScenicData(): ScenicData {

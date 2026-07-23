@@ -3,16 +3,15 @@ import { describe, expect, it, vi } from 'vitest';
 import { GuidePanel } from '../src/components/GuidePanel';
 import type { ScenicAreaSummary } from '../src/types/guide';
 
-const SCENIC_NAME = '\u4e91\u5c9a\u53e4\u9547';
-const SCENIC_DESCRIPTION =
-  '\u4e00\u5ea7\u4ee5\u6c34\u5df7\u3001\u53e4\u6865\u3001\u8336\u574a\u3001\u706f\u5df7\u548c\u620f\u53f0\u6587\u5316\u4e3a\u7279\u8272\u7684\u865a\u62df\u53e4\u9547\u3002';
-const TICKET_INFO = '\u6210\u4eba\u7968 60 \u5143';
-const QUICK_QUESTION = '\u5e2e\u6211\u89c4\u5212\u4e00\u6761\u534a\u65e5\u6e38\u8def\u7ebf';
+const SCENIC_NAME = '乌镇景区';
+const SCENIC_DESCRIPTION = '乌镇位于浙江省嘉兴市桐乡市，是典型江南水乡古镇。';
+const TICKET_INFO = '西栅 150 元';
+const QUICK_QUESTION = '帮我规划一条乌镇半日游路线';
 const PANEL_TITLE = '\u5bf9\u8bdd\u5bfc\u89c8';
 
 const scenicArea: ScenicAreaSummary = {
   scenicArea: {
-    id: 'yunlan-town',
+    id: 'wuzhen-scenic-area',
     name: SCENIC_NAME,
     description: SCENIC_DESCRIPTION,
     openingHours: '09:00-21:00',

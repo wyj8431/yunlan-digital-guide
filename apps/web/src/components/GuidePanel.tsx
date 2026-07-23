@@ -1,4 +1,4 @@
-import type { ChatMessage, ScenicAreaSummary } from '../types/guide';
+import type { ChatMessage, GuideImageAttachment, ScenicAreaSummary } from '../types/guide';
 import { ChatMessages } from './ChatMessages';
 import { QuestionInput } from './QuestionInput';
 import { QuickQuestions } from './QuickQuestions';
@@ -11,7 +11,7 @@ type GuidePanelProps = {
   messages: ChatMessage[];
   loading: boolean;
   error: string | null;
-  onAsk: (question: string) => void;
+  onAsk: (question: string, image?: GuideImageAttachment | null) => void;
 };
 
 export function GuidePanel({ scenicArea, messages, loading, error, onAsk }: GuidePanelProps) {

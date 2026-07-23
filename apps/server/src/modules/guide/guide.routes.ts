@@ -1,9 +1,10 @@
 import Router from '@koa/router';
 import { readEnv } from '../../config/env.js';
-import { createGuideResponse, GuideServiceError } from './guide.service.js';
+import { createGuideResponse, GuideServiceError, normalizeGuideImage } from './guide.service.js';
 
 type ChatRequestBody = {
   message?: unknown;
+  image?: unknown;
 };
 
 export function createGuideRouter(): Router {
@@ -14,7 +15,11 @@ export function createGuideRouter(): Router {
     const message = typeof body?.message === 'string' ? body.message : '';
 
     try {
-      ctx.body = await createGuideResponse({ message, env: readEnv() });
+      ctx.body = await createGuideResponse({
+        message,
+        image: normalizeGuideImage(body?.image),
+        env: readEnv()
+      });
     } catch (caught) {
       if (caught instanceof GuideServiceError) {
         ctx.status = caught.status;

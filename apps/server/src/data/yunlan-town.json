@@ -1,168 +1,204 @@
 {
   "scenicArea": {
-    "id": "yunlan-town",
-    "name": "云岚古镇",
-    "description": "一座以水巷、古桥、茶坊、灯巷和戏台文化为特色的虚拟古镇。",
-    "openingHours": "09:00-21:00",
-    "ticketInfo": "成人票 60 元，儿童与老人按景区规则优惠。"
+    "id": "wuzhen-scenic-area",
+    "name": "乌镇景区",
+    "description": "乌镇位于浙江省嘉兴市桐乡市，是典型江南水乡古镇，核心游览区包含东栅、西栅等片区，适合水乡街巷、夜游、非遗体验和摄影打卡。",
+    "openingHours": "西栅 09:00-22:00，东栅 07:00-18:00；夜游和特殊日期以景区当天公告为准。",
+    "ticketInfo": "常规门票参考：东栅 110 元，西栅 150 元，东西栅联票 190 元；以官方购票页实时价格为准。",
+    "location": "浙江省嘉兴市桐乡市乌镇镇",
+    "sourceName": "乌镇旅游官方网站 / 乌镇旅游官方预订网",
+    "sourceUrl": "https://www.ewuzhen.com/",
+    "sourceUpdatedAt": "2026-07-22"
   },
   "spots": [
     {
-      "id": "south-gate",
-      "name": "南门牌坊",
-      "summary": "云岚古镇的入口地标，牌坊纹样记录着古镇水路商贸的起源。",
-      "story": "南门牌坊建在古镇南侧水陆交汇处。相传早年商船沿云岚河停靠，茶叶、丝绸和木雕都从这里进入镇中。牌坊上的云纹和水纹象征古镇因水而兴。",
-      "recommendedDurationMinutes": 20
+      "id": "xizha-street",
+      "name": "西栅老街",
+      "summary": "西栅是乌镇夜游和水乡慢行的核心区域，白墙黛瓦、河道石桥和灯影水巷集中。",
+      "story": "西栅适合安排傍晚到夜间游览。沿河慢走可以看到江南水乡街巷、桥梁、民宿和夜景灯光，是第一次到乌镇最容易形成整体印象的区域。",
+      "recommendedDurationMinutes": 90
     },
     {
-      "id": "yunlan-bridge",
-      "name": "云岚古桥",
-      "summary": "横跨内河的石拱桥，是古镇最适合听故事和拍照的位置。",
-      "story": "云岚古桥以青石砌成，桥身微拱。传说镇上的第一家茶坊就开在桥边，往来商旅常在桥头交换消息，因此这里也被称作古镇的消息口。",
-      "recommendedDurationMinutes": 30
+      "id": "dongzha-old-town",
+      "name": "东栅景区",
+      "summary": "东栅保留传统民居、老街和生活化水乡肌理，适合了解乌镇早期古镇风貌。",
+      "story": "东栅更偏传统古镇参观，游览节奏比西栅紧凑。适合上午进入，沿老街、河埠和展馆串联，感受水乡日常和民俗展示。",
+      "recommendedDurationMinutes": 120
     },
     {
-      "id": "tea-lane",
-      "name": "茶坊小巷",
-      "summary": "保留老茶坊和手作铺的巷子，适合休息与体验非遗。",
-      "story": "茶坊小巷两侧是低矮木楼，午后常有茶香。巷内的老茶坊会演示云岚烘茶和木印法制作，是了解古镇生活气息的地方。",
+      "id": "muhsin-art-museum",
+      "name": "木心美术馆",
+      "summary": "位于西栅内的文化艺术空间，适合安静参观，也适合雨天或午后避开人流。",
+      "story": "木心美术馆以文学、艺术和建筑空间体验为特色，和水乡街巷形成对照。喜欢人文内容的游客可把它作为西栅深度游的一站。",
+      "recommendedDurationMinutes": 60
+    },
+    {
+      "id": "wuzhen-grand-theater",
+      "name": "乌镇大剧院",
+      "summary": "乌镇戏剧节的重要场馆之一，建筑外观和周边水景适合拍照。",
+      "story": "乌镇大剧院让古镇游览增加了当代戏剧和建筑气质。若遇到演出或节庆活动，可提前查看官方排期。",
       "recommendedDurationMinutes": 40
     },
     {
-      "id": "river-lantern-lane",
-      "name": "河畔灯巷",
-      "summary": "沿河灯笼与白墙黛瓦相映，是傍晚拍照的推荐点。",
-      "story": "河畔灯巷在傍晚最有氛围。过去居民会在节庆时把手写愿望挂在灯笼下，灯影映在水面上，被称为云岚夜色。",
-      "recommendedDurationMinutes": 35
-    },
-    {
-      "id": "rain-listening-stage",
-      "name": "听雨戏台",
-      "summary": "古镇公共演艺空间，适合收尾休息并了解地方戏曲。",
-      "story": "听雨戏台面向一片小广场。雨天时瓦檐落雨声会和戏腔混在一起，因此得名。现在这里常安排评弹、折子戏和民俗小演出。",
+      "id": "water-market",
+      "name": "水上集市",
+      "summary": "水乡生活氛围浓的体验点，适合早间或傍晚拍摄河埠、船只和市集场景。",
+      "story": "水上集市保留了乌镇依水而生的生活想象。游览时可把它和西栅老街、桥边夜景连成一条轻松路线。",
       "recommendedDurationMinutes": 45
     }
   ],
   "routes": [
     {
       "id": "half-day-classic",
-      "name": "半日经典路线",
-      "duration": "约 3 小时",
-      "description": "覆盖古镇入口、古桥、茶坊、灯巷和戏台，适合第一次到访。",
+      "name": "乌镇半日经典路线",
+      "duration": "约 4 小时",
+      "description": "适合第一次到乌镇的游客，重点体验西栅水乡街巷、文化场馆和夜景。",
       "steps": [
         {
-          "spotId": "south-gate",
-          "title": "从南门牌坊进入",
-          "durationMinutes": 20,
-          "description": "先了解古镇整体历史和水路商贸起源。"
+          "spotId": "xizha-street",
+          "title": "从西栅游客服务中心入园",
+          "durationMinutes": 40,
+          "description": "先沿主街和河道慢行，建立水乡空间感，也方便确认返程和游船信息。"
         },
         {
-          "spotId": "yunlan-bridge",
-          "title": "登上云岚古桥",
-          "durationMinutes": 30,
-          "description": "在桥头听古镇商旅故事，并拍摄河道视角。"
+          "spotId": "muhsin-art-museum",
+          "title": "参观木心美术馆",
+          "durationMinutes": 60,
+          "description": "安排一段安静的人文内容，雨天或炎热时也适合作为室内停留。"
         },
         {
-          "spotId": "tea-lane",
-          "title": "走进茶坊小巷",
+          "spotId": "wuzhen-grand-theater",
+          "title": "走到乌镇大剧院周边",
+          "durationMinutes": 40,
+          "description": "拍摄剧院建筑和水岸视角，若有演出可提前在官方渠道确认排期。"
+        },
+        {
+          "spotId": "water-market",
+          "title": "水上集市和河埠拍照",
           "durationMinutes": 45,
-          "description": "体验烘茶香气和木印手作。"
+          "description": "傍晚光线更柔和，适合拍摄船只、水面倒影和街巷灯光。"
         },
         {
-          "spotId": "river-lantern-lane",
-          "title": "傍晚漫步河畔灯巷",
-          "durationMinutes": 35,
-          "description": "欣赏灯影与水面倒影，是路线中最适合拍照的一段。"
-        },
-        {
-          "spotId": "rain-listening-stage",
-          "title": "在听雨戏台收尾",
-          "durationMinutes": 45,
-          "description": "看一段小演出或在广场休息，结束半日游。"
+          "spotId": "xizha-street",
+          "title": "西栅夜景收尾",
+          "durationMinutes": 55,
+          "description": "夜游是西栅亮点，建议放慢节奏，不要把路线排得太满。"
         }
       ]
     },
     {
       "id": "family-easy",
       "name": "亲子轻松路线",
-      "duration": "约 2 小时",
-      "description": "少走回头路，优先安排休息和体验点，适合带孩子慢慢逛。",
+      "duration": "约 3 小时",
+      "description": "少走回头路，减少长时间排队，把休息、拍照和轻体验穿插起来。",
       "steps": [
         {
-          "spotId": "south-gate",
-          "title": "南门牌坊集合",
-          "durationMinutes": 15,
-          "description": "确认游览方向和服务点位置。"
+          "spotId": "xizha-street",
+          "title": "西栅入口集合",
+          "durationMinutes": 30,
+          "description": "先确认卫生间、餐饮和返程位置，避免孩子疲劳后临时找服务点。"
         },
         {
-          "spotId": "tea-lane",
-          "title": "茶坊小巷体验手作",
+          "spotId": "water-market",
+          "title": "水上集市慢行",
           "durationMinutes": 45,
-          "description": "安排轻量互动体验，孩子更容易参与。"
+          "description": "轻松看船、看水、拍照，节奏比连续逛展更适合亲子。"
         },
         {
-          "spotId": "river-lantern-lane",
-          "title": "河畔灯巷拍照",
-          "durationMinutes": 30,
-          "description": "沿河慢行，避开拥挤路段。"
+          "spotId": "muhsin-art-museum",
+          "title": "选择性参观室内空间",
+          "durationMinutes": 45,
+          "description": "如果孩子状态好，可以短暂停留；如果人多，可改为周边水岸休息。"
         },
         {
-          "spotId": "rain-listening-stage",
-          "title": "听雨戏台休息",
-          "durationMinutes": 30,
-          "description": "在开阔广场休整，也方便就近补水和如厕。"
+          "spotId": "xizha-street",
+          "title": "夜景前提前用餐",
+          "durationMinutes": 60,
+          "description": "建议错峰吃饭，再选择一小段夜景路线，不必强行走完整个片区。"
+        }
+      ]
+    },
+    {
+      "id": "one-day-east-west",
+      "name": "东西栅一日路线",
+      "duration": "约 7-8 小时",
+      "description": "上午东栅看传统风貌，下午到晚上西栅看文化空间和夜景。",
+      "steps": [
+        {
+          "spotId": "dongzha-old-town",
+          "title": "上午游览东栅",
+          "durationMinutes": 150,
+          "description": "东栅适合安排在白天，沿老街和水巷了解传统古镇风貌。"
+        },
+        {
+          "spotId": "xizha-street",
+          "title": "下午进入西栅",
+          "durationMinutes": 120,
+          "description": "先完成主街和桥边慢行，再根据体力选择场馆或游船。"
+        },
+        {
+          "spotId": "muhsin-art-museum",
+          "title": "加入人文场馆",
+          "durationMinutes": 60,
+          "description": "把木心美术馆或其他当日开放场馆作为深度体验点。"
+        },
+        {
+          "spotId": "water-market",
+          "title": "夜游西栅",
+          "durationMinutes": 120,
+          "description": "夜景建议留足时间，官方开放和票务以当天公告为准。"
         }
       ]
     }
   ],
   "services": [
     {
+      "id": "official-booking",
+      "name": "官方购票",
+      "type": "booking",
+      "description": "建议通过乌镇旅游官方预订网或景区官方渠道购票，价格、入园时间和优惠政策以官方页面为准。"
+    },
+    {
       "id": "visitor-center",
-      "name": "游客中心",
+      "name": "游客服务中心",
       "type": "visitor-center",
-      "description": "提供咨询、寄存和失物招领。"
+      "description": "提供咨询、票务、行李寄存和基础导览服务，建议入园前先确认返程和当日活动。"
     },
     {
-      "id": "south-parking",
-      "name": "南门停车场",
+      "id": "parking-transfer",
+      "name": "停车与换乘",
       "type": "parking",
-      "description": "靠近南门牌坊，适合自驾游客入园。"
+      "description": "自驾游客建议优先查看官方交通和停车提示，节假日提前预留换乘时间。"
     },
     {
-      "id": "bridge-restroom",
-      "name": "古桥公共厕所",
-      "type": "restroom",
-      "description": "位于云岚古桥东侧，沿主路步行可达。"
-    },
-    {
-      "id": "snack-street",
-      "name": "小吃街",
+      "id": "food-rest",
+      "name": "餐饮休息",
       "type": "food",
-      "description": "提供茶点、汤面和地方小吃。"
+      "description": "西栅内餐饮和休息点较集中，亲子或老人同行建议错峰用餐。"
     },
     {
-      "id": "medical-station",
-      "name": "医务服务点",
-      "type": "medical",
-      "description": "提供基础急救和临时休息协助。"
+      "id": "public-restroom",
+      "name": "公共卫生间",
+      "type": "restroom",
+      "description": "主要游线周边设有公共卫生间，建议在游客服务中心确认最近点位。"
     }
   ],
   "faqs": [
     {
-      "question": "云岚古镇几点开放？",
-      "answer": "云岚古镇开放时间为 09:00-21:00。"
+      "question": "乌镇景区几点开放？",
+      "answer": "参考开放时间为西栅 09:00-22:00，东栅 07:00-18:00；节假日、夜游和特殊活动以景区当天公告为准。"
     },
     {
-      "question": "半日游从哪里开始比较好？",
-      "answer": "建议从南门牌坊开始，顺路游览古桥、茶坊小巷、河畔灯巷和听雨戏台。"
+      "question": "乌镇门票多少钱？",
+      "answer": "常规门票参考为东栅 110 元、西栅 150 元、东西栅联票 190 元；请以官方购票页实时价格为准。"
     },
     {
-      "question": "适合亲子游吗？",
-      "answer": "适合。亲子轻松路线会减少折返，并优先安排茶坊体验和戏台休息。"
+      "question": "第一次去乌镇怎么玩？",
+      "answer": "如果只有半天，建议优先西栅，从游客服务中心入园，串联木心美术馆、乌镇大剧院周边、水上集市和西栅夜景。"
     },
     {
-      "question": "哪里适合傍晚拍照？",
-      "answer": "河畔灯巷适合傍晚拍照，灯笼、河面和白墙黛瓦会形成层次。"
+      "question": "乌镇适合亲子游吗？",
+      "answer": "适合。亲子建议减少赶路，把水上集市、短距离街巷慢行、错峰用餐和夜景前休息组合起来。"
     }
   ]
 }

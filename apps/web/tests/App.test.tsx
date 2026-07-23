@@ -38,9 +38,9 @@ describe('App speech and typewriter sync', () => {
   beforeEach(() => {
     fetchScenicAreaMock.mockResolvedValue({
       scenicArea: {
-        id: 'yunlan-town',
-        name: 'Yunlan',
-        description: 'Ancient town',
+        id: 'wuzhen-scenic-area',
+        name: 'Wuzhen',
+        description: 'Water town',
         openingHours: '09:00-21:00',
         ticketInfo: '60'
       },
@@ -49,7 +49,7 @@ describe('App speech and typewriter sync', () => {
       services: [],
       quickQuestions: ['Ask guide']
     });
-    streamGuideAnswerMock.mockImplementation((_message, handlers) => {
+    streamGuideAnswerMock.mockImplementation((_message, _image, handlers) => {
       handlers.onResult({
         answer: 'abcdef',
         cards: [],

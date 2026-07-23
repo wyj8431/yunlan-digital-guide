@@ -1,9 +1,10 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QuestionInput } from '../src/components/QuestionInput';
 
 const VOICE_INPUT_LABEL = '\u8bed\u97f3\u8f93\u5165';
 const STOP_VOICE_INPUT_LABEL = '\u505c\u6b62\u8bed\u97f3\u8f93\u5165';
+const IMAGE_FILE_INPUT_LABEL = '选择图片文件';
 const UNSUPPORTED_HINT =
   '\u5f53\u524d\u6d4f\u89c8\u5668\u4e0d\u652f\u6301\u8bed\u97f3\u8f93\u5165\uff0c\u53ef\u4ee5\u76f4\u63a5\u6253\u5b57\u63d0\u95ee\u3002';
 const INTRO_QUESTION = '\u8bf7\u4ecb\u7ecd\u4e00\u4e0b\u53e4\u9547\u666f\u533a';
@@ -76,7 +77,7 @@ describe('QuestionInput', () => {
       activeRecognition?.onend?.(new Event('end'));
     });
 
-    expect(onAsk).toHaveBeenCalledWith(INTRO_QUESTION);
+    expect(onAsk).toHaveBeenCalledWith(INTRO_QUESTION, null);
   });
 
   it('auto-sends after a short silence even if the browser does not end recognition', () => {
@@ -96,7 +97,7 @@ describe('QuestionInput', () => {
       vi.advanceTimersByTime(1300);
     });
 
-    expect(onAsk).toHaveBeenCalledWith(ROUTE_QUESTION);
+    expect(onAsk).toHaveBeenCalledWith(ROUTE_QUESTION, null);
   });
 
   it('submits the current transcript when the user taps stop', () => {
@@ -111,7 +112,36 @@ describe('QuestionInput', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: STOP_VOICE_INPUT_LABEL }));
 
-    expect(onAsk).toHaveBeenCalledWith(TICKET_QUESTION);
+    expect(onAsk).toHaveBeenCalledWith(TICKET_QUESTION, null);
+  });
+
+  it('submits an uploaded image with the typed question', async () => {
+    vi.useRealTimers();
+    const onAsk = vi.fn();
+    render(<QuestionInput disabled={false} onAsk={onAsk} />);
+
+    const image = new File(['fake-image'], 'wuzhen.webp', { type: 'image/webp' });
+    fireEvent.change(screen.getByLabelText(IMAGE_FILE_INPUT_LABEL), {
+      target: { files: [image] }
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('wuzhen.webp')).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText('向数字导游提问'), {
+      target: { value: '这张图片适合走哪条路线？' }
+    });
+    fireEvent.submit(screen.getByRole('button', { name: '发送问题' }).closest('form')!);
+
+    expect(onAsk).toHaveBeenCalledWith(
+      '这张图片适合走哪条路线？',
+      expect.objectContaining({
+        name: 'wuzhen.webp',
+        mimeType: 'image/webp',
+        dataUrl: expect.stringContaining('data:image/webp;base64,')
+      })
+    );
   });
 
   it('shows a helpful hint when speech recognition is unavailable', () => {

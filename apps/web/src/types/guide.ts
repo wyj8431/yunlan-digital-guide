@@ -4,6 +4,10 @@ export type ScenicAreaInfo = {
   description: string;
   openingHours: string;
   ticketInfo: string;
+  location?: string;
+  sourceName?: string;
+  sourceUrl?: string;
+  sourceUpdatedAt?: string;
 };
 
 export type ScenicAreaSummary = {
@@ -18,6 +22,8 @@ export type ChatMessage = {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  imagePreviewUrl?: string;
+  imageName?: string;
   streaming?: boolean;
 };
 
@@ -49,4 +55,10 @@ export type GuideChatResponse = {
   cards: RouteCard[];
   source: 'llm' | 'local-fallback';
   speechTimeline: GuideSpeechTimeline;
+};
+
+export type GuideImageAttachment = {
+  name?: string;
+  mimeType: string;
+  dataUrl: string;
 };

@@ -27,7 +27,7 @@ describe('useGuideChat', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     streamGuideAnswerMock.mockImplementation(
-      (_message: string, handlers: GuideChatStreamHandlers) => {
+      (_message: string, _image: unknown, handlers: GuideChatStreamHandlers) => {
         window.setTimeout(() => handlers.onDelta('abc'), 0);
         window.setTimeout(() => {
           handlers.onResult({
@@ -100,7 +100,7 @@ describe('useGuideChat', () => {
 
   it('buffers streamed guide deltas until speech playback starts', async () => {
     streamGuideAnswerMock.mockImplementationOnce(
-      (_message: string, handlers: GuideChatStreamHandlers) => {
+      (_message: string, _image: unknown, handlers: GuideChatStreamHandlers) => {
         window.setTimeout(() => handlers.onDelta('abcdef'), 0);
         window.setTimeout(() => {
           handlers.onResult({
@@ -178,7 +178,7 @@ describe('useGuideChat', () => {
 
   it('falls back to the speech-duration typewriter when the stream has no deltas', async () => {
     streamGuideAnswerMock.mockImplementationOnce(
-      (_message: string, handlers: GuideChatStreamHandlers) => {
+      (_message: string, _image: unknown, handlers: GuideChatStreamHandlers) => {
         window.setTimeout(() => {
           handlers.onResult({
             answer: 'abc',
@@ -218,10 +218,31 @@ describe('useGuideChat', () => {
       await Promise.resolve();
     });
 
-    expect(streamGuideAnswerMock).toHaveBeenCalledWith('intro', expect.any(Object));
+    expect(streamGuideAnswerMock).toHaveBeenCalledWith('intro', undefined, expect.any(Object));
     expect(result.current.messages[1]).toMatchObject({
       content: 'abc',
       streaming: false
     });
+  });
+
+  it('sends image attachments with the guide question', () => {
+    const { result } = renderHook(() => useGuideChat());
+    const image = {
+      name: 'bridge.png',
+      mimeType: 'image/png',
+      dataUrl: 'data:image/png;base64,aaaa'
+    };
+
+    act(() => {
+      void result.current.ask('分析这张图', image);
+    });
+
+    expect(result.current.messages[0]).toMatchObject({
+      role: 'user',
+      content: '分析这张图',
+      imagePreviewUrl: image.dataUrl,
+      imageName: 'bridge.png'
+    });
+    expect(streamGuideAnswerMock).toHaveBeenCalledWith('分析这张图', image, expect.any(Object));
   });
 });

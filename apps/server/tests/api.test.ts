@@ -25,9 +25,9 @@ describe('server api', () => {
       .get('/api/scenic-area')
       .expect(200)
       .expect(({ body }) => {
-        expect(body.scenicArea.name).toBe('云岚古镇');
+        expect(body.scenicArea.name).toBe('乌镇景区');
         expect(body.spots).toHaveLength(5);
-        expect(body.quickQuestions).toContain('帮我规划一条半日游路线');
+        expect(body.quickQuestions).toContain('帮我规划一条乌镇半日游路线');
       });
   });
 
@@ -40,6 +40,21 @@ describe('server api', () => {
       .expect(400)
       .expect(({ body }) => {
         expect(body).toEqual({ code: 'EMPTY_MESSAGE', message: '请输入想咨询的导游问题。' });
+      });
+  });
+
+  it('validates uploaded guide images', async () => {
+    const app = createApp();
+
+    await request(app.callback())
+      .post('/api/guide/chat')
+      .send({
+        message: '分析这张图片',
+        image: { name: 'bad.txt', mimeType: 'text/plain', dataUrl: 'data:text/plain;base64,aaaa' }
+      })
+      .expect(400)
+      .expect(({ body }) => {
+        expect(body).toEqual({ code: 'INVALID_IMAGE', message: '仅支持 PNG、JPG 或 WebP 图片。' });
       });
   });
 

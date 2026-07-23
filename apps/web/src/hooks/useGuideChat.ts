@@ -6,7 +6,12 @@ import {
   isGuideSpeechDurationEvent,
   isGuideSpeechPlaybackEvent
 } from '../lib/guideSpeechSync';
-import type { ChatMessage, GuideSpeechTimeline, RouteCard } from '../types/guide';
+import type {
+  ChatMessage,
+  GuideImageAttachment,
+  GuideSpeechTimeline,
+  RouteCard
+} from '../types/guide';
 
 const FALLBACK_CJK_MS = 145;
 const FALLBACK_WHITESPACE_MS = 35;
@@ -318,10 +323,10 @@ export function useGuideChat() {
   );
 
   const ask = useCallback(
-    async (message: string) => {
+    async (message: string, image?: GuideImageAttachment | null) => {
       const trimmed = message.trim();
 
-      if (!trimmed || loading) {
+      if ((!trimmed && !image) || loading) {
         return;
       }
 
@@ -340,13 +345,19 @@ export function useGuideChat() {
       setSpeechTimeline(null);
       setMessages((current) => [
         ...current,
-        { id: crypto.randomUUID(), role: 'user', content: trimmed },
+        {
+          id: crypto.randomUUID(),
+          role: 'user',
+          content: trimmed || '请分析这张图片',
+          imagePreviewUrl: image?.dataUrl,
+          imageName: image?.name
+        },
         { id: assistantMessageId, role: 'assistant', content: '', streaming: true }
       ]);
 
       try {
         await new Promise<void>((resolve, reject) => {
-          activeStreamRef.current = streamGuideAnswer(trimmed, {
+          activeStreamRef.current = streamGuideAnswer(trimmed, image, {
             onDelta: (delta) => {
               streamedAnswer += delta;
               receivedStreamDelta = true;
