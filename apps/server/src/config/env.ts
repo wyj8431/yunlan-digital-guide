@@ -3,11 +3,22 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: path.resolve(currentDir, '../../.env') });
-dotenv.config({ path: path.resolve(currentDir, '../../../.env') });
+
+export function resolveEnvFilePaths(configDir: string): [string, string] {
+  return [path.resolve(configDir, '../../.env'), path.resolve(configDir, '../../../../.env')];
+}
+
+for (const envPath of resolveEnvFilePaths(currentDir)) {
+  dotenv.config({ path: envPath });
+}
 
 const DEFAULT_ARK_BASE_URL = 'https://ark.cn-beijing.volces.com/api/v3';
 const DEFAULT_COZE_API_BASE = 'https://api.coze.cn';
+const DEFAULT_XFYUN_ASR_URL = 'wss://iat-api.xfyun.cn/v2/iat';
+const DEFAULT_XFYUN_TTS_URL = 'wss://tts-api.xfyun.cn/v2/tts';
+const DEFAULT_MOFA_SDK_SCRIPT_URL =
+  'https://media.xingyun3d.com/xingyun3d/general/litesdk/xmovAvatar@latest.js';
+const DEFAULT_MOFA_GATEWAY_SERVER = 'https://nebula-agent.xingyun3d.com/user/v1/ttsa/session';
 
 function readFirstNonEmptyEnv(...keys: string[]): string {
   for (const key of keys) {
@@ -139,6 +150,7 @@ export type ServerEnv = {
   cozeApiToken: string;
   cozeBotId: string;
   cozeUserId: string;
+  virtualHumanProvider: string;
   virtualHumanEnabled: boolean;
   xfyunVirtualHumanAppId: string;
   xfyunVirtualHumanApiKey: string;
@@ -148,9 +160,23 @@ export type ServerEnv = {
   xfyunVirtualHumanSdkScriptUrl: string;
   xfyunVirtualHumanTtsVoice: string;
   xfyunVirtualHumanActions: string;
+  mofaVirtualHumanEnabled: boolean;
+  mofaVirtualHumanServiceId: string;
+  mofaVirtualHumanAppId: string;
+  mofaVirtualHumanAppSecret: string;
+  mofaVirtualHumanSdkScriptUrl: string;
+  mofaVirtualHumanGatewayServer: string;
+  mofaVirtualHumanActions: string;
+  mofaVirtualHumanEnableLogger: boolean;
+  xfyunAsrEnabled: boolean;
+  xfyunAsrAppId: string;
+  xfyunAsrApiKey: string;
+  xfyunAsrApiSecret: string;
+  xfyunAsrUrl: string;
   xfyunTtsAppId: string;
   xfyunTtsApiKey: string;
   xfyunTtsApiSecret: string;
+  xfyunTtsUrl: string;
   xfyunTtsVoice: string;
 };
 
@@ -165,6 +191,7 @@ export function readEnv(): ServerEnv {
     cozeApiToken: readFirstConfiguredSecret('COZE_API_TOKEN', 'COZE_ACCESS_TOKEN'),
     cozeBotId: readOptionalEnv('COZE_BOT_ID'),
     cozeUserId: readOptionalEnv('COZE_USER_ID') || 'wyj-guide-user',
+    virtualHumanProvider: readOptionalEnv('VIRTUAL_HUMAN_PROVIDER').toLowerCase() || 'auto',
     virtualHumanEnabled: process.env.XFYUN_VIRTUAL_HUMAN_ENABLED === 'true',
     xfyunVirtualHumanAppId: process.env.XFYUN_VIRTUAL_HUMAN_APP_ID ?? '',
     xfyunVirtualHumanApiKey: process.env.XFYUN_VIRTUAL_HUMAN_API_KEY ?? '',
@@ -179,6 +206,28 @@ export function readEnv(): ServerEnv {
       '/libs/avatar-sdk-web_3.2.3.1002/esm/index.js',
     xfyunVirtualHumanTtsVoice: process.env.XFYUN_VIRTUAL_HUMAN_TTS_VOICE ?? 'x4_lingxiaoxuan_oral',
     xfyunVirtualHumanActions: process.env.XFYUN_VIRTUAL_HUMAN_ACTIONS ?? '',
+    mofaVirtualHumanEnabled: process.env.MOFA_VIRTUAL_HUMAN_ENABLED === 'true',
+    mofaVirtualHumanServiceId: readOptionalEnv('MOFA_VIRTUAL_HUMAN_SERVICE_ID'),
+    mofaVirtualHumanAppId: readOptionalEnv('MOFA_VIRTUAL_HUMAN_APP_ID'),
+    mofaVirtualHumanAppSecret: readFirstConfiguredSecret(
+      'MOFA_VIRTUAL_HUMAN_APP_SECRET',
+      'MOFA_VIRTUAL_HUMAN_API_SECRET'
+    ),
+    mofaVirtualHumanSdkScriptUrl:
+      readOptionalEnv('MOFA_VIRTUAL_HUMAN_SDK_SCRIPT_URL') || DEFAULT_MOFA_SDK_SCRIPT_URL,
+    mofaVirtualHumanGatewayServer:
+      readOptionalEnv('MOFA_VIRTUAL_HUMAN_GATEWAY_SERVER') || DEFAULT_MOFA_GATEWAY_SERVER,
+    mofaVirtualHumanActions: readOptionalEnv('MOFA_VIRTUAL_HUMAN_ACTIONS'),
+    mofaVirtualHumanEnableLogger: process.env.MOFA_VIRTUAL_HUMAN_ENABLE_LOGGER === 'true',
+    xfyunAsrEnabled: process.env.XFYUN_ASR_ENABLED === 'true',
+    xfyunAsrAppId: readFirstNonEmptyEnv('XFYUN_ASR_APP_ID', 'XFYUN_VIRTUAL_HUMAN_APP_ID'),
+    xfyunAsrApiKey: readFirstConfiguredSecret('XFYUN_ASR_API_KEY', 'XFYUN_VIRTUAL_HUMAN_API_KEY'),
+    xfyunAsrApiSecret: readFirstConfiguredSecret(
+      'XFYUN_ASR_API_SECRET',
+      'XFYUN_VIRTUAL_HUMAN_API_SECRET',
+      'XFYUN_VIRTUAL_HUMAN_APP_SECRET'
+    ),
+    xfyunAsrUrl: readOptionalEnv('XFYUN_ASR_URL') || DEFAULT_XFYUN_ASR_URL,
     xfyunTtsAppId: process.env.XFYUN_TTS_APP_ID ?? process.env.XFYUN_VIRTUAL_HUMAN_APP_ID ?? '',
     xfyunTtsApiKey: process.env.XFYUN_TTS_API_KEY ?? process.env.XFYUN_VIRTUAL_HUMAN_API_KEY ?? '',
     xfyunTtsApiSecret: readFirstNonEmptyEnv(
@@ -186,6 +235,7 @@ export function readEnv(): ServerEnv {
       'XFYUN_VIRTUAL_HUMAN_API_SECRET',
       'XFYUN_VIRTUAL_HUMAN_APP_SECRET'
     ),
+    xfyunTtsUrl: readOptionalEnv('XFYUN_TTS_URL') || DEFAULT_XFYUN_TTS_URL,
     xfyunTtsVoice: readFirstNonEmptyEnv('XFYUN_TTS_VOICE') || 'xiaoyan'
   };
 }

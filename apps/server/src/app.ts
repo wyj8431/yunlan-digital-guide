@@ -2,6 +2,7 @@ import cors from '@koa/cors';
 import Router from '@koa/router';
 import Koa from 'koa';
 import bodyParser from 'koa-bodyparser';
+import { createDocsRouter } from './modules/docs/docs.routes.js';
 import { createGuideRouter } from './modules/guide/guide.routes.js';
 import { createScenicRouter } from './modules/scenic/scenic.routes.js';
 import { createSpeechRouter } from './modules/speech/speech.routes.js';
@@ -10,6 +11,7 @@ import { createVirtualHumanRouter } from './modules/virtual-human/virtual-human.
 export function createApp(): Koa {
   const app = new Koa();
   const router = new Router();
+  const docsRouter = createDocsRouter();
   const guideRouter = createGuideRouter();
   const scenicRouter = createScenicRouter();
   const speechRouter = createSpeechRouter();
@@ -23,6 +25,8 @@ export function createApp(): Koa {
   app.use(bodyParser({ jsonLimit: '15mb' }));
   app.use(router.routes());
   app.use(router.allowedMethods());
+  app.use(docsRouter.routes());
+  app.use(docsRouter.allowedMethods());
   app.use(scenicRouter.routes());
   app.use(scenicRouter.allowedMethods());
   app.use(guideRouter.routes());

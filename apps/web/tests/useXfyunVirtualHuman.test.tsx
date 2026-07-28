@@ -4,7 +4,14 @@ import { useXfyunVirtualHuman } from '../src/hooks/useXfyunVirtualHuman';
 import { GUIDE_SPEECH_PLAYBACK_EVENT } from '../src/lib/guideSpeechSync';
 
 const start = vi.fn().mockResolvedValue(undefined);
-const speak = vi.fn().mockResolvedValue(undefined);
+let resolveSpeech: (() => void) | null = null;
+let clientOptions: { onSpeechStart?: (text: string) => void } = {};
+const speak = vi.fn(
+  () =>
+    new Promise<void>((resolve) => {
+      resolveSpeech = resolve;
+    })
+);
 const stop = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('../src/api/virtualHumanApi', () => ({
@@ -39,12 +46,17 @@ vi.mock('../src/api/virtualHumanApi', () => ({
 }));
 
 vi.mock('../src/lib/xfyunVirtualHumanClient', () => ({
-  createXfyunVirtualHumanClient: vi.fn(() => ({
-    start,
-    speak,
-    triggerAction: vi.fn().mockResolvedValue(undefined),
-    stop
-  }))
+  createXfyunVirtualHumanClient: vi.fn(
+    (_config, _wrapper, _loader, options: { onSpeechStart?: (text: string) => void }) => {
+      clientOptions = options;
+      return {
+        start,
+        speak,
+        triggerAction: vi.fn().mockResolvedValue(undefined),
+        stop
+      };
+    }
+  )
 }));
 
 function Harness({ answerText }: { answerText: string }) {
@@ -60,6 +72,8 @@ afterEach(() => {
   start.mockClear();
   speak.mockClear();
   stop.mockClear();
+  resolveSpeech = null;
+  clientOptions = {};
 });
 
 describe('useXfyunVirtualHuman', () => {
@@ -82,6 +96,14 @@ describe('useXfyunVirtualHuman', () => {
 
     await waitFor(() => {
       expect(speak).toHaveBeenCalledWith('新的答案');
+    });
+    expect(playbackEvents).toEqual([{ text: '新的答案', phase: 'preparing' }]);
+
+    clientOptions.onSpeechStart?.('新的答案');
+    resolveSpeech?.();
+
+    await waitFor(() => {
+      expect(playbackEvents).toHaveLength(3);
     });
     expect(playbackEvents).toEqual([
       { text: '新的答案', phase: 'preparing' },

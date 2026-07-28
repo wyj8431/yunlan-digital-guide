@@ -17,6 +17,7 @@ type DecodedSpeechChunkResult = { ok: true; audio: AudioBuffer } | { ok: false; 
 
 const MAX_SPEECH_CHUNK_CHARS = 24;
 const SPEECH_CHUNK_PREFETCH_WINDOW = 2;
+const MIN_PROJECTED_DURATION_CHUNKS = 4;
 
 function scoreVoice(voice: SpeechSynthesisVoice): number {
   const lang = voice.lang.toLowerCase();
@@ -177,13 +178,20 @@ export function useSpeechSynthesis() {
       text: string,
       firstDecodedAudio: AudioBuffer,
       firstChunkIndex: number,
-      chunkCount: number,
+      speechChunks: string[],
       loadChunk: (index: number) => Promise<DecodedSpeechChunkResult>,
       prefetchFrom: (index: number) => void,
       playbackToken: number
     ) => {
       try {
         let durationMs = Math.max(1, Math.round(firstDecodedAudio.duration * 1000));
+        let knownCharacterCount = Math.max(
+          1,
+          Array.from(speechChunks[firstChunkIndex] ?? '').length
+        );
+        let plannedCharacterCount = speechChunks
+          .slice(firstChunkIndex)
+          .reduce((total, chunk) => total + Array.from(chunk).length, 0);
         let durationDispatched = false;
         const dispatchDuration = () => {
           if (durationDispatched || playbackTokenRef.current !== playbackToken) {
@@ -194,9 +202,32 @@ export function useSpeechSynthesis() {
           dispatchGuideSpeechDuration({ text, durationMs });
         };
 
+        const dispatchProjectedDuration = () => {
+          if (playbackTokenRef.current !== playbackToken) {
+            return;
+          }
+
+          const averageCharacterMs = Math.min(
+            500,
+            Math.max(40, durationMs / Math.max(knownCharacterCount, 1))
+          );
+          const remainingCharacterCount = Math.max(0, plannedCharacterCount - knownCharacterCount);
+          dispatchGuideSpeechDuration({
+            text,
+            durationMs: Math.max(
+              1,
+              Math.round(durationMs + remainingCharacterCount * averageCharacterMs)
+            )
+          });
+        };
+
+        if (speechChunks.length >= MIN_PROJECTED_DURATION_CHUNKS) {
+          dispatchProjectedDuration();
+        }
+
         await playDecodedServerAudio(audioContext, text, firstDecodedAudio, true);
 
-        for (let index = firstChunkIndex + 1; index < chunkCount; index += 1) {
+        for (let index = firstChunkIndex + 1; index < speechChunks.length; index += 1) {
           if (playbackTokenRef.current !== playbackToken) {
             return;
           }
@@ -208,10 +239,18 @@ export function useSpeechSynthesis() {
           }
 
           if (!decodedChunk.ok) {
+            plannedCharacterCount -= Array.from(speechChunks[index] ?? '').length;
+            if (speechChunks.length >= MIN_PROJECTED_DURATION_CHUNKS) {
+              dispatchProjectedDuration();
+            }
             continue;
           }
 
           durationMs += Math.max(1, Math.round(decodedChunk.audio.duration * 1000));
+          knownCharacterCount += Array.from(speechChunks[index] ?? '').length;
+          if (speechChunks.length >= MIN_PROJECTED_DURATION_CHUNKS) {
+            dispatchProjectedDuration();
+          }
           await playDecodedServerAudio(audioContext, text, decodedChunk.audio, false);
         }
 
@@ -272,7 +311,6 @@ export function useSpeechSynthesis() {
         dispatchGuideSpeechPlayback({ text, phase: 'error' });
       };
       window.speechSynthesis.speak(utterance);
-      dispatchBrowserStart();
     },
     [browserSpeechSupported]
   );
@@ -376,7 +414,7 @@ export function useSpeechSynthesis() {
           text,
           firstSuccessfulChunk.audio,
           firstSuccessfulChunk.index,
-          speechChunks.length,
+          speechChunks,
           loadChunk,
           prefetchFrom,
           playbackToken

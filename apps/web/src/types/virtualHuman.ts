@@ -34,6 +34,23 @@ export type VirtualHumanConfig =
         volume: number;
         rhy: number;
       };
+    }
+  | {
+      enabled: true;
+      provider: 'mofa-xingyun';
+      serviceId: string;
+      sdkScriptUrl: string;
+      appId: string;
+      appSecret: string;
+      gatewayServer: string;
+      actions: Array<{
+        id: string;
+        label: string;
+      }>;
+      startConfig: {
+        hardwareAcceleration: 'prefer-hardware';
+        enableLogger: boolean;
+      };
     };
 
-export type SpeechDriver = 'browser' | 'xfyun';
+export type SpeechDriver = 'browser' | 'xfyun' | 'mofa';

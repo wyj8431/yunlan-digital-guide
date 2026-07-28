@@ -12,7 +12,7 @@
 - WebSocket 流式回答，文字像打字机一样逐步出现
 - 讯飞虚拟人 SDK 接入，支持动作切换和说话
 - 本地 Three.js 数字人兜底，支持估算口型同步
-- 语音输入：浏览器录音后提交到后端讯飞 ASR
+- 语音输入：浏览器通过 `/api/voice` WebSocket 发送 16 kHz、单声道 PCM16，实时接收讯飞 ASR 转写并自动提交
 - 语音回复：优先后端讯飞 TTS + WebAudio 播放时钟，失败时回退浏览器朗读
 
 ## 快速启动
@@ -27,6 +27,7 @@ npm run dev
 - 前端：http://localhost:5173
 - 后端：http://localhost:8787
 - 口型实验室：http://localhost:5173/lab/lip-sync
+- 在线接口文档：http://localhost:8787/api/docs
 
 ## 环境变量
 
@@ -88,7 +89,7 @@ XFYUN_TTS_VOICE=xiaoyan
 语音提问：
 
 ```text
-麦克风录音 -> /api/speech/transcribe -> 自动提交问题 -> 流式回答 -> 数字人说话
+麦克风 -> PCM16 音频块 -> WS /api/voice -> transcript.partial/final -> 自动提交问题 -> answer.final
 ```
 
 语音回复：
@@ -124,6 +125,9 @@ npm --workspace apps/web run test -- useGuideChat QuestionInput
 
 ## 文档
 
+- 在线接口文档：`http://localhost:8787/api/docs`
+- OpenAPI JSON：`http://localhost:8787/api/docs/openapi.json`
 - 第三阶段联调清单：`docs/integration/phase-3b-xfyun-voice.md`
+- Phase 3B 浏览器验收：`apps/web/tests/phase3b.browser.test.js`
 - 设计规格：`docs/superpowers/specs/2026-07-19-yunlan-ancient-town-digital-guide-design.md`
 - 语音口型性能规格：`docs/superpowers/specs/2026-07-20-phase-three-voice-lip-sync-performance-design.md`

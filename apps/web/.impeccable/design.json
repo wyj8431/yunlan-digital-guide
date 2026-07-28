@@ -1,0 +1,150 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-27T10:00:00+08:00",
+  "title": "Design System: 智慧文旅 · 全息导游",
+  "extensions": {
+    "colorMeta": {
+      "water-ink": {
+        "role": "primary",
+        "displayName": "水墨深绿",
+        "canonical": "#043b34",
+        "tonalRamp": [
+          "#021713",
+          "#043b34",
+          "#075b4d",
+          "#0d806b",
+          "#28a88d",
+          "#6acdb7",
+          "#b4eadc",
+          "#ecfbf6"
+        ]
+      },
+      "mist-aqua": {
+        "role": "secondary",
+        "displayName": "水雾天青",
+        "canonical": "#77f3e4",
+        "tonalRamp": [
+          "#073c38",
+          "#0d625b",
+          "#138b80",
+          "#22b5a6",
+          "#54d8c9",
+          "#77f3e4",
+          "#b8faf2",
+          "#edfffc"
+        ]
+      },
+      "sunrise-gold": {
+        "role": "tertiary",
+        "displayName": "晨曦金",
+        "canonical": "#ffe7a0",
+        "tonalRamp": [
+          "#42330e",
+          "#68521b",
+          "#91742d",
+          "#bb9848",
+          "#dfbd6d",
+          "#ffe7a0",
+          "#fff1c7",
+          "#fffbed"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "水乡展示字",
+        "purpose": "页面主命题与旅行护照封面。"
+      },
+      "body": {
+        "displayName": "旅行正文",
+        "purpose": "景区资料、路线建议和操作说明。"
+      }
+    },
+    "shadows": [
+      {
+        "name": "scene-depth",
+        "value": "0 32px 82px rgba(0, 17, 21, 0.32)",
+        "purpose": "核心场景与真实景区背景之间的纵深。"
+      },
+      {
+        "name": "control-lift",
+        "value": "0 14px 32px rgba(0, 18, 21, 0.28)",
+        "purpose": "返回按钮与轻量控制。"
+      }
+    ],
+    "motion": [
+      {
+        "name": "state-transition",
+        "value": "180ms ease",
+        "purpose": "按钮、地图图层与导航状态切换。"
+      },
+      {
+        "name": "water-ripple",
+        "value": "2.8s ease-out infinite",
+        "purpose": "语音连接、聆听、识别和思考状态。"
+      }
+    ],
+    "breakpoints": [
+      { "name": "scene-compact", "value": "1100px" },
+      { "name": "mobile", "value": "760px" },
+      { "name": "mobile-small", "value": "480px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Travel Command",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "胶囊形主要命令，使用晨曦金表达明确行动。",
+      "html": "<button class=\"ds-travel-command\">开始数字人讲解</button>",
+      "css": ".ds-travel-command { min-height:48px; border:1px solid rgba(255,231,160,.48); border-radius:999px; background:rgba(255,231,160,.13); padding:0 20px; color:#ffe7a0; font-weight:850; transition:background 180ms ease,transform 180ms ease; } .ds-travel-command:hover { background:rgba(255,231,160,.23); transform:translateY(-2px); } .ds-travel-command:focus-visible { outline:3px solid rgba(255,231,160,.76); outline-offset:3px; }"
+    },
+    {
+      "name": "Travel Navigation",
+      "kind": "nav",
+      "refersTo": "navigation",
+      "description": "固定在底部的五入口旅行控制带。",
+      "html": "<nav class=\"ds-travel-nav\"><button class=\"ds-nav-active\">探索</button><button>行程</button><button>我的</button></nav>",
+      "css": ".ds-travel-nav { display:flex; gap:8px; min-height:72px; align-items:center; justify-content:center; border:1px solid rgba(218,255,241,.24); border-radius:8px; background:rgba(2,45,43,.88); padding:8px; color:#f7fff9; } .ds-travel-nav button { border:0; border-radius:6px; background:transparent; padding:12px 22px; color:inherit; } .ds-travel-nav .ds-nav-active { background:rgba(46,201,169,.25); color:#ffe7a0; } .ds-travel-nav button:focus-visible { outline:3px solid rgba(255,231,160,.76); outline-offset:2px; }"
+    },
+    {
+      "name": "Voice Core",
+      "kind": "custom",
+      "refersTo": "button-voice",
+      "description": "用同心水纹承载语音会话的主要入口。",
+      "html": "<button class=\"ds-voice-core\" aria-label=\"开始语音提问\">MIC</button>",
+      "css": ".ds-voice-core { display:grid; width:132px; aspect-ratio:1; place-items:center; border:1px solid rgba(255,231,160,.54); border-radius:50%; background:radial-gradient(circle at 50% 35%,rgba(33,173,143,.84),rgba(2,46,49,.96)); color:#fff8d8; font-weight:850; box-shadow:18px 26px 64px rgba(0,13,20,.38); transition:transform 180ms ease; } .ds-voice-core:hover { transform:scale(1.05); } .ds-voice-core:focus-visible { outline:3px solid rgba(255,231,160,.76); outline-offset:3px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Living Wuzhen Travel OS",
+    "overview": "界面像一座由水、晨光和植物能量驱动的旅行操作系统。信息根据任务变成观景台、问题星群、故事声波、运河节点、时间流和旅行护照。",
+    "keyCharacteristics": [
+      "每个页面拥有独立的空间隐喻，同时共享水脉、晨光和植物能量语言。",
+      "主要信息始终可读，循环动画只承担状态和方向表达。",
+      "翠绿和天青负责行动与流动，晨曦金负责重要状态，珊瑚色只用于风险提醒。"
+    ],
+    "rules": [
+      {
+        "name": "Three-Energy Rule",
+        "body": "翠绿表示生命与行动，天青表示信息流，晨曦金表示选择和重要状态。",
+        "section": "colors"
+      },
+      {
+        "name": "Quiet Label Rule",
+        "body": "标签不依赖夸张字距或全大写制造科技感。",
+        "section": "typography"
+      }
+    ],
+    "dos": [
+      "Do 让页面核心任务在首屏成为最大的视觉装置。",
+      "Do 使用真实景区数据，并对票务、开放时间和班次标注官方核验提醒。",
+      "Do 在移动端重新编排空间关系，而不是简单缩小桌面布局。"
+    ],
+    "donts": [
+      "Don't 用同尺寸图标卡片铺满所有页面。",
+      "Don't 伪造实时天气、余票、酒店库存或用户历史足迹。",
+      "Don't 让装饰光效遮挡按钮、状态文字或地图节点。"
+    ]
+  }
+}

@@ -1,9 +1,12 @@
-import type { Server as HttpServer } from 'node:http';
+import type { IncomingMessage, Server as HttpServer } from 'node:http';
+import type { Duplex } from 'node:stream';
 import { WebSocket, WebSocketServer } from 'ws';
 import { readEnv } from '../../config/env.js';
+import { GuideAttachmentError, normalizeGuideAttachment } from './guide-attachment.js';
 import {
   createGuideStreamResponse,
   GuideServiceError,
+  normalizeGuideHistory,
   normalizeGuideImage,
   type GuideChatResponse
 } from './guide.service.js';
@@ -11,10 +14,16 @@ import type { GuideSpeechTimeline } from './speech-timeline.js';
 
 const GUIDE_CHAT_STREAM_PATH = '/api/guide/chat/stream';
 
+function requestPath(req: IncomingMessage): string {
+  return req.url?.split('?')[0] ?? '';
+}
+
 type GuideStreamRequest = {
   type?: unknown;
   message?: unknown;
+  attachment?: unknown;
   image?: unknown;
+  history?: unknown;
 };
 
 type GuideStreamEvent =
@@ -42,7 +51,17 @@ function parseRequest(raw: WebSocket.RawData): GuideStreamRequest {
 }
 
 export function attachGuideWebSocketServer(server: HttpServer): WebSocketServer {
-  const wss = new WebSocketServer({ server, path: GUIDE_CHAT_STREAM_PATH });
+  const wss = new WebSocketServer({ noServer: true });
+
+  server.on('upgrade', (req: IncomingMessage, socket: Duplex, head: Buffer) => {
+    if (requestPath(req) !== GUIDE_CHAT_STREAM_PATH) {
+      return;
+    }
+
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      wss.emit('connection', ws, req);
+    });
+  });
 
   wss.on('connection', (socket) => {
     let activeController: AbortController | null = null;
@@ -69,7 +88,11 @@ export function attachGuideWebSocketServer(server: HttpServer): WebSocketServer 
 
         const response = await createGuideStreamResponse({
           message: request.message,
-          image: normalizeGuideImage(request.image),
+          attachment:
+            request.attachment !== undefined
+              ? normalizeGuideAttachment(request.attachment)
+              : normalizeGuideImage(request.image),
+          history: normalizeGuideHistory(request.history),
           env: readEnv(),
           onDelta: (delta) => sendEvent(socket, { type: 'delta', delta }),
           signal: controller.signal
@@ -83,7 +106,7 @@ export function attachGuideWebSocketServer(server: HttpServer): WebSocketServer 
           return;
         }
 
-        if (caught instanceof GuideServiceError) {
+        if (caught instanceof GuideServiceError || caught instanceof GuideAttachmentError) {
           sendEvent(socket, { type: 'error', code: caught.code, message: caught.message });
         } else {
           sendEvent(socket, {

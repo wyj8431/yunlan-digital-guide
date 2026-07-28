@@ -12,9 +12,13 @@ codex-dev-*.log
 .playwright-preview*.png
 .playwright-*.png
 .codex-run/
+.codex-runtime/
 .playwright-mcp/
+*.log
 layout-mobile-*.png
 yunlan-*.png
+guide-export-menu-before.png
+history-scroll-fixed-desktop.png
 tmp/
 apps/web/public/models/CesiumMan.glb
 apps/web/public/models/xbot.glb

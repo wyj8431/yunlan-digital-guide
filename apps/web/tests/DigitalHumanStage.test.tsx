@@ -70,8 +70,10 @@ vi.mock('three', () => {
         super();
       }
     },
+    CircleGeometry: class {},
     CylinderGeometry: class {},
     RingGeometry: class {},
+    TorusGeometry: class {},
     MeshStandardMaterial: class {
       constructor(public readonly options: unknown) {}
     },

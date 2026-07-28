@@ -1,4 +1,5 @@
 import type { ServerEnv } from '../../config/env.js';
+import sharp from 'sharp';
 import type { ChatCompletionMessage, LlmChat, LlmChatStream } from './llm-client.js';
 
 type CozeDeltaPayload = {
@@ -49,13 +50,73 @@ function splitDataUrl(dataUrl: string): { mimeType: string; bytes: Uint8Array } 
   };
 }
 
+type OptimizedCozeImage = {
+  mimeType: string;
+  extension: string;
+  bytes: Uint8Array;
+};
+
+const COZE_IMAGE_MAX_EDGE = 512;
+
+async function optimizeCozeImage(mimeType: string, bytes: Uint8Array): Promise<OptimizedCozeImage> {
+  const normalizedMimeType = mimeType === 'image/jpg' ? 'image/jpeg' : mimeType;
+  const extension =
+    normalizedMimeType === 'image/jpeg' ? 'jpg' : normalizedMimeType.split('/')[1] || 'png';
+
+  if (
+    bytes.byteLength < 128 ||
+    !['image/jpeg', 'image/png', 'image/webp'].includes(normalizedMimeType)
+  ) {
+    return { mimeType, extension, bytes };
+  }
+
+  try {
+    const input = Buffer.from(bytes);
+    const metadata = await sharp(input).metadata();
+    const width = metadata.width ?? 0;
+    const height = metadata.height ?? 0;
+
+    if (width <= COZE_IMAGE_MAX_EDGE && height <= COZE_IMAGE_MAX_EDGE) {
+      return { mimeType: normalizedMimeType, extension, bytes };
+    }
+
+    let pipeline = sharp(input).rotate().resize({
+      width: COZE_IMAGE_MAX_EDGE,
+      height: COZE_IMAGE_MAX_EDGE,
+      fit: 'inside',
+      withoutEnlargement: true
+    });
+
+    if (normalizedMimeType === 'image/jpeg') {
+      pipeline = pipeline.jpeg({ quality: 82, progressive: true });
+    } else if (normalizedMimeType === 'image/webp') {
+      pipeline = pipeline.webp({ quality: 82, smartSubsample: true });
+    } else {
+      pipeline = pipeline.png({ compressionLevel: 8, adaptiveFiltering: true });
+    }
+
+    return {
+      mimeType: normalizedMimeType,
+      extension,
+      bytes: Uint8Array.from(await pipeline.toBuffer())
+    };
+  } catch {
+    // Invalid or unsupported test fixtures still follow the existing upload path.
+    return { mimeType, extension, bytes };
+  }
+}
+
 async function uploadCozeImage(dataUrl: string, env: ServerEnv): Promise<string> {
-  const { mimeType, bytes } = splitDataUrl(dataUrl);
-  const extension = mimeType.split('/')[1] || 'png';
-  const arrayBuffer = new ArrayBuffer(bytes.byteLength);
-  new Uint8Array(arrayBuffer).set(bytes);
+  const parsed = splitDataUrl(dataUrl);
+  const optimized = await optimizeCozeImage(parsed.mimeType, parsed.bytes);
+  const arrayBuffer = new ArrayBuffer(optimized.bytes.byteLength);
+  new Uint8Array(arrayBuffer).set(optimized.bytes);
   const formData = new FormData();
-  formData.append('file', new Blob([arrayBuffer], { type: mimeType }), `guide-image.${extension}`);
+  formData.append(
+    'file',
+    new Blob([arrayBuffer], { type: optimized.mimeType }),
+    `guide-image.${optimized.extension}`
+  );
 
   const response = await fetch(`${env.cozeApiBase.replace(/\/$/, '')}/v1/files/upload`, {
     method: 'POST',
@@ -105,7 +166,12 @@ async function buildCozeAdditionalMessage(messages: ChatCompletionMessage[], env
   let hasImage = false;
 
   for (const message of messages) {
-    const prefix = message.role === 'system' ? '系统要求' : '用户问题';
+    const prefix =
+      message.role === 'system'
+        ? '系统要求'
+        : message.role === 'assistant'
+          ? '导游历史回答'
+          : '用户问题';
 
     if (typeof message.content === 'string') {
       objectItems.push({ type: 'text', text: `${prefix}：${message.content}` });
@@ -146,7 +212,12 @@ async function buildCozeAdditionalMessage(messages: ChatCompletionMessage[], env
     type: 'question',
     content: messages
       .map((message) => {
-        const prefix = message.role === 'system' ? '系统要求' : '用户问题';
+        const prefix =
+          message.role === 'system'
+            ? '系统要求'
+            : message.role === 'assistant'
+              ? '导游历史回答'
+              : '用户问题';
 
         return `${prefix}：${textFromMessageContent(message.content)}`;
       })

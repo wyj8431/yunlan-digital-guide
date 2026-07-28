@@ -127,6 +127,7 @@ describe('createXfyunVirtualHumanClient', () => {
   });
 
   it('drives the avatar with plain text and releases the session', async () => {
+    vi.useFakeTimers();
     const writeText = vi.fn().mockResolvedValue(undefined);
     const stop = vi.fn();
     const destroy = vi.fn();
@@ -155,7 +156,9 @@ describe('createXfyunVirtualHumanClient', () => {
     );
 
     await client.start();
-    await client.speak('欢迎来到云岚古镇');
+    const speaking = client.speak('欢迎来到云岚古镇');
+    await vi.runAllTimersAsync();
+    await speaking;
     await client.stop();
 
     expect(writeText).toHaveBeenCalledWith('欢迎来到云岚古镇', {
@@ -165,9 +168,11 @@ describe('createXfyunVirtualHumanClient', () => {
     });
     expect(stop).toHaveBeenCalledOnce();
     expect(destroy).toHaveBeenCalledOnce();
+    vi.useRealTimers();
   });
 
   it('reports the SDK tts duration for the current spoken text', async () => {
+    vi.useFakeTimers();
     const onSpeechDuration = vi.fn();
     const ttsDurationListenerRef = {
       current: null as ((payload: unknown) => void) | null
@@ -203,10 +208,224 @@ describe('createXfyunVirtualHumanClient', () => {
     );
 
     await client.start();
-    await client.speak('欢迎来到云岚古镇');
+    const speaking = client.speak('欢迎来到云岚古镇');
+    await Promise.resolve();
     ttsDurationListenerRef.current?.({ payload: { tts: { duration: 2.4 } } });
 
     expect(onSpeechDuration).toHaveBeenCalledWith(2400, '欢迎来到云岚古镇');
+    await vi.runAllTimersAsync();
+    await speaking;
+    vi.useRealTimers();
+  });
+
+  it('keeps long SDK tts durations in seconds instead of treating them as milliseconds', async () => {
+    vi.useFakeTimers();
+    const onSpeechDuration = vi.fn();
+    const ttsDurationListenerRef = {
+      current: null as ((payload: unknown) => void) | null
+    };
+
+    class AvatarPlatform {
+      setApiInfo() {}
+      setGlobalParams() {}
+      start() {
+        return Promise.resolve();
+      }
+      writeText() {
+        return Promise.resolve();
+      }
+      stop() {}
+      destroy() {}
+      on(event: unknown, listener: (payload: unknown) => void) {
+        if (event === 'tts_duration') {
+          ttsDurationListenerRef.current = listener;
+        }
+        return this;
+      }
+    }
+
+    const client = createXfyunVirtualHumanClient(
+      config,
+      document.createElement('div'),
+      async () => ({
+        default: AvatarPlatform,
+        SDKEvents: { tts_duration: 'tts_duration' }
+      }),
+      { onSpeechDuration }
+    );
+
+    await client.start();
+    const speaking = client.speak('long document summary');
+    await Promise.resolve();
+    ttsDurationListenerRef.current?.({ payload: { tts: { duration: 240 } } });
+
+    expect(onSpeechDuration).toHaveBeenLastCalledWith(240_000, 'long document summary');
+    await vi.runAllTimersAsync();
+    await speaking;
+    vi.useRealTimers();
+  });
+
+  it('uses frame events as the actual speech start and end boundaries', async () => {
+    const listeners = new Map<unknown, (...args: unknown[]) => void>();
+    const onSpeechStart = vi.fn();
+    const onSpeechDuration = vi.fn();
+
+    class AvatarPlatform {
+      setApiInfo() {}
+      setGlobalParams() {}
+      start() {
+        return Promise.resolve();
+      }
+      writeText() {
+        return Promise.resolve();
+      }
+      stop() {}
+      destroy() {}
+      on(event: unknown, listener: (...args: unknown[]) => void) {
+        listeners.set(event, listener);
+        return this;
+      }
+    }
+
+    const client = createXfyunVirtualHumanClient(
+      config,
+      document.createElement('div'),
+      async () => ({
+        default: AvatarPlatform,
+        SDKEvents: {
+          frame_start: 'frame_start',
+          frame_stop: 'frame_stop',
+          tts_duration: 'tts_duration'
+        }
+      }),
+      { onSpeechStart, onSpeechDuration }
+    );
+
+    await client.start();
+    const speaking = client.speak('欢迎来到云岚古镇');
+    await Promise.resolve();
+
+    expect(onSpeechStart).not.toHaveBeenCalled();
+    listeners.get('tts_duration')?.({ duration: 2.4 });
+    listeners.get('frame_start')?.({});
+
+    expect(onSpeechDuration).toHaveBeenLastCalledWith(2400, '欢迎来到云岚古镇');
+    expect(onSpeechStart).toHaveBeenCalledWith('欢迎来到云岚古镇');
+
+    let finished = false;
+    void speaking.then(() => {
+      finished = true;
+    });
+    await Promise.resolve();
+    expect(finished).toBe(false);
+
+    listeners.get('frame_stop')?.({});
+    await speaking;
+    expect(finished).toBe(true);
+  });
+
+  it('does not let the estimated duration finish speech before frame_stop', async () => {
+    vi.useFakeTimers();
+    const listeners = new Map<unknown, (...args: unknown[]) => void>();
+
+    class AvatarPlatform {
+      setApiInfo() {}
+      setGlobalParams() {}
+      start() {
+        return Promise.resolve();
+      }
+      writeText() {
+        return Promise.resolve();
+      }
+      stop() {}
+      destroy() {}
+      on(event: unknown, listener: (...args: unknown[]) => void) {
+        listeners.set(event, listener);
+        return this;
+      }
+    }
+
+    const client = createXfyunVirtualHumanClient(
+      config,
+      document.createElement('div'),
+      async () => ({
+        default: AvatarPlatform,
+        SDKEvents: {
+          frame_start: 'frame_start',
+          frame_stop: 'frame_stop'
+        }
+      })
+    );
+
+    await client.start();
+    const speaking = client.speak('short speech');
+    let finished = false;
+    void speaking.then(() => {
+      finished = true;
+    });
+
+    listeners.get('frame_start')?.({});
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    expect(finished).toBe(false);
+
+    listeners.get('frame_stop')?.({});
+    await speaking;
+    expect(finished).toBe(true);
+    vi.useRealTimers();
+  });
+
+  it('does not finish a short speech before its frame start event', async () => {
+    vi.useFakeTimers();
+    const listeners = new Map<unknown, (...args: unknown[]) => void>();
+    const onSpeechStart = vi.fn();
+
+    class AvatarPlatform {
+      setApiInfo() {}
+      setGlobalParams() {}
+      start() {
+        return Promise.resolve();
+      }
+      writeText() {
+        return Promise.resolve();
+      }
+      stop() {}
+      destroy() {}
+      on(event: unknown, listener: (...args: unknown[]) => void) {
+        listeners.set(event, listener);
+        return this;
+      }
+    }
+
+    const client = createXfyunVirtualHumanClient(
+      config,
+      document.createElement('div'),
+      async () => ({
+        default: AvatarPlatform,
+        SDKEvents: {
+          frame_start: 'frame_start',
+          frame_stop: 'frame_stop'
+        }
+      }),
+      { onSpeechStart }
+    );
+
+    await client.start();
+    const speaking = client.speak('好');
+    let finished = false;
+    void speaking.then(() => {
+      finished = true;
+    });
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(onSpeechStart).not.toHaveBeenCalled();
+    expect(finished).toBe(false);
+
+    listeners.get('frame_start')?.({});
+    listeners.get('frame_stop')?.({});
+    await speaking;
+    expect(finished).toBe(true);
+    vi.useRealTimers();
   });
 
   it('triggers an avatar action through writeCmd', async () => {

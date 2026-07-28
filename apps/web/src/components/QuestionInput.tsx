@@ -1,12 +1,14 @@
-import { ImagePlus, Mic, Send, Square, X } from 'lucide-react';
+import { FileText, FileUp, Mic, Send, Square, X } from 'lucide-react';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import type { MutableRefObject } from 'react';
 import { transcribeSpeechAudio } from '../api/speechApi';
-import type { GuideImageAttachment } from '../types/guide';
+import type { GuideAttachment, GuideAttachmentKind } from '../types/guide';
+import type { VoiceGuideState } from '../voice/useVoiceGuideSession';
 
 type QuestionInputProps = {
   disabled: boolean;
-  onAsk: (question: string, image?: GuideImageAttachment | null) => void;
+  onAsk: (question: string, attachment?: GuideAttachment | null) => void;
+  voice?: VoiceGuideState;
 };
 
 type VoiceState = 'idle' | 'listening' | 'processing' | 'unsupported' | 'error';
@@ -20,7 +22,7 @@ const NO_SPEECH_TIMEOUT_MS = 7000;
 const SILENCE_AUTO_SEND_MS = 1300;
 const MANUAL_STOP_FALLBACK_MS = 700;
 const VOICE_RMS_THRESHOLD = 0.025;
-const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
 const HINT_READY =
   '\u53ef\u4ee5\u76f4\u63a5\u8f93\u5165\uff0c\u4e5f\u53ef\u4ee5\u6309\u9ea6\u514b\u98ce\u8bf4\u5b8c\u81ea\u52a8\u53d1\u9001\u3002';
@@ -59,37 +61,82 @@ const INPUT_LABEL = '\u5411\u6570\u5b57\u5bfc\u6e38\u63d0\u95ee';
 const VOICE_INPUT_LABEL = '\u8bed\u97f3\u8f93\u5165';
 const STOP_VOICE_INPUT_LABEL = '\u505c\u6b62\u8bed\u97f3\u8f93\u5165';
 const SEND_QUESTION_LABEL = '\u53d1\u9001\u95ee\u9898';
-const ATTACH_IMAGE_LABEL = '上传图片';
-const IMAGE_FILE_INPUT_LABEL = '选择图片文件';
-const REMOVE_IMAGE_LABEL = '移除图片';
-const HINT_IMAGE_READY = '图片已添加，可以输入问题并发送。';
-const HINT_IMAGE_TOO_LARGE = '图片太大，请压缩到 4MB 以内再发送。';
-const HINT_IMAGE_UNSUPPORTED = '仅支持 PNG、JPG 或 WebP 图片。';
+const ATTACH_FILE_LABEL = '上传图片或文档';
+const ATTACHMENT_FILE_INPUT_LABEL = '选择附件文件';
+const REMOVE_ATTACHMENT_LABEL = '移除附件';
+const HINT_ATTACHMENT_READY = '附件已添加，可以输入问题并发送。';
+const HINT_ATTACHMENT_TOO_LARGE = '附件太大，请压缩到 10MB 以内再发送。';
+const HINT_ATTACHMENT_UNSUPPORTED =
+  '仅支持 PNG、JPG、WebP、Word、PowerPoint、Excel、CSV 和 Markdown 文件。';
+const ATTACHMENT_ACCEPT = [
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  '.doc',
+  '.docx',
+  '.ppt',
+  '.pptx',
+  '.xls',
+  '.xlsx',
+  '.csv',
+  '.md'
+].join(',');
+const ATTACHMENT_TYPES: Record<string, { kind: GuideAttachmentKind; mimeType: string }> = {
+  png: { kind: 'image', mimeType: 'image/png' },
+  jpg: { kind: 'image', mimeType: 'image/jpeg' },
+  jpeg: { kind: 'image', mimeType: 'image/jpeg' },
+  webp: { kind: 'image', mimeType: 'image/webp' },
+  doc: { kind: 'document', mimeType: 'application/msword' },
+  docx: {
+    kind: 'document',
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  },
+  ppt: { kind: 'presentation', mimeType: 'application/vnd.ms-powerpoint' },
+  pptx: {
+    kind: 'presentation',
+    mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+  },
+  xls: { kind: 'spreadsheet', mimeType: 'application/vnd.ms-excel' },
+  xlsx: {
+    kind: 'spreadsheet',
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  },
+  csv: { kind: 'spreadsheet', mimeType: 'text/csv' },
+  md: { kind: 'markdown', mimeType: 'text/markdown' }
+};
 
-function isSupportedImage(file: File): boolean {
-  return ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'].includes(file.type);
+function getAttachmentType(file: File) {
+  const extension = file.name.split('.').pop()?.toLowerCase() ?? '';
+  return ATTACHMENT_TYPES[extension] ?? null;
 }
 
-async function readImageAttachment(file: File): Promise<GuideImageAttachment> {
-  if (!isSupportedImage(file)) {
-    throw new Error(HINT_IMAGE_UNSUPPORTED);
+async function readGuideAttachment(file: File): Promise<GuideAttachment> {
+  const attachmentType = getAttachmentType(file);
+  if (!attachmentType) {
+    throw new Error(HINT_ATTACHMENT_UNSUPPORTED);
   }
 
-  if (file.size > MAX_IMAGE_BYTES) {
-    throw new Error(HINT_IMAGE_TOO_LARGE);
+  if (file.size > MAX_ATTACHMENT_BYTES) {
+    throw new Error(HINT_ATTACHMENT_TOO_LARGE);
   }
 
-  const dataUrl = await new Promise<string>((resolve, reject) => {
+  const rawDataUrl = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result ?? ''));
-    reader.onerror = () => reject(new Error(HINT_IMAGE_UNSUPPORTED));
+    reader.onerror = () => reject(new Error(HINT_ATTACHMENT_UNSUPPORTED));
     reader.readAsDataURL(file);
   });
+  const dataUrl = rawDataUrl.replace(
+    /^data:[^;,]*;base64,/,
+    `data:${attachmentType.mimeType};base64,`
+  );
 
   return {
     name: file.name,
-    mimeType: file.type,
-    dataUrl
+    mimeType: attachmentType.mimeType,
+    kind: attachmentType.kind,
+    dataUrl,
+    sizeBytes: file.size
   };
 }
 
@@ -107,9 +154,9 @@ function chooseRecorderMimeType(): string {
   return '';
 }
 
-export function QuestionInput({ disabled, onAsk }: QuestionInputProps) {
+export function QuestionInput({ disabled, onAsk, voice }: QuestionInputProps) {
   const [question, setQuestion] = useState('');
-  const [image, setImage] = useState<GuideImageAttachment | null>(null);
+  const [attachment, setAttachment] = useState<GuideAttachment | null>(null);
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
   const [voiceHint, setVoiceHint] = useState(HINT_READY);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -137,7 +184,25 @@ export function QuestionInput({ disabled, onAsk }: QuestionInputProps) {
   const speechRecognitionSupported =
     typeof window !== 'undefined' &&
     Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
-  const voiceSupported = recorderSupported || speechRecognitionSupported;
+  const legacyVoiceSupported = recorderSupported || speechRecognitionSupported;
+  const streamingVoiceActive = Boolean(voice && !['idle', 'error'].includes(voice.status));
+  const effectiveVoiceSupported = voice
+    ? voice.supported || legacyVoiceSupported
+    : legacyVoiceSupported;
+  const effectiveVoiceState: VoiceState = streamingVoiceActive
+    ? voice?.status === 'thinking' || voice?.status === 'speaking'
+      ? 'processing'
+      : 'listening'
+    : voice?.status === 'error'
+      ? 'error'
+      : voiceState;
+  const effectiveVoiceHint = voice?.error
+    ? voice.error
+    : voice?.transcript
+      ? HINT_HEARD
+      : streamingVoiceActive
+        ? HINT_LISTENING_AUTO_SEND
+        : voiceHint;
 
   function clearTimer(timerRef: MutableRefObject<number | null>) {
     if (timerRef.current !== null) {
@@ -180,17 +245,17 @@ export function QuestionInput({ disabled, onAsk }: QuestionInputProps) {
   function submitQuestion(
     nextQuestion: string,
     nextHint = HINT_SENT,
-    nextImage: GuideImageAttachment | null = image
+    nextAttachment: GuideAttachment | null = attachment
   ) {
     const trimmed = nextQuestion.trim();
 
-    if (!trimmed && !nextImage) {
+    if (!trimmed && !nextAttachment) {
       return;
     }
 
-    onAsk(trimmed, nextImage);
+    onAsk(trimmed, nextAttachment);
     setQuestion('');
-    setImage(null);
+    setAttachment(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -468,27 +533,27 @@ export function QuestionInput({ disabled, onAsk }: QuestionInputProps) {
     submitQuestion(question);
   }
 
-  async function handleImageChange(file: File | undefined) {
+  async function handleAttachmentChange(file: File | undefined) {
     if (!file) {
       return;
     }
 
     try {
-      const attachment = await readImageAttachment(file);
-      setImage(attachment);
-      setVoiceHint(HINT_IMAGE_READY);
+      const nextAttachment = await readGuideAttachment(file);
+      setAttachment(nextAttachment);
+      setVoiceHint(HINT_ATTACHMENT_READY);
     } catch (caught) {
-      setImage(null);
+      setAttachment(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
       setVoiceState('error');
-      setVoiceHint(caught instanceof Error ? caught.message : HINT_IMAGE_UNSUPPORTED);
+      setVoiceHint(caught instanceof Error ? caught.message : HINT_ATTACHMENT_UNSUPPORTED);
     }
   }
 
-  function removeImage() {
-    setImage(null);
+  function removeAttachment() {
+    setAttachment(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -496,7 +561,7 @@ export function QuestionInput({ disabled, onAsk }: QuestionInputProps) {
   }
 
   useEffect(() => {
-    if (!voiceSupported) {
+    if (!voice && !legacyVoiceSupported) {
       setVoiceState('unsupported');
       setVoiceHint(HINT_UNSUPPORTED);
     }
@@ -511,10 +576,21 @@ export function QuestionInput({ disabled, onAsk }: QuestionInputProps) {
       }
       stopMediaResources();
     };
-  }, [voiceSupported]);
+  }, [legacyVoiceSupported, voice]);
+
+  useEffect(() => {
+    if (voice?.transcript) {
+      setQuestion(voice.transcript);
+    }
+  }, [voice?.transcript]);
 
   async function startVoiceInput() {
-    if (disabled || voiceState === 'listening' || voiceState === 'processing') {
+    if (disabled || effectiveVoiceState === 'listening' || effectiveVoiceState === 'processing') {
+      return;
+    }
+
+    if (voice?.supported) {
+      voice.toggle();
       return;
     }
 
@@ -527,6 +603,11 @@ export function QuestionInput({ disabled, onAsk }: QuestionInputProps) {
   }
 
   function stopVoiceInput() {
+    if (streamingVoiceActive) {
+      voice?.cancel();
+      return;
+    }
+
     if (mediaRecorderRef.current) {
       stopMediaRecording();
       return;
@@ -539,22 +620,23 @@ export function QuestionInput({ disabled, onAsk }: QuestionInputProps) {
     }, MANUAL_STOP_FALLBACK_MS);
   }
 
-  const voiceLabel = voiceState === 'listening' ? STOP_VOICE_INPUT_LABEL : VOICE_INPUT_LABEL;
+  const voiceLabel =
+    effectiveVoiceState === 'listening' ? STOP_VOICE_INPUT_LABEL : VOICE_INPUT_LABEL;
 
   return (
     <div className="question-input-shell">
       <form className="question-input" onSubmit={handleSubmit}>
         <input
           ref={fileInputRef}
-          className="question-image-input"
+          className="question-attachment-input"
           type="file"
-          accept="image/png,image/jpeg,image/webp"
-          onChange={(event) => void handleImageChange(event.target.files?.[0])}
-          aria-label={IMAGE_FILE_INPUT_LABEL}
+          accept={ATTACHMENT_ACCEPT}
+          onChange={(event) => void handleAttachmentChange(event.target.files?.[0])}
+          aria-label={ATTACHMENT_FILE_INPUT_LABEL}
         />
         <input
           value={question}
-          disabled={disabled || voiceState === 'processing'}
+          disabled={disabled || effectiveVoiceState === 'processing' || streamingVoiceActive}
           onChange={(event) => setQuestion(event.target.value)}
           placeholder={PLACEHOLDER_SCENIC_QUESTION}
           aria-label={INPUT_LABEL}
@@ -562,47 +644,71 @@ export function QuestionInput({ disabled, onAsk }: QuestionInputProps) {
         <div className="question-actions">
           <button
             type="button"
-            disabled={disabled || voiceState === 'processing'}
+            disabled={disabled || effectiveVoiceState === 'processing'}
             onClick={() => fileInputRef.current?.click()}
-            aria-label={ATTACH_IMAGE_LABEL}
-            title={ATTACH_IMAGE_LABEL}
+            aria-label={ATTACH_FILE_LABEL}
+            title={ATTACH_FILE_LABEL}
           >
-            <ImagePlus size={16} />
+            <FileUp size={16} />
           </button>
           <button
             type="button"
-            disabled={disabled || !voiceSupported || voiceState === 'processing'}
-            onClick={voiceState === 'listening' ? stopVoiceInput : () => void startVoiceInput()}
+            disabled={disabled || !effectiveVoiceSupported || effectiveVoiceState === 'processing'}
+            onClick={
+              effectiveVoiceState === 'listening' ? stopVoiceInput : () => void startVoiceInput()
+            }
             aria-label={voiceLabel}
             title={voiceLabel}
           >
-            {voiceState === 'listening' ? <Square size={16} /> : <Mic size={16} />}
+            {effectiveVoiceState === 'listening' ? <Square size={16} /> : <Mic size={16} />}
           </button>
           <button
             type="submit"
-            disabled={disabled || voiceState === 'processing' || (!question.trim() && !image)}
+            disabled={
+              disabled ||
+              effectiveVoiceState === 'processing' ||
+              streamingVoiceActive ||
+              (!question.trim() && !attachment)
+            }
             aria-label={SEND_QUESTION_LABEL}
           >
             <Send size={16} />
           </button>
         </div>
       </form>
-      {image ? (
-        <div className="question-image-preview">
-          <img src={image.dataUrl} alt="" />
-          <span>{image.name ?? '已选择图片'}</span>
+      {attachment ? (
+        <div className="question-attachment-preview">
+          {attachment.kind === 'image' ? (
+            <img src={attachment.dataUrl} alt="" />
+          ) : (
+            <FileText size={22} aria-hidden="true" />
+          )}
+          <span>
+            <strong>{attachment.name}</strong>
+            <small>
+              {attachment.kind === 'image'
+                ? '图片'
+                : attachment.kind === 'document'
+                  ? 'Word 文档'
+                  : attachment.kind === 'presentation'
+                    ? 'PowerPoint'
+                    : attachment.kind === 'spreadsheet'
+                      ? '表格'
+                      : 'Markdown'}
+            </small>
+          </span>
           <button
             type="button"
-            onClick={removeImage}
-            aria-label={REMOVE_IMAGE_LABEL}
-            title={REMOVE_IMAGE_LABEL}
+            onClick={removeAttachment}
+            aria-label={REMOVE_ATTACHMENT_LABEL}
+            title={REMOVE_ATTACHMENT_LABEL}
           >
             <X size={14} />
           </button>
         </div>
       ) : null}
-      <p className={`question-status question-status--${voiceState}`} aria-live="polite">
-        {voiceHint}
+      <p className={`question-status question-status--${effectiveVoiceState}`} aria-live="polite">
+        {effectiveVoiceHint}
       </p>
     </div>
   );

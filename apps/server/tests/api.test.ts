@@ -31,6 +31,31 @@ describe('server api', () => {
       });
   });
 
+  it('serves online api documentation and openapi json', async () => {
+    const app = createApp();
+
+    await request(app.callback())
+      .get('/api/docs')
+      .expect(200)
+      .expect('Content-Type', /html/)
+      .expect((response) => {
+        expect(response.text).toContain('乌镇景区 AI 数字导游 API 文档');
+        expect(response.text).toContain('/api/docs/openapi.json');
+      });
+
+    await request(app.callback())
+      .get('/api/docs/openapi.json')
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.openapi).toBe('3.1.0');
+        expect(body.paths).toHaveProperty('/api/guide/chat');
+        expect(body.paths).toHaveProperty('/api/destinations');
+        expect(body.paths).toHaveProperty('/api/voice');
+        expect(body.components.schemas).toHaveProperty('GuideChatResponse');
+        expect(body.components.schemas).toHaveProperty('GuideAttachment');
+      });
+  });
+
   it('returns a clear guide chat validation error', async () => {
     const app = createApp();
 
@@ -41,6 +66,27 @@ describe('server api', () => {
       .expect(({ body }) => {
         expect(body).toEqual({ code: 'EMPTY_MESSAGE', message: '请输入想咨询的导游问题。' });
       });
+  });
+
+  it('downloads guide answers as Markdown and Excel files', async () => {
+    const app = createApp();
+
+    await request(app.callback())
+      .post('/api/guide/export')
+      .send({ content: '# 行程\n\n- 西湖', format: 'markdown', title: '杭州行程' })
+      .expect(200)
+      .expect('Content-Type', /text\/markdown/)
+      .expect('Content-Disposition', /attachment/)
+      .expect((response) => {
+        expect(response.headers['content-disposition']).toContain('filename*=UTF-8');
+      });
+
+    await request(app.callback())
+      .post('/api/guide/export')
+      .send({ content: '| 景点 | 天数 |\n| --- | --- |\n| 乌镇 | 1 |', format: 'excel' })
+      .expect(200)
+      .expect('Content-Type', /spreadsheetml.sheet/)
+      .expect('Content-Disposition', /\.xlsx/);
   });
 
   it('validates uploaded guide images', async () => {
@@ -55,6 +101,100 @@ describe('server api', () => {
       .expect(400)
       .expect(({ body }) => {
         expect(body).toEqual({ code: 'INVALID_IMAGE', message: '仅支持 PNG、JPG 或 WebP 图片。' });
+      });
+  });
+
+  it('lists a broad destination catalog instead of only Wuzhen', async () => {
+    const app = createApp();
+
+    await request(app.callback())
+      .get('/api/destinations')
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.destinations.length).toBeGreaterThanOrEqual(20);
+        expect(body.destinations).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ name: '黄山' }),
+            expect.objectContaining({ name: '兵马俑' }),
+            expect.objectContaining({ name: '悉尼歌剧院' })
+          ])
+        );
+      });
+
+    await request(app.callback())
+      .get(`/api/destinations/${encodeURIComponent('兵马俑')}`)
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.destination).toBe('兵马俑');
+        expect(body.sections).toHaveLength(5);
+        expect(body.sections.join('\n')).toContain('秦始皇帝陵博物院');
+      });
+  });
+
+  it('lists all province tourism catalogs and returns province details', async () => {
+    const app = createApp();
+    const list = await request(app.callback()).get('/api/provinces').expect(200);
+
+    expect(list.body.provinces).toHaveLength(34);
+    expect(
+      list.body.provinces.find((item: { name: string }) => item.name === '山西')
+    ).toMatchObject({
+      spotCount: 15,
+      featuredSpots: expect.arrayContaining(['平遥古城', '云冈石窟', '五台山'])
+    });
+
+    await request(app.callback())
+      .get(`/api/provinces/${encodeURIComponent('山西省')}`)
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.province).toBe('山西');
+        expect(body.highlights).toHaveLength(15);
+        expect(body.highlights).toEqual(
+          expect.arrayContaining([expect.objectContaining({ name: '平遥古城', city: '晋中' })])
+        );
+      });
+
+    await request(app.callback())
+      .get(`/api/provinces/${encodeURIComponent('不存在')}`)
+      .expect(404)
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          code: 'PROVINCE_NOT_FOUND',
+          message: '没有找到这个省份的旅游资料。'
+        });
+      });
+  });
+
+  it('returns retrieved guide knowledge for debugging grounded answers', async () => {
+    const app = createApp();
+
+    await request(app.callback())
+      .get('/api/guide/retrieval')
+      .query({ query: '上海迪士尼亲子游怎么玩？' })
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.query).toBe('上海迪士尼亲子游怎么玩？');
+        expect(body.results[0]).toMatchObject({
+          source: 'destination-knowledge',
+          title: '上海迪士尼度假区'
+        });
+        expect(body.results[0].content).toContain('飞跃地平线');
+        expect(body.context).toContain('检索到的景区知识库上下文');
+      });
+  });
+
+  it('validates empty guide retrieval query', async () => {
+    const app = createApp();
+
+    await request(app.callback())
+      .get('/api/guide/retrieval')
+      .query({ query: '   ' })
+      .expect(400)
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          code: 'EMPTY_QUERY',
+          message: '请输入要检索的景区旅游问题。'
+        });
       });
   });
 
@@ -74,6 +214,7 @@ describe('server api', () => {
   });
 
   it('returns a portrait full-body config when xfyun is enabled', async () => {
+    vi.stubEnv('VIRTUAL_HUMAN_PROVIDER', 'xfyun');
     vi.stubEnv('XFYUN_VIRTUAL_HUMAN_ENABLED', 'true');
     vi.stubEnv('XFYUN_VIRTUAL_HUMAN_APP_ID', 'app-id');
     vi.stubEnv('XFYUN_VIRTUAL_HUMAN_API_KEY', 'api-key');
@@ -93,11 +234,11 @@ describe('server api', () => {
           actions: expect.arrayContaining([
             expect.objectContaining({ id: 'A_LH_introduced_O', label: '介绍' })
           ]),
-          signedUrl: expect.stringContaining(
-            'wss://avatar.cn-huadong-1.xf-yun.com/v1/interact?authorization='
-          ),
+          signedUrl: '',
           startConfig: {
             appId: 'app-id',
+            apiKey: 'api-key',
+            apiSecret: 'api-secret',
             avatarId: 'avatar-id',
             width: 720,
             height: 1280,
@@ -105,12 +246,11 @@ describe('server api', () => {
             transparent: true
           }
         });
-        expect(body.startConfig).not.toHaveProperty('apiKey');
-        expect(body.startConfig).not.toHaveProperty('apiSecret');
       });
   });
 
   it('falls back to App Secret when API Secret is blank', async () => {
+    vi.stubEnv('VIRTUAL_HUMAN_PROVIDER', 'xfyun');
     vi.stubEnv('XFYUN_VIRTUAL_HUMAN_ENABLED', 'true');
     vi.stubEnv('XFYUN_VIRTUAL_HUMAN_APP_ID', 'app-id');
     vi.stubEnv('XFYUN_VIRTUAL_HUMAN_API_KEY', 'api-key');
@@ -129,16 +269,48 @@ describe('server api', () => {
           actions: expect.arrayContaining([
             expect.objectContaining({ id: 'A_RH_bye_O', label: '再见' })
           ]),
-          signedUrl: expect.stringContaining(
-            'wss://avatar.cn-huadong-1.xf-yun.com/v1/interact?authorization='
-          ),
+          signedUrl: '',
           startConfig: {
             appId: 'app-id',
+            apiKey: 'api-key',
+            apiSecret: 'app-secret',
             avatarId: 'avatar-id'
           }
         });
-        expect(body.startConfig).not.toHaveProperty('apiKey');
-        expect(body.startConfig).not.toHaveProperty('apiSecret');
+      });
+  });
+
+  it('returns a Mofa Xingyun config when mofa is selected', async () => {
+    vi.stubEnv('VIRTUAL_HUMAN_PROVIDER', 'mofa');
+    vi.stubEnv('MOFA_VIRTUAL_HUMAN_ENABLED', 'true');
+    vi.stubEnv('MOFA_VIRTUAL_HUMAN_SERVICE_ID', 'service-123');
+    vi.stubEnv('MOFA_VIRTUAL_HUMAN_APP_ID', 'mofa-app');
+    vi.stubEnv('MOFA_VIRTUAL_HUMAN_APP_SECRET', 'mofa-secret');
+    vi.stubEnv('MOFA_VIRTUAL_HUMAN_ACTIONS', '自然待机:interactiveidle,离线休息:offlineMode');
+    vi.stubEnv('MOFA_VIRTUAL_HUMAN_ENABLE_LOGGER', 'false');
+    const app = createApp();
+
+    await request(app.callback())
+      .get('/api/virtual-human/config')
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({
+          enabled: true,
+          provider: 'mofa-xingyun',
+          serviceId: 'service-123',
+          appId: 'mofa-app',
+          appSecret: 'mofa-secret',
+          gatewayServer: 'https://nebula-agent.xingyun3d.com/user/v1/ttsa/session',
+          actions: [
+            { id: 'interactiveidle', label: '自然待机' },
+            { id: 'offlineMode', label: '离线休息' }
+          ],
+          startConfig: {
+            hardwareAcceleration: 'prefer-hardware',
+            enableLogger: false
+          }
+        });
+        expect(body.sdkScriptUrl).toContain('xmovAvatar@latest.js');
       });
   });
 

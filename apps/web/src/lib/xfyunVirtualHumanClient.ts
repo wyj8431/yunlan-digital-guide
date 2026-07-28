@@ -1,6 +1,6 @@
 import type { VirtualHumanConfig } from '../types/virtualHuman';
 
-type EnabledVirtualHumanConfig = Extract<VirtualHumanConfig, { enabled: true }>;
+type EnabledVirtualHumanConfig = Extract<VirtualHumanConfig, { provider: 'xfyun-vms' }>;
 
 type AvatarPlatformApi = {
   setApiInfo: (config: Record<string, unknown>) => void;
@@ -48,11 +48,35 @@ export type XfyunVirtualHumanClient = {
 type XfyunWindow = Window & { VMS?: LegacyVmsApi };
 type XfyunVirtualHumanClientOptions = {
   onSpeechDuration?: (durationMs: number, text: string) => void;
+  onSpeechStart?: (text: string) => void;
 };
 
 const AVATAR_SERVER_URL = 'wss://avatar.cn-huadong-1.xf-yun.com/v1/interact';
 const MIN_SYNC_DURATION_MS = 600;
-const MAX_SYNC_DURATION_MS = 180_000;
+const MAX_SYNC_DURATION_MS = 1_800_000;
+const SPEECH_EVENT_FALLBACK_MS = 1_500;
+const SPEECH_COMPLETION_GRACE_MS = 3_000;
+const FRAME_EVENT_COMPLETION_WATCHDOG_MS = 300_000;
+
+type ActiveSpeech = {
+  text: string;
+  durationMs: number;
+  started: boolean;
+  resolve: () => void;
+  completionTimerId: number | null;
+  startFallbackTimerId: number | null;
+};
+
+function estimateSpeechDurationMs(text: string): number {
+  const normalizedText = text.trim();
+  const spokenCharacters = Array.from(normalizedText).filter((character) => !/\s/u.test(character));
+  const punctuationPauses = (normalizedText.match(/[，。！？；、,.!?;]/gu) ?? []).length * 180;
+
+  return Math.min(
+    MAX_SYNC_DURATION_MS,
+    Math.max(MIN_SYNC_DURATION_MS, spokenCharacters.length * 220 + punctuationPauses)
+  );
+}
 
 function isCurrentSdkModule(sdk: LoadedSdk): sdk is CurrentSdkModule {
   return 'default' in sdk && typeof sdk.default === 'function';
@@ -163,7 +187,7 @@ function normalizeDurationMs(payload: unknown): number | null {
     return null;
   }
 
-  const durationMs = duration < 120 ? duration * 1000 : duration;
+  const durationMs = duration <= MAX_SYNC_DURATION_MS / 1000 ? duration * 1000 : duration;
 
   return Math.min(MAX_SYNC_DURATION_MS, Math.max(MIN_SYNC_DURATION_MS, durationMs));
 }
@@ -178,6 +202,64 @@ export function createXfyunVirtualHumanClient(
   let legacyVms: LegacyVmsApi | null = null;
   let disarmAudioResume: (() => void) | null = null;
   let currentSpeechText = '';
+  let activeSpeech: ActiveSpeech | null = null;
+  let supportsSpeechFrameEvents = false;
+
+  const finishActiveSpeech = () => {
+    if (!activeSpeech) {
+      return;
+    }
+
+    if (activeSpeech.completionTimerId !== null) {
+      window.clearTimeout(activeSpeech.completionTimerId);
+    }
+    if (activeSpeech.startFallbackTimerId !== null) {
+      window.clearTimeout(activeSpeech.startFallbackTimerId);
+    }
+    const resolve = activeSpeech.resolve;
+    activeSpeech = null;
+    currentSpeechText = '';
+    resolve();
+  };
+
+  const scheduleSpeechCompletion = (speech: ActiveSpeech) => {
+    if (speech.completionTimerId !== null) {
+      window.clearTimeout(speech.completionTimerId);
+    }
+    const completionDelayMs = supportsSpeechFrameEvents
+      ? Math.max(
+          FRAME_EVENT_COMPLETION_WATCHDOG_MS,
+          speech.durationMs * 2 + SPEECH_COMPLETION_GRACE_MS
+        )
+      : speech.durationMs + SPEECH_COMPLETION_GRACE_MS;
+    speech.completionTimerId = window.setTimeout(finishActiveSpeech, completionDelayMs);
+  };
+
+  const markSpeechStarted = () => {
+    if (!activeSpeech || activeSpeech.started) {
+      return;
+    }
+
+    activeSpeech.started = true;
+    if (activeSpeech.startFallbackTimerId !== null) {
+      window.clearTimeout(activeSpeech.startFallbackTimerId);
+      activeSpeech.startFallbackTimerId = null;
+    }
+    options.onSpeechStart?.(activeSpeech.text);
+    scheduleSpeechCompletion(activeSpeech);
+  };
+
+  const updateSpeechDuration = (durationMs: number) => {
+    if (!activeSpeech) {
+      return;
+    }
+
+    activeSpeech.durationMs = durationMs;
+    options.onSpeechDuration?.(durationMs, activeSpeech.text);
+    if (activeSpeech.started) {
+      scheduleSpeechCompletion(activeSpeech);
+    }
+  };
 
   return {
     async start() {
@@ -195,9 +277,18 @@ export function createXfyunVirtualHumanClient(
         avatar.on?.(ttsDurationEvent, (payload) => {
           const durationMs = normalizeDurationMs(payload);
           if (durationMs !== null && currentSpeechText) {
-            options.onSpeechDuration?.(durationMs, currentSpeechText);
+            updateSpeechDuration(durationMs);
           }
         });
+      }
+      const frameStartEvent = sdk.SDKEvents?.frame_start;
+      const frameStopEvent = sdk.SDKEvents?.frame_stop;
+      supportsSpeechFrameEvents = Boolean(frameStartEvent && frameStopEvent);
+      if (frameStartEvent) {
+        avatar.on?.(frameStartEvent, markSpeechStarted);
+      }
+      if (frameStopEvent) {
+        avatar.on?.(frameStopEvent, finishActiveSpeech);
       }
 
       const player = avatar.player ?? avatar.createPlayer?.();
@@ -244,22 +335,59 @@ export function createXfyunVirtualHumanClient(
     },
 
     async speak(text: string) {
+      finishActiveSpeech();
+      const durationMs = estimateSpeechDurationMs(text);
+      currentSpeechText = text;
+      options.onSpeechDuration?.(durationMs, text);
+      let resolveSpeech!: () => void;
+      const speechCompleted = new Promise<void>((resolve) => {
+        resolveSpeech = resolve;
+      });
+      activeSpeech = {
+        text,
+        durationMs,
+        started: false,
+        resolve: resolveSpeech,
+        completionTimerId: null,
+        startFallbackTimerId: null
+      };
+
+      if (supportsSpeechFrameEvents) {
+        activeSpeech.startFallbackTimerId = window.setTimeout(
+          markSpeechStarted,
+          SPEECH_EVENT_FALLBACK_MS
+        );
+      } else {
+        markSpeechStarted();
+      }
+
       if (avatar) {
-        currentSpeechText = text;
-        await avatar.writeText(text, {
-          nlp: false,
-          tts: config.tts,
-          avatar_dispatch: { interactive_mode: 1, content_analysis: 1 }
-        });
+        try {
+          await avatar.writeText(text, {
+            nlp: false,
+            tts: config.tts,
+            avatar_dispatch: { interactive_mode: 1, content_analysis: 1 }
+          });
+        } catch (error) {
+          finishActiveSpeech();
+          throw error;
+        }
+        await speechCompleted;
         return;
       }
 
       if (legacyVms) {
-        currentSpeechText = text;
-        await legacyVms.textDriver(createLegacyTextPayload(text, config));
+        try {
+          await legacyVms.textDriver(createLegacyTextPayload(text, config));
+        } catch (error) {
+          finishActiveSpeech();
+          throw error;
+        }
+        await speechCompleted;
         return;
       }
 
+      finishActiveSpeech();
       throw new Error('讯飞虚拟人尚未启动');
     },
 
@@ -273,6 +401,7 @@ export function createXfyunVirtualHumanClient(
     },
 
     async stop() {
+      finishActiveSpeech();
       disarmAudioResume?.();
       disarmAudioResume = null;
       await Promise.resolve(avatar?.stop?.()).catch(() => undefined);
@@ -280,6 +409,7 @@ export function createXfyunVirtualHumanClient(
       await legacyVms?.stop().catch(() => undefined);
       avatar = null;
       legacyVms = null;
+      supportsSpeechFrameEvents = false;
       currentSpeechText = '';
     }
   };

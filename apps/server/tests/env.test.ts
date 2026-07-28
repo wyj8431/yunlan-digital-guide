@@ -1,11 +1,37 @@
+import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { readEnv } from '../src/config/env';
+import { readEnv, resolveEnvFilePaths } from '../src/config/env';
 
 afterEach(() => {
   vi.unstubAllEnvs();
 });
 
 describe('server env', () => {
+  it('loads the server-local and workspace-root env files', () => {
+    const configDir = path.join('workspace', 'apps', 'server', 'src', 'config');
+
+    expect(resolveEnvFilePaths(configDir)).toEqual([
+      path.resolve(configDir, '../../.env'),
+      path.resolve(configDir, '../../../../.env')
+    ]);
+  });
+
+  it('reads separate streaming ASR configuration', () => {
+    vi.stubEnv('XFYUN_ASR_ENABLED', 'true');
+    vi.stubEnv('XFYUN_ASR_APP_ID', 'asr-app');
+    vi.stubEnv('XFYUN_ASR_API_KEY', 'asr-key');
+    vi.stubEnv('XFYUN_ASR_API_SECRET', 'asr-secret');
+    vi.stubEnv('XFYUN_ASR_URL', 'wss://example.com/iat');
+
+    expect(readEnv()).toMatchObject({
+      xfyunAsrEnabled: true,
+      xfyunAsrAppId: 'asr-app',
+      xfyunAsrApiKey: 'asr-key',
+      xfyunAsrApiSecret: 'asr-secret',
+      xfyunAsrUrl: 'wss://example.com/iat'
+    });
+  });
+
   it('does not reuse the virtual human voice as the default tts voice', () => {
     vi.stubEnv('XFYUN_TTS_VOICE', '');
     vi.stubEnv('XFYUN_VIRTUAL_HUMAN_TTS_VOICE', 'x4_lingxiaoxuan_oral');
@@ -71,6 +97,24 @@ describe('server env', () => {
     expect(env.cozeApiToken).toBe('coze-test-token');
     expect(env.cozeBotId).toBe('bot-123');
     expect(env.cozeUserId).toBe('wyj-test-user');
+  });
+
+  it('reads Mofa Xingyun virtual human settings', () => {
+    vi.stubEnv('VIRTUAL_HUMAN_PROVIDER', 'mofa');
+    vi.stubEnv('MOFA_VIRTUAL_HUMAN_ENABLED', 'true');
+    vi.stubEnv('MOFA_VIRTUAL_HUMAN_SERVICE_ID', 'service-123');
+    vi.stubEnv('MOFA_VIRTUAL_HUMAN_APP_ID', 'mofa-app');
+    vi.stubEnv('MOFA_VIRTUAL_HUMAN_APP_SECRET', 'mofa-secret');
+
+    const env = readEnv();
+
+    expect(env.virtualHumanProvider).toBe('mofa');
+    expect(env.mofaVirtualHumanEnabled).toBe(true);
+    expect(env.mofaVirtualHumanServiceId).toBe('service-123');
+    expect(env.mofaVirtualHumanAppId).toBe('mofa-app');
+    expect(env.mofaVirtualHumanAppSecret).toBe('mofa-secret');
+    expect(env.mofaVirtualHumanSdkScriptUrl).toContain('xmovAvatar@latest.js');
+    expect(env.mofaVirtualHumanGatewayServer).toContain('/ttsa/session');
   });
 
   it('uses Ark settings for the fallback LLM when LLM_PROVIDER is hybrid', () => {

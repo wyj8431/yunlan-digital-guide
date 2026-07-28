@@ -1,9 +1,17 @@
 import type {
   GuideChatResponse,
-  GuideImageAttachment,
+  GuideAttachment,
   GuideSpeechTimeline,
   ScenicAreaSummary
 } from '../types/guide';
+import { createBackendWebSocketUrl } from './backendSocketUrl';
+
+export type GuideConversationMessage = {
+  role: 'user' | 'assistant';
+  content: string;
+};
+
+export type GuideExportFormat = 'txt' | 'word' | 'markdown' | 'excel';
 
 async function readJson<T>(response: Response): Promise<T> {
   const body = (await response.json()) as unknown;
@@ -29,15 +37,64 @@ export async function fetchScenicArea(): Promise<ScenicAreaSummary> {
 
 export async function askGuide(
   message: string,
-  image?: GuideImageAttachment | null
+  attachment?: GuideAttachment | null,
+  history?: GuideConversationMessage[]
 ): Promise<GuideChatResponse> {
   const response = await fetch('/api/guide/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, image })
+    body: JSON.stringify({ message, attachment, history })
   });
 
   return readJson<GuideChatResponse>(response);
+}
+
+function exportFilename(response: Response, format: GuideExportFormat): string {
+  const disposition = response.headers.get('Content-Disposition') ?? '';
+  const encoded = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1];
+  if (encoded) {
+    try {
+      return decodeURIComponent(encoded);
+    } catch {
+      // Fall through to the safe local filename.
+    }
+  }
+
+  const extension = { txt: 'txt', word: 'rtf', markdown: 'md', excel: 'xlsx' }[format];
+  return `数字导游回答.${extension}`;
+}
+
+export async function downloadGuideAnswer(
+  content: string,
+  format: GuideExportFormat
+): Promise<void> {
+  const response = await fetch('/api/guide/export', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content, format })
+  });
+
+  if (!response.ok) {
+    let message = '文件导出失败，请稍后重试。';
+    try {
+      const body = (await response.json()) as { message?: unknown };
+      if (typeof body.message === 'string') {
+        message = body.message;
+      }
+    } catch {
+      // Keep the stable fallback message for non-JSON errors.
+    }
+    throw new Error(message);
+  }
+
+  const objectUrl = URL.createObjectURL(await response.blob());
+  const anchor = document.createElement('a');
+  anchor.href = objectUrl;
+  anchor.download = exportFilename(response, format);
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(objectUrl);
 }
 
 export type GuideChatStreamEvent =
@@ -62,11 +119,7 @@ export type GuideChatStreamController = {
 };
 
 function createGuideStreamUrl(): string {
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const host =
-    window.location.port === '5173' ? `${window.location.hostname}:8787` : window.location.host;
-
-  return `${protocol}//${host}/api/guide/chat/stream`;
+  return createBackendWebSocketUrl('/api/guide/chat/stream');
 }
 
 function parseGuideStreamEvent(raw: string): GuideChatStreamEvent {
@@ -81,13 +134,14 @@ function parseGuideStreamEvent(raw: string): GuideChatStreamEvent {
 
 export function streamGuideAnswer(
   message: string,
-  image: GuideImageAttachment | null | undefined,
-  handlers: GuideChatStreamHandlers
+  attachment: GuideAttachment | null | undefined,
+  handlers: GuideChatStreamHandlers,
+  history?: GuideConversationMessage[]
 ): GuideChatStreamController {
   if (typeof WebSocket === 'undefined') {
     let closed = false;
 
-    void askGuide(message, image)
+    void askGuide(message, attachment, history)
       .then((response) => {
         if (closed) {
           return;
@@ -114,7 +168,7 @@ export function streamGuideAnswer(
   let completed = false;
 
   socket.addEventListener('open', () => {
-    socket.send(JSON.stringify({ type: 'ask', message, image }));
+    socket.send(JSON.stringify({ type: 'ask', message, attachment, history }));
   });
 
   socket.addEventListener('message', (event) => {

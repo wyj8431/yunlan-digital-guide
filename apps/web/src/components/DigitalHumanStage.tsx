@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, PersonStanding, RefreshCw } from 'lucide-react';
+import { AudioLines, ChevronDown, Map, Mic2, PersonStanding, RefreshCw, Route } from 'lucide-react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { useXfyunVirtualHuman } from '../hooks/useXfyunVirtualHuman';
@@ -39,6 +39,7 @@ type DigitalHumanStageProps = {
   answerText?: string;
   speechTimeline?: GuideSpeechTimeline | null;
   onSpeechDriverChange?: (driver: SpeechDriver) => void;
+  onNavigate?: (view: 'narration' | 'map' | 'itinerary' | 'voice') => void;
 };
 
 function fitModelToStage(model: THREE.Object3D) {
@@ -79,7 +80,8 @@ export function DigitalHumanStage({
   speaking,
   answerText,
   speechTimeline,
-  onSpeechDriverChange
+  onSpeechDriverChange,
+  onNavigate
 }: DigitalHumanStageProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const virtualHuman = useXfyunVirtualHuman({
@@ -88,8 +90,8 @@ export function DigitalHumanStage({
     onSpeechDriverChange
   });
   const effectiveSpeaking = virtualHuman.speaking || speaking;
-  const xfyunPending = virtualHuman.status === 'loading';
-  const xfyunUnavailable = virtualHuman.status === 'error' && virtualHuman.config?.enabled;
+  const onlineHumanPending = virtualHuman.status === 'loading';
+  const onlineHumanUnavailable = virtualHuman.status === 'error' && virtualHuman.config?.enabled;
   const speakingRef = useRef(effectiveSpeaking);
   const speechTimelineRef = useRef<GuideSpeechTimeline | null>(null);
   const speechTimelineStartedAtRef = useRef<number | null>(null);
@@ -97,10 +99,20 @@ export function DigitalHumanStage({
   const [actionsOpen, setActionsOpen] = useState(false);
   const [selectedActionId, setSelectedActionId] = useState(FALLBACK_ACTIONS[0].id);
   const [actionMessage, setActionMessage] = useState('');
+  const [wakeHintVisible, setWakeHintVisible] = useState(true);
   const actionOptions =
     virtualHuman.config?.enabled && virtualHuman.config.actions.length > 0
       ? virtualHuman.config.actions
       : FALLBACK_ACTIONS;
+  const onlineHumanName =
+    virtualHuman.config?.enabled && virtualHuman.config.provider === 'mofa-xingyun'
+      ? '魔珐星云数字人'
+      : '讯飞虚拟人';
+  const shouldShowWakeButton =
+    virtualHuman.active &&
+    virtualHuman.config?.enabled &&
+    virtualHuman.config.provider === 'mofa-xingyun' &&
+    wakeHintVisible;
   const selectedAction =
     actionOptions.find((action) => action.id === selectedActionId) ?? actionOptions[0];
 
@@ -186,21 +198,39 @@ export function DigitalHumanStage({
     const fillLight = new THREE.AmbientLight('#e8dcc7', 0.7);
     scene.add(fillLight);
 
-    const floor = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.6, 1.82, 0.12, 80),
-      new THREE.MeshStandardMaterial({ color: '#8b9d83', roughness: 0.82 })
+    const floorGlow = new THREE.Mesh(
+      new THREE.CircleGeometry(1.46, 128),
+      new THREE.MeshBasicMaterial({
+        color: '#78fff3',
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.18,
+        depthWrite: false
+      })
     );
-    floor.position.y = -1.04;
-    floor.receiveShadow = true;
-    scene.add(floor);
+    floorGlow.rotation.x = -Math.PI / 2;
+    floorGlow.position.y = -1.045;
+    scene.add(floorGlow);
+
+    const floorRing = new THREE.Mesh(
+      new THREE.TorusGeometry(1.46, 0.018, 12, 128),
+      new THREE.MeshBasicMaterial({
+        color: '#fff0a8',
+        transparent: true,
+        opacity: 0.62
+      })
+    );
+    floorRing.rotation.x = Math.PI / 2;
+    floorRing.position.y = -1.038;
+    scene.add(floorRing);
 
     const halo = new THREE.Mesh(
       new THREE.RingGeometry(1.88, 1.94, 96),
       new THREE.MeshBasicMaterial({
-        color: '#e8dcc7',
+        color: '#f7edb7',
         side: THREE.DoubleSide,
         transparent: true,
-        opacity: 0.45
+        opacity: 0.52
       })
     );
     halo.position.set(0, 0.08, -0.54);
@@ -357,15 +387,27 @@ export function DigitalHumanStage({
     }
   }
 
+  async function handleWakeAvatar() {
+    setWakeHintVisible(false);
+    setActionMessage('');
+
+    try {
+      await virtualHuman.triggerAction('onlineMode');
+    } catch {
+      setWakeHintVisible(true);
+      setActionMessage('点击右侧上线互动后可唤醒数字人。');
+    }
+  }
+
   return (
     <div
       className={`digital-human-stage ${effectiveSpeaking ? 'is-speaking' : 'is-idle'} ${
         virtualHuman.active
-          ? 'has-xfyun-human'
-          : xfyunPending
-            ? 'is-xfyun-connecting'
-            : xfyunUnavailable
-              ? 'is-xfyun-unavailable'
+          ? 'has-online-human'
+          : onlineHumanPending
+            ? 'is-online-human-connecting'
+            : onlineHumanUnavailable
+              ? 'is-online-human-unavailable'
               : 'has-local-human'
       }`}
       aria-label="乌镇景区年轻数字导游舞台"
@@ -376,18 +418,22 @@ export function DigitalHumanStage({
       </div>
 
       <div className="model-stage">
-        <div
-          id={XFYUN_STREAM_DOM_ID}
-          className="xfyun-stream-host"
-          aria-label="讯飞在线虚拟人画面"
-        />
+        <div className="xfyun-stream-host" aria-label="线上数字人画面">
+          <div id={XFYUN_STREAM_DOM_ID} className="online-stream-mount" />
+        </div>
         <div ref={hostRef} className="model-host" />
+        {shouldShowWakeButton ? (
+          <button type="button" className="avatar-wake-button" onClick={handleWakeAvatar}>
+            <PersonStanding size={18} aria-hidden="true" />
+            <span>点击唤醒数字人</span>
+          </button>
+        ) : null}
         <div className="model-status">
           <span>
             {virtualHuman.active
-              ? '讯飞虚拟人'
-              : xfyunPending || xfyunUnavailable
-                ? '讯飞虚拟人'
+              ? onlineHumanName
+              : onlineHumanPending || onlineHumanUnavailable
+                ? onlineHumanName
                 : modelState === 'ready'
                   ? '3D 数字人模型'
                   : modelState === 'error'
@@ -395,16 +441,16 @@ export function DigitalHumanStage({
                     : '正在加载3D数字人'}
           </span>
           <strong>
-            {xfyunPending
+            {onlineHumanPending
               ? '接入中'
-              : xfyunUnavailable
+              : onlineHumanUnavailable
                 ? '接入异常'
                 : effectiveSpeaking
                   ? '讲解中'
                   : '待机中'}
           </strong>
           <small>{virtualHuman.message}</small>
-          {xfyunUnavailable ? (
+          {onlineHumanUnavailable ? (
             <button
               type="button"
               className="xfyun-retry-button"
@@ -416,6 +462,45 @@ export function DigitalHumanStage({
             </button>
           ) : null}
         </div>
+      </div>
+
+      <div className="stage-holo-tools">
+        <button
+          type="button"
+          className="stage-holo-tool stage-holo-tool--narration"
+          onClick={() => onNavigate?.('narration')}
+        >
+          <AudioLines size={18} />
+          <span>实时讲解</span>
+          <small>Real-time</small>
+        </button>
+        <button
+          type="button"
+          className="stage-holo-tool stage-holo-tool--map"
+          onClick={() => onNavigate?.('map')}
+        >
+          <Map size={18} />
+          <span>全景地图</span>
+          <small>Map</small>
+        </button>
+        <button
+          type="button"
+          className="stage-holo-tool stage-holo-tool--route"
+          onClick={() => onNavigate?.('itinerary')}
+        >
+          <Route size={18} />
+          <span>智能路线</span>
+          <small>Route</small>
+        </button>
+        <button
+          type="button"
+          className="stage-holo-tool stage-holo-tool--voice"
+          onClick={() => onNavigate?.('voice')}
+        >
+          <Mic2 size={18} />
+          <span>语音交互</span>
+          <small>Voice</small>
+        </button>
       </div>
 
       <div className="avatar-action-switcher">

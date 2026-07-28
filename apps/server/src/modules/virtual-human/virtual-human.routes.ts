@@ -1,8 +1,6 @@
-﻿import { createHmac } from 'node:crypto';
 import Router from '@koa/router';
 import { readEnv, type ServerEnv } from '../../config/env.js';
 
-const XFYUN_AVATAR_SERVER_URL = 'wss://avatar.cn-huadong-1.xf-yun.com/v1/interact';
 const DEFAULT_XFYUN_ACTIONS = [
   { id: 'A_LH_introduced_O', label: '介绍' },
   { id: 'A_RLH_introduced_O', label: '双手介绍' },
@@ -17,6 +15,12 @@ const DEFAULT_XFYUN_ACTIONS = [
   { id: 'A_RH_hello_O', label: '打招呼' },
   { id: 'A_RH_bye_O', label: '再见' },
   { id: 'A_H_listen_C', label: '倾听点头' }
+];
+const DEFAULT_MOFA_ACTIONS = [
+  { id: 'onlineMode', label: '上线互动' },
+  { id: 'interactiveidle', label: '自然待机' },
+  { id: 'idle', label: '安静待机' },
+  { id: 'offlineMode', label: '离线休息' }
 ];
 
 type VirtualHumanConfigResponse =
@@ -55,20 +59,24 @@ type VirtualHumanConfigResponse =
         volume: number;
         rhy: number;
       };
+    }
+  | {
+      enabled: true;
+      provider: 'mofa-xingyun';
+      serviceId: string;
+      sdkScriptUrl: string;
+      appId: string;
+      appSecret: string;
+      gatewayServer: string;
+      actions: Array<{
+        id: string;
+        label: string;
+      }>;
+      startConfig: {
+        hardwareAcceleration: 'prefer-hardware';
+        enableLogger: boolean;
+      };
     };
-
-function createSignedUrl(apiKey: string, apiSecret: string): string {
-  const parsedUrl = new URL(XFYUN_AVATAR_SERVER_URL);
-  const date = new Date().toUTCString();
-  const requestLine = `GET ${parsedUrl.pathname} HTTP/1.1`;
-  const signString = `host: ${parsedUrl.host}\ndate: ${date}\n${requestLine}`;
-  const signature = createHmac('sha256', apiSecret).update(signString).digest('base64');
-  const authorization = Buffer.from(
-    `api_key="${apiKey}", algorithm="hmac-sha256", headers="host date request-line", signature="${signature}"`
-  ).toString('base64');
-
-  return `${XFYUN_AVATAR_SERVER_URL}?authorization=${encodeURIComponent(authorization)}&date=${encodeURIComponent(date)}&host=${parsedUrl.host}`;
-}
 
 function readActionOptions(actionsConfig: string): Array<{ id: string; label: string }> {
   const customActions = actionsConfig
@@ -84,7 +92,67 @@ function readActionOptions(actionsConfig: string): Array<{ id: string; label: st
   return customActions.length > 0 ? customActions : DEFAULT_XFYUN_ACTIONS;
 }
 
-function createVirtualHumanConfig(env: ServerEnv): VirtualHumanConfigResponse {
+function readMofaActionOptions(actionsConfig: string): Array<{ id: string; label: string }> {
+  const customActions = actionsConfig
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((item) => {
+      const [label, id = label] = item.split(':').map((part) => part.trim());
+      return { id, label };
+    })
+    .filter((item) => item.id && item.label);
+
+  return customActions.length > 0 ? customActions : DEFAULT_MOFA_ACTIONS;
+}
+
+function shouldUseMofa(env: ServerEnv): boolean {
+  return ['mofa', 'mofa-xingyun', 'xingyun'].includes(env.virtualHumanProvider);
+}
+
+function shouldUseXfyun(env: ServerEnv): boolean {
+  return ['xfyun', 'xfyun-vms'].includes(env.virtualHumanProvider);
+}
+
+function createFallbackConfig(reason: string): VirtualHumanConfigResponse {
+  return {
+    enabled: false,
+    provider: 'three-fallback',
+    reason
+  };
+}
+
+function createMofaConfig(env: ServerEnv): VirtualHumanConfigResponse {
+  const missingKeys = [
+    ['MOFA_VIRTUAL_HUMAN_APP_ID', env.mofaVirtualHumanAppId],
+    ['MOFA_VIRTUAL_HUMAN_APP_SECRET/MOFA_VIRTUAL_HUMAN_API_SECRET', env.mofaVirtualHumanAppSecret]
+  ].filter(([, value]) => !value);
+
+  if (!env.mofaVirtualHumanEnabled || missingKeys.length > 0) {
+    return createFallbackConfig(
+      !env.mofaVirtualHumanEnabled
+        ? '未启用魔珐星云数字人配置，当前使用本地 Three.js 数字人兜底。'
+        : `魔珐星云数字人配置缺失：${missingKeys.map(([key]) => key).join(', ')}。`
+    );
+  }
+
+  return {
+    enabled: true,
+    provider: 'mofa-xingyun',
+    serviceId: env.mofaVirtualHumanServiceId,
+    sdkScriptUrl: env.mofaVirtualHumanSdkScriptUrl,
+    appId: env.mofaVirtualHumanAppId,
+    appSecret: env.mofaVirtualHumanAppSecret,
+    gatewayServer: env.mofaVirtualHumanGatewayServer,
+    actions: readMofaActionOptions(env.mofaVirtualHumanActions),
+    startConfig: {
+      hardwareAcceleration: 'prefer-hardware',
+      enableLogger: env.mofaVirtualHumanEnableLogger
+    }
+  };
+}
+
+function createXfyunConfig(env: ServerEnv): VirtualHumanConfigResponse {
   if (!env.virtualHumanEnabled) {
     return {
       enabled: false,
@@ -116,10 +184,12 @@ function createVirtualHumanConfig(env: ServerEnv): VirtualHumanConfigResponse {
     provider: 'xfyun-vms',
     serviceId: env.xfyunVirtualHumanServiceId,
     sdkScriptUrl: env.xfyunVirtualHumanSdkScriptUrl,
-    signedUrl: createSignedUrl(env.xfyunVirtualHumanApiKey, env.xfyunVirtualHumanApiSecret),
+    signedUrl: '',
     actions: readActionOptions(env.xfyunVirtualHumanActions),
     startConfig: {
       appId: env.xfyunVirtualHumanAppId,
+      apiKey: env.xfyunVirtualHumanApiKey,
+      apiSecret: env.xfyunVirtualHumanApiSecret,
       avatarId: env.xfyunVirtualHumanAvatarId,
       width: 720,
       height: 1280,
@@ -137,6 +207,33 @@ function createVirtualHumanConfig(env: ServerEnv): VirtualHumanConfigResponse {
       rhy: 3
     }
   };
+}
+
+function createVirtualHumanConfig(env: ServerEnv): VirtualHumanConfigResponse {
+  if (env.virtualHumanProvider === 'local' || env.virtualHumanProvider === 'three-fallback') {
+    return createFallbackConfig('已指定使用本地 Three.js 数字人。');
+  }
+
+  if (shouldUseMofa(env)) {
+    return createMofaConfig(env);
+  }
+
+  if (shouldUseXfyun(env)) {
+    return createXfyunConfig(env);
+  }
+
+  if (env.mofaVirtualHumanEnabled) {
+    const mofaConfig = createMofaConfig(env);
+    if (mofaConfig.enabled) {
+      return mofaConfig;
+    }
+  }
+
+  if (env.virtualHumanEnabled) {
+    return createXfyunConfig(env);
+  }
+
+  return createFallbackConfig('未启用线上虚拟人配置，当前使用本地 Three.js 数字人兜底。');
 }
 
 export function createVirtualHumanRouter(): Router {

@@ -2,7 +2,7 @@ import type { ServerEnv } from '../../config/env.js';
 import { chatWithCoze, chatWithCozeStream } from './coze-client.js';
 
 export type ChatCompletionMessage = {
-  role: 'system' | 'user';
+  role: 'system' | 'user' | 'assistant';
   content:
     | string
     | Array<
@@ -29,7 +29,7 @@ export type LlmChatStream = (
 ) => Promise<string>;
 
 const HYBRID_PRIMARY_TIMEOUT_MS = 15_000;
-const HYBRID_PRIMARY_IMAGE_TIMEOUT_MS = 60_000;
+const HYBRID_PRIMARY_IMAGE_TIMEOUT_MS = 180_000;
 
 function usesCozeProvider(env: ServerEnv): boolean {
   return env.llmProvider === 'coze';
@@ -44,6 +44,18 @@ function messagesHaveImage(messages: ChatCompletionMessage[]): boolean {
     (message) =>
       Array.isArray(message.content) && message.content.some((part) => part.type === 'image_url')
   );
+}
+
+function messagesHaveExtractedAttachment(messages: ChatCompletionMessage[]): boolean {
+  return messages.some((message) => {
+    if (typeof message.content === 'string') {
+      return message.content.includes('BEGIN_ATTACHMENT');
+    }
+
+    return message.content.some(
+      (part) => part.type === 'text' && part.text.includes('BEGIN_ATTACHMENT')
+    );
+  });
 }
 
 function getHybridPrimaryTimeoutMs(messages: ChatCompletionMessage[]): number {
@@ -123,6 +135,10 @@ export const chatWithLlm: LlmChat = async (messages, env) => {
   }
 
   if (usesHybridProvider(env)) {
+    if (messagesHaveExtractedAttachment(messages)) {
+      return chatWithOpenAiCompatible(messages, env);
+    }
+
     const primary = createTimedOperation(
       (primarySignal) => chatWithCozeStream(messages, env, () => undefined, primarySignal),
       undefined,
@@ -234,22 +250,35 @@ export const chatWithLlmStream: LlmChatStream = async (messages, env, onDelta, s
   }
 
   if (usesHybridProvider(env)) {
-    const primaryDeltas: string[] = [];
+    if (messagesHaveExtractedAttachment(messages)) {
+      return chatWithOpenAiCompatibleStream(messages, env, onDelta, signal);
+    }
+
+    let primaryHasEmittedDelta = false;
     const primary = createTimedOperation(
       (primarySignal) =>
-        chatWithCozeStream(messages, env, (delta) => primaryDeltas.push(delta), primarySignal),
+        chatWithCozeStream(
+          messages,
+          env,
+          (delta) => {
+            primaryHasEmittedDelta = true;
+            onDelta(delta);
+          },
+          primarySignal
+        ),
       signal,
       getHybridPrimaryTimeoutMs(messages)
     );
 
     try {
-      const answer = await primary.promise;
-      primaryDeltas.forEach((delta) => onDelta(delta));
-
-      return answer;
+      return await primary.promise;
     } catch {
       if (signal?.aborted && !primary.timedOut) {
         throw new Error('LLM stream request was aborted');
+      }
+
+      if (primaryHasEmittedDelta) {
+        throw new Error('Coze hybrid stream failed after emitting a partial answer');
       }
 
       return chatWithOpenAiCompatibleStream(messages, env, onDelta, signal);

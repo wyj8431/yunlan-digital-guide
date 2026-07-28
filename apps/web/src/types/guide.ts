@@ -22,9 +22,21 @@ export type ChatMessage = {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  attachmentName?: string;
+  attachmentKind?: GuideAttachmentKind;
+  attachmentPreviewUrl?: string;
   imagePreviewUrl?: string;
   imageName?: string;
   streaming?: boolean;
+  retrievedKnowledge?: GuideKnowledgeResult[];
+};
+
+export type GuideChatSession = {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  messages: ChatMessage[];
 };
 
 export type RouteCard = {
@@ -55,10 +67,29 @@ export type GuideChatResponse = {
   cards: RouteCard[];
   source: 'llm' | 'local-fallback';
   speechTimeline: GuideSpeechTimeline;
+  retrievedKnowledge: GuideKnowledgeResult[];
 };
 
-export type GuideImageAttachment = {
-  name?: string;
+export type GuideAttachmentKind =
+  'image' | 'document' | 'spreadsheet' | 'presentation' | 'markdown';
+
+export type GuideAttachment = {
+  name: string;
   mimeType: string;
+  kind: GuideAttachmentKind;
   dataUrl: string;
+  sizeBytes?: number;
+};
+
+export type GuideImageAttachment = GuideAttachment;
+
+export type GuideKnowledgeSource = 'destination-knowledge' | 'local-scenic';
+
+export type GuideKnowledgeResult = {
+  id: string;
+  title: string;
+  source: GuideKnowledgeSource;
+  content: string;
+  keywords: string[];
+  score: number;
 };

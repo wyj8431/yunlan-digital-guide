@@ -1,5 +1,9 @@
-import { useEffect, useRef } from 'react';
-import type { ChatMessage } from '../types/guide';
+import { useEffect, useRef, useState } from 'react';
+import { Download, FileCode2, FileSpreadsheet, FileText, FileType2 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import type { ChatMessage, GuideKnowledgeSource } from '../types/guide';
+import { downloadGuideAnswer, type GuideExportFormat } from '../api/guideApi';
 
 const CHAT_LOG_LABEL = '\u804a\u5929\u8bb0\u5f55';
 const WELCOME_MESSAGE =
@@ -7,12 +11,111 @@ const WELCOME_MESSAGE =
 
 type ChatMessagesProps = {
   messages: ChatMessage[];
+  autoScroll?: boolean;
 };
 
-export function ChatMessages({ messages }: ChatMessagesProps) {
+function getKnowledgeSourceLabel(source: GuideKnowledgeSource) {
+  return source === 'destination-knowledge' ? '目的地知识库' : '本地景区资料';
+}
+
+const GUIDE_EXPORT_OPTIONS: Array<{
+  format: GuideExportFormat;
+  label: string;
+  icon: typeof FileText;
+}> = [
+  { format: 'txt', label: '文本 (.txt)', icon: FileType2 },
+  { format: 'word', label: 'Word (.rtf)', icon: FileText },
+  { format: 'markdown', label: 'Markdown (.md)', icon: FileCode2 },
+  { format: 'excel', label: 'Excel (.xlsx)', icon: FileSpreadsheet }
+];
+
+function GuideAnswerExport({ content }: { content: string }) {
+  const [open, setOpen] = useState(false);
+  const [exporting, setExporting] = useState<GuideExportFormat | null>(null);
+  const [error, setError] = useState('');
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const closeOnOutsidePress = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', closeOnOutsidePress);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePress);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [open]);
+
+  async function exportAnswer(format: GuideExportFormat) {
+    setExporting(format);
+    setError('');
+    try {
+      await downloadGuideAnswer(content, format);
+      setOpen(false);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : '文件导出失败，请稍后重试。');
+    } finally {
+      setExporting(null);
+    }
+  }
+
+  return (
+    <div ref={rootRef} className="message-export">
+      <button
+        type="button"
+        className="message-export-trigger"
+        aria-label="导出回答"
+        title="导出回答"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <Download size={16} aria-hidden="true" />
+        <span>导出</span>
+      </button>
+      {open ? (
+        <div className="message-export-menu" role="menu" aria-label="选择导出格式">
+          {GUIDE_EXPORT_OPTIONS.map((option) => {
+            const Icon = option.icon;
+            return (
+              <button
+                key={option.format}
+                type="button"
+                role="menuitem"
+                disabled={exporting !== null}
+                onClick={() => void exportAnswer(option.format)}
+              >
+                <Icon size={16} aria-hidden="true" />
+                <span>{exporting === option.format ? '正在生成...' : option.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+      {error ? <span className="message-export-error">{error}</span> : null}
+    </div>
+  );
+}
+
+export function ChatMessages({ messages, autoScroll = true }: ChatMessagesProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    if (!autoScroll) {
+      return;
+    }
+
     const container = containerRef.current;
     if (!container) {
       return;
@@ -24,7 +127,7 @@ export function ChatMessages({ messages }: ChatMessagesProps) {
     }
 
     container.scrollTop = container.scrollHeight;
-  }, [messages]);
+  }, [autoScroll, messages]);
 
   if (messages.length === 0) {
     return (
@@ -49,16 +152,49 @@ export function ChatMessages({ messages }: ChatMessagesProps) {
           className={`message message-${message.role} ${message.streaming ? 'message-streaming' : ''}`}
         >
           <span>{message.role === 'user' ? 'Visitor' : 'Digital Guide'}</span>
-          {message.imagePreviewUrl ? (
+          {message.attachmentKind && message.attachmentKind !== 'image' ? (
+            <div className="message-attachment">
+              <FileText size={18} aria-hidden="true" />
+              <span>{message.attachmentName ?? '用户上传附件'}</span>
+            </div>
+          ) : null}
+          {message.attachmentPreviewUrl || message.imagePreviewUrl ? (
             <figure className="message-image">
-              <img src={message.imagePreviewUrl} alt={message.imageName ?? '用户上传图片'} />
-              {message.imageName ? <figcaption>{message.imageName}</figcaption> : null}
+              <img
+                src={message.attachmentPreviewUrl ?? message.imagePreviewUrl}
+                alt={message.attachmentName ?? message.imageName ?? '用户上传图片'}
+              />
+              {message.attachmentName || message.imageName ? (
+                <figcaption>{message.attachmentName ?? message.imageName}</figcaption>
+              ) : null}
             </figure>
           ) : null}
-          <p aria-live={message.streaming ? 'polite' : undefined}>
-            {message.content}
-            {message.streaming ? <i className="typewriter-caret" aria-hidden="true" /> : null}
-          </p>
+          {message.role === 'assistant' && !message.streaming ? (
+            <div className="message-markdown">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+            </div>
+          ) : (
+            <p aria-live={message.streaming ? 'polite' : undefined}>
+              {message.content}
+              {message.streaming ? <i className="typewriter-caret" aria-hidden="true" /> : null}
+            </p>
+          )}
+          {message.role === 'assistant' && !message.streaming && message.content ? (
+            <GuideAnswerExport content={message.content} />
+          ) : null}
+          {message.role === 'assistant' && message.retrievedKnowledge?.length ? (
+            <div className="message-sources" aria-label="参考资料">
+              <strong>参考资料</strong>
+              <div>
+                {message.retrievedKnowledge.slice(0, 3).map((knowledge) => (
+                  <span key={knowledge.id} className="message-source-chip">
+                    <em>{getKnowledgeSourceLabel(knowledge.source)}</em>
+                    {knowledge.title}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </article>
       ))}
     </div>

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import sharp from 'sharp';
 import { chatWithCozeStream } from '../src/modules/guide/coze-client';
 import { chatWithLlmStream } from '../src/modules/guide/llm-client';
 import type { ServerEnv } from '../src/config/env';
@@ -22,9 +23,15 @@ const env: ServerEnv = {
   xfyunVirtualHumanSdkScriptUrl: '',
   xfyunVirtualHumanTtsVoice: '',
   xfyunVirtualHumanActions: '',
+  xfyunAsrEnabled: false,
+  xfyunAsrAppId: '',
+  xfyunAsrApiKey: '',
+  xfyunAsrApiSecret: '',
+  xfyunAsrUrl: 'wss://iat-api.xfyun.cn/v2/iat',
   xfyunTtsAppId: '',
   xfyunTtsApiKey: '',
   xfyunTtsApiSecret: '',
+  xfyunTtsUrl: 'wss://tts-api.xfyun.cn/v2/tts',
   xfyunTtsVoice: 'xiaoyan'
 };
 
@@ -263,5 +270,60 @@ describe('coze client', () => {
       { type: 'text', text: '用户问题：请分析这张图片' },
       { type: 'image', file_id: 'coze-file-123' }
     ]);
+  });
+
+  it('downsizes large images before uploading them to Coze', async () => {
+    const original = await sharp({
+      create: {
+        width: 2_400,
+        height: 1_600,
+        channels: 3,
+        background: { r: 40, g: 120, b: 90 }
+      }
+    })
+      .png()
+      .toBuffer();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ code: 0, data: { id: 'coze-file-optimized' } }), {
+          status: 200
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          streamFromText(
+            'event:conversation.message.delta\ndata: {"type":"answer","content":"图片分析完成"}\n\n'
+          ),
+          { status: 200 }
+        )
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await chatWithCozeStream(
+      [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: '分析图片' },
+            {
+              type: 'image_url',
+              image_url: { url: `data:image/png;base64,${original.toString('base64')}` }
+            }
+          ]
+        }
+      ],
+      env,
+      () => undefined
+    );
+
+    const uploadBody = fetchMock.mock.calls[0][1].body as FormData;
+    const uploadedFile = uploadBody.get('file') as File;
+    const optimized = Buffer.from(await uploadedFile.arrayBuffer());
+    const metadata = await sharp(optimized).metadata();
+
+    expect(metadata.width).toBeLessThanOrEqual(512);
+    expect(metadata.height).toBeLessThanOrEqual(512);
+    expect(optimized.byteLength).toBeLessThan(original.byteLength);
   });
 });

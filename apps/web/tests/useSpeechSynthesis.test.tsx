@@ -305,6 +305,10 @@ describe('useSpeechSynthesis', () => {
       arrayBuffer: vi.fn(async () => new ArrayBuffer(8))
     } as unknown as Response);
     const { result } = renderHook(() => useSpeechSynthesis());
+    const durationEvents: Array<{ text: string; durationMs: number }> = [];
+    window.addEventListener(GUIDE_SPEECH_DURATION_EVENT, (event) => {
+      durationEvents.push((event as CustomEvent<{ text: string; durationMs: number }>).detail);
+    });
 
     await act(async () => {
       await result.current.speak(MANY_CHUNKS_TEXT);
@@ -315,6 +319,7 @@ describe('useSpeechSynthesis', () => {
     expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({ text: 'One.' });
     expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body))).toEqual({ text: 'Two.' });
     expect(source.start).toHaveBeenCalledTimes(1);
+    expect(durationEvents).toEqual([{ text: MANY_CHUNKS_TEXT, durationMs: 3000 }]);
 
     act(() => {
       source.onended?.();
@@ -395,6 +400,46 @@ describe('useSpeechSynthesis', () => {
     expect(
       (window.speechSynthesis.speak as ReturnType<typeof vi.fn>).mock.calls[0][0].voice?.lang
     ).toBe('zh-CN');
+    expect(playbackEvents).toEqual([
+      { text: WELCOME_TEXT, phase: 'preparing' },
+      { text: WELCOME_TEXT, phase: 'start' },
+      { text: WELCOME_TEXT, phase: 'end' }
+    ]);
+  });
+
+  it('waits for the browser utterance start event before advancing captions', async () => {
+    installAudioContext();
+    vi.mocked(fetch).mockResolvedValue({
+      ok: false,
+      json: vi.fn(async () => ({ message: 'TTS not configured' }))
+    } as unknown as Response);
+    let utterance: SpeechSynthesisUtterance | null = null;
+    vi.mocked(window.speechSynthesis.speak).mockImplementationOnce((nextUtterance) => {
+      utterance = nextUtterance;
+    });
+    const { result } = renderHook(() => useSpeechSynthesis());
+    const playbackEvents: Array<{ text: string; phase: string }> = [];
+    window.addEventListener(GUIDE_SPEECH_PLAYBACK_EVENT, (event) => {
+      playbackEvents.push((event as CustomEvent<{ text: string; phase: string }>).detail);
+    });
+
+    await act(async () => {
+      await result.current.speak(WELCOME_TEXT);
+    });
+
+    expect(playbackEvents).toEqual([{ text: WELCOME_TEXT, phase: 'preparing' }]);
+
+    act(() => {
+      utterance?.onstart?.(new Event('start') as SpeechSynthesisEvent);
+    });
+    expect(playbackEvents).toEqual([
+      { text: WELCOME_TEXT, phase: 'preparing' },
+      { text: WELCOME_TEXT, phase: 'start' }
+    ]);
+
+    act(() => {
+      utterance?.onend?.(new Event('end') as SpeechSynthesisEvent);
+    });
     expect(playbackEvents).toEqual([
       { text: WELCOME_TEXT, phase: 'preparing' },
       { text: WELCOME_TEXT, phase: 'start' },

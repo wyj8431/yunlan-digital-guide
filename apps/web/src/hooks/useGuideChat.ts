@@ -1,89 +1,82 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { streamGuideAnswer, type GuideChatStreamController } from '../api/guideApi';
+import {
+  streamGuideAnswer,
+  type GuideChatStreamController,
+  type GuideChatStreamHandlers,
+  type GuideConversationMessage
+} from '../api/guideApi';
 import {
   GUIDE_SPEECH_DURATION_EVENT,
   GUIDE_SPEECH_PLAYBACK_EVENT,
   isGuideSpeechDurationEvent,
   isGuideSpeechPlaybackEvent
 } from '../lib/guideSpeechSync';
+import {
+  clearGuideChatHistory,
+  loadGuideChatHistory,
+  removeGuideChatHistory,
+  saveGuideChatHistory
+} from '../lib/guideChatHistory';
 import type {
   ChatMessage,
-  GuideImageAttachment,
+  GuideAttachment,
+  GuideChatSession,
   GuideSpeechTimeline,
   RouteCard
 } from '../types/guide';
 
-const FALLBACK_CJK_MS = 145;
-const FALLBACK_WHITESPACE_MS = 35;
-const FALLBACK_LATIN_MS = 55;
-const FALLBACK_COMMA_MS = 180;
-const FALLBACK_SENTENCE_END_MS = 260;
 const TYPEWRITER_FRAME_MS = 48;
+const PREVIEW_CHARACTER_MS = 145;
+const PREVIEW_CHARACTER_LIMIT = 10;
+const LONG_ANSWER_SYNC_THRESHOLD = 240;
+const LONG_ANSWER_MAX_VISIBLE_PROGRESS = 0.94;
+const SPEECH_START_FALLBACK_MS = 6_000;
 const MIN_SPEECH_DURATION_MS = 900;
-const SPEECH_START_FALLBACK_MS = 900;
-const SPEECH_PREPARING_FALLBACK_MS = 30000;
+const HISTORY_SAVE_DELAY_MS = 250;
+const IMAGE_ANALYSIS_STATUS = '正在识别画面并整理景点推荐，请稍候…';
+const DOCUMENT_ANALYSIS_STATUS = '正在读取文档并提炼重点，请稍候…';
 
 type ActiveTypewriter = {
   messageId: string;
   answer: string;
   characters: string[];
-  startedAt: number | null;
-  durationMs: number;
   visibleCount: number;
-  resolve: () => void;
-  promise: Promise<void>;
+  phase: 'preview' | 'speech';
+  previewStartedAt: number;
+  speechStartedAt: number | null;
+  speechStartVisibleCount: number;
+  durationMs: number;
 };
 
-function isCjkCharacter(character: string): boolean {
-  return /[\u3400-\u9fff]/.test(character);
-}
-
-function isCommaLikePause(character: string): boolean {
-  return /[,;:]/.test(character) || ['\uFF0C', '\u3001', '\uFF1B', '\uFF1A'].includes(character);
-}
-
-function isSentenceEndingPause(character: string): boolean {
-  return /[.!?]/.test(character) || ['\u3002', '\uFF01', '\uFF1F'].includes(character);
-}
-
-export function getTypewriterDelayMs(character: string): number {
-  if (/\s/.test(character)) {
-    return FALLBACK_WHITESPACE_MS;
+function getSpeechVisibleLimit(typewriter: ActiveTypewriter): number {
+  if (typewriter.characters.length < LONG_ANSWER_SYNC_THRESHOLD) {
+    return typewriter.characters.length;
   }
 
-  if (isSentenceEndingPause(character)) {
-    return FALLBACK_SENTENCE_END_MS;
-  }
-
-  if (isCommaLikePause(character)) {
-    return FALLBACK_COMMA_MS;
-  }
-
-  if (isCjkCharacter(character)) {
-    return FALLBACK_CJK_MS;
-  }
-
-  return FALLBACK_LATIN_MS;
-}
-
-export function estimateSpeechDurationMs(answer: string): number {
-  const characters = Array.from(answer);
-  const estimatedMs = characters.reduce(
-    (total, character) => total + getTypewriterDelayMs(character),
-    0
+  return Math.max(
+    typewriter.speechStartVisibleCount,
+    Math.min(
+      typewriter.characters.length - 1,
+      Math.floor(typewriter.characters.length * LONG_ANSWER_MAX_VISIBLE_PROGRESS)
+    )
   );
-
-  return Math.max(MIN_SPEECH_DURATION_MS, estimatedMs);
 }
 
-export function estimateTypewriterIntervalMs(answer: string): number {
-  const characters = Array.from(answer);
+function estimateSpeechDurationMs(text: string): number {
+  return Math.max(MIN_SPEECH_DURATION_MS, Array.from(text).length * PREVIEW_CHARACTER_MS);
+}
 
-  if (characters.length === 0) {
-    return FALLBACK_CJK_MS;
-  }
+export function buildConversationHistory(messages: ChatMessage[]): GuideConversationMessage[] {
+  return messages
+    .filter((message) => message.content.trim())
+    .slice(-6)
+    .map(({ role, content }) => ({ role, content }));
+}
 
-  return Math.round(estimateSpeechDurationMs(answer) / characters.length);
+function buildSessionTitle(messages: ChatMessage[]) {
+  const firstQuestion = messages.find((message) => message.role === 'user');
+  const title = firstQuestion?.content.replace(/\s+/g, ' ').trim() || '附件分析';
+  return Array.from(title).slice(0, 32).join('');
 }
 
 export function useGuideChat() {
@@ -91,7 +84,16 @@ export function useGuideChat() {
   const speechStartFallbackTimerRef = useRef<number | null>(null);
   const activeTypewriterRef = useRef<ActiveTypewriter | null>(null);
   const activeStreamRef = useRef<GuideChatStreamController | null>(null);
+  const activeExternalSessionRef = useRef<string | null>(null);
+  const completedExternalSessionsRef = useRef(new Set<string>());
+  const activeSessionIdRef = useRef<string>(crypto.randomUUID());
+  const sessionCreatedAtRef = useRef(new Date().toISOString());
+  const suppressNextHistorySaveRef = useRef(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [historySessions, setHistorySessions] = useState<GuideChatSession[]>(() =>
+    loadGuideChatHistory()
+  );
+  const [activeSessionId, setActiveSessionId] = useState<string>(activeSessionIdRef.current);
   const [routeCards, setRouteCards] = useState<RouteCard[]>([]);
   const [latestAnswer, setLatestAnswer] = useState('');
   const [speechTimeline, setSpeechTimeline] = useState<GuideSpeechTimeline | null>(null);
@@ -123,63 +125,126 @@ export function useGuideChat() {
     []
   );
 
+  const updateAssistantKnowledge = useCallback(
+    (messageId: string, response: { retrievedKnowledge?: ChatMessage['retrievedKnowledge'] }) => {
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === messageId
+            ? { ...message, retrievedKnowledge: response.retrievedKnowledge ?? [] }
+            : message
+        )
+      );
+    },
+    []
+  );
+
   const finishTypewriter = useCallback(
     (typewriter: ActiveTypewriter) => {
       clearTypingTimer();
+      clearSpeechStartFallbackTimer();
       activeTypewriterRef.current = null;
       updateAssistantMessage(typewriter.messageId, typewriter.answer, false);
-      typewriter.resolve();
     },
-    [clearTypingTimer, updateAssistantMessage]
+    [clearSpeechStartFallbackTimer, clearTypingTimer, updateAssistantMessage]
   );
 
   const renderTypewriterFrame = useCallback(() => {
     const typewriter = activeTypewriterRef.current;
 
-    if (!typewriter) {
+    if (!typewriter || typewriter.characters.length === 0) {
       return;
     }
 
-    const characterCount = typewriter.characters.length;
+    let nextVisibleCount = typewriter.visibleCount;
+    let nextFrameDelayMs = TYPEWRITER_FRAME_MS;
+    let speechVisibleLimit = typewriter.characters.length;
 
-    if (typewriter.startedAt === null) {
-      return;
+    if (typewriter.phase === 'preview') {
+      const elapsedMs = Math.max(0, Date.now() - typewriter.previewStartedAt);
+      nextVisibleCount = Math.min(
+        typewriter.characters.length,
+        PREVIEW_CHARACTER_LIMIT,
+        Math.max(1, Math.floor(elapsedMs / PREVIEW_CHARACTER_MS) + 1)
+      );
+    } else if (typewriter.speechStartedAt !== null) {
+      speechVisibleLimit = getSpeechVisibleLimit(typewriter);
+      const elapsedMs = Math.max(0, Date.now() - typewriter.speechStartedAt);
+      const progress = Math.min(1, elapsedMs / Math.max(typewriter.durationMs, 1));
+      nextFrameDelayMs = Math.max(
+        1,
+        Math.min(TYPEWRITER_FRAME_MS, typewriter.durationMs - elapsedMs)
+      );
+      const remainingCharacters = Math.max(
+        0,
+        typewriter.characters.length - typewriter.speechStartVisibleCount
+      );
+      nextVisibleCount = Math.min(
+        speechVisibleLimit,
+        Math.max(
+          typewriter.visibleCount,
+          typewriter.speechStartVisibleCount + Math.floor(progress * remainingCharacters)
+        )
+      );
     }
-
-    if (characterCount === 0) {
-      finishTypewriter(typewriter);
-      return;
-    }
-
-    const elapsedMs = Math.max(0, Date.now() - typewriter.startedAt);
-    const progress = Math.min(1, elapsedMs / Math.max(typewriter.durationMs, 1));
-    const nextVisibleCount = Math.min(
-      characterCount,
-      Math.max(typewriter.visibleCount, Math.max(1, Math.floor(progress * characterCount)))
-    );
 
     if (nextVisibleCount > typewriter.visibleCount) {
       typewriter.visibleCount = nextVisibleCount;
       updateAssistantMessage(
         typewriter.messageId,
         typewriter.characters.slice(0, nextVisibleCount).join(''),
-        nextVisibleCount < characterCount
+        true
       );
     }
 
-    if (nextVisibleCount >= characterCount || progress >= 1) {
+    if (typewriter.phase === 'speech' && nextVisibleCount >= typewriter.characters.length) {
       finishTypewriter(typewriter);
       return;
     }
 
-    const remainingMs = Math.max(0, typewriter.durationMs - elapsedMs);
-    typingTimerRef.current = window.setTimeout(
-      renderTypewriterFrame,
-      Math.min(TYPEWRITER_FRAME_MS, remainingMs)
-    );
-  }, [finishTypewriter, updateAssistantMessage]);
+    const previewTarget = Math.min(typewriter.characters.length, PREVIEW_CHARACTER_LIMIT);
+    const shouldContinue =
+      typewriter.phase === 'speech'
+        ? nextVisibleCount < speechVisibleLimit
+        : nextVisibleCount < previewTarget;
 
-  const startTypewriter = useCallback(
+    if (shouldContinue) {
+      clearTypingTimer();
+      typingTimerRef.current = window.setTimeout(renderTypewriterFrame, nextFrameDelayMs);
+    }
+  }, [clearTypingTimer, finishTypewriter, updateAssistantMessage]);
+
+  const paceAssistantAnswer = useCallback(
+    (messageId: string, answer: string, durationMs?: number) => {
+      const characters = Array.from(answer);
+      const activeTypewriter = activeTypewriterRef.current;
+
+      if (activeTypewriter?.messageId === messageId) {
+        activeTypewriter.answer = answer;
+        activeTypewriter.characters = characters;
+        if (durationMs) {
+          activeTypewriter.durationMs = Math.max(TYPEWRITER_FRAME_MS, durationMs);
+        }
+      } else {
+        clearTypingTimer();
+        activeTypewriterRef.current = {
+          messageId,
+          answer,
+          characters,
+          visibleCount: 0,
+          phase: 'preview',
+          previewStartedAt: Date.now(),
+          speechStartedAt: null,
+          speechStartVisibleCount: 0,
+          durationMs: Math.max(TYPEWRITER_FRAME_MS, durationMs ?? estimateSpeechDurationMs(answer))
+        };
+      }
+
+      renderTypewriterFrame();
+    },
+    [clearTypingTimer, renderTypewriterFrame]
+  );
+
+  const startSpeechPacing = useCallback(
     (text: string) => {
       const typewriter = activeTypewriterRef.current;
 
@@ -188,18 +253,16 @@ export function useGuideChat() {
       }
 
       clearSpeechStartFallbackTimer();
-
-      if (typewriter.startedAt === null) {
-        typewriter.startedAt = Date.now();
-      }
-
+      typewriter.phase = 'speech';
+      typewriter.speechStartedAt = Date.now();
+      typewriter.speechStartVisibleCount = typewriter.visibleCount;
       clearTypingTimer();
       renderTypewriterFrame();
     },
     [clearSpeechStartFallbackTimer, clearTypingTimer, renderTypewriterFrame]
   );
 
-  const syncTypewriterDuration = useCallback(
+  const syncSpeechDuration = useCallback(
     (text: string, durationMs: number) => {
       const typewriter = activeTypewriterRef.current;
 
@@ -207,72 +270,36 @@ export function useGuideChat() {
         return;
       }
 
-      const visibleProgress =
-        typewriter.characters.length > 0
-          ? typewriter.visibleCount / typewriter.characters.length
-          : 0;
-      if (typewriter.startedAt !== null) {
-        typewriter.startedAt = Date.now() - durationMs * visibleProgress;
-      }
       typewriter.durationMs = Math.max(TYPEWRITER_FRAME_MS, durationMs);
-      clearTypingTimer();
-      renderTypewriterFrame();
-    },
-    [clearTypingTimer, renderTypewriterFrame]
-  );
-
-  const paceAssistantAnswer = useCallback(
-    (messageId: string, answer: string): Promise<void> => {
-      const typewriter = activeTypewriterRef.current;
-      const characters = Array.from(answer);
-      const durationMs = estimateSpeechDurationMs(answer);
-
-      if (typewriter && typewriter.messageId === messageId) {
-        typewriter.answer = answer;
-        typewriter.characters = characters;
-        typewriter.durationMs = Math.max(TYPEWRITER_FRAME_MS, durationMs);
+      if (typewriter.phase === 'speech') {
         clearTypingTimer();
         renderTypewriterFrame();
-        return typewriter.promise;
       }
-
-      let resolveTypewriter!: () => void;
-      const promise = new Promise<void>((resolve) => {
-        resolveTypewriter = resolve;
-      });
-
-      activeTypewriterRef.current = {
-        messageId,
-        answer,
-        characters,
-        startedAt: null,
-        durationMs,
-        visibleCount: 0,
-        resolve: resolveTypewriter,
-        promise
-      };
-
-      renderTypewriterFrame();
-      return promise;
     },
     [clearTypingTimer, renderTypewriterFrame]
   );
 
   const scheduleSpeechStartFallback = useCallback(
-    (text: string, delayMs = SPEECH_START_FALLBACK_MS) => {
+    (text: string) => {
       clearSpeechStartFallbackTimer();
       speechStartFallbackTimerRef.current = window.setTimeout(() => {
         speechStartFallbackTimerRef.current = null;
-        startTypewriter(text);
-      }, delayMs);
+        startSpeechPacing(text);
+      }, SPEECH_START_FALLBACK_MS);
     },
-    [clearSpeechStartFallbackTimer, startTypewriter]
+    [clearSpeechStartFallbackTimer, startSpeechPacing]
   );
+
+  const discardTypewriter = useCallback(() => {
+    clearTypingTimer();
+    clearSpeechStartFallbackTimer();
+    activeTypewriterRef.current = null;
+  }, [clearSpeechStartFallbackTimer, clearTypingTimer]);
 
   useEffect(() => {
     const handleSpeechDuration = (event: Event) => {
       if (isGuideSpeechDurationEvent(event)) {
-        syncTypewriterDuration(event.detail.text, event.detail.durationMs);
+        syncSpeechDuration(event.detail.text, event.detail.durationMs);
       }
     };
     const handleSpeechPlayback = (event: Event) => {
@@ -280,18 +307,15 @@ export function useGuideChat() {
         return;
       }
 
-      if (event.detail.phase === 'preparing') {
-        scheduleSpeechStartFallback(event.detail.text, SPEECH_PREPARING_FALLBACK_MS);
+      const typewriter = activeTypewriterRef.current;
+      if (!typewriter || typewriter.answer !== event.detail.text) {
         return;
       }
 
       if (event.detail.phase === 'start') {
-        startTypewriter(event.detail.text);
-        return;
-      }
-
-      if (event.detail.phase === 'error') {
-        startTypewriter(event.detail.text);
+        startSpeechPacing(event.detail.text);
+      } else if (event.detail.phase === 'end' || event.detail.phase === 'error') {
+        finishTypewriter(typewriter);
       }
     };
 
@@ -300,45 +324,60 @@ export function useGuideChat() {
     return () => {
       window.removeEventListener(GUIDE_SPEECH_DURATION_EVENT, handleSpeechDuration);
       window.removeEventListener(GUIDE_SPEECH_PLAYBACK_EVENT, handleSpeechPlayback);
-      clearTypingTimer();
-      clearSpeechStartFallbackTimer();
+      discardTypewriter();
       activeStreamRef.current?.close();
       activeStreamRef.current = null;
     };
-  }, [
-    clearSpeechStartFallbackTimer,
-    clearTypingTimer,
-    scheduleSpeechStartFallback,
-    startTypewriter,
-    syncTypewriterDuration
-  ]);
+  }, [discardTypewriter, finishTypewriter, startSpeechPacing, syncSpeechDuration]);
 
-  const typeAssistantAnswer = useCallback(
-    (messageId: string, answer: string) => {
-      clearTypingTimer();
-      activeTypewriterRef.current = null;
-      return paceAssistantAnswer(messageId, answer);
-    },
-    [clearTypingTimer, paceAssistantAnswer]
-  );
+  useEffect(() => {
+    if (messages.length === 0) {
+      return;
+    }
+
+    if (suppressNextHistorySaveRef.current) {
+      suppressNextHistorySaveRef.current = false;
+      return;
+    }
+
+    const sessionId = activeSessionId;
+    const createdAt = sessionCreatedAtRef.current;
+    const timer = window.setTimeout(() => {
+      const updatedSessions = saveGuideChatHistory({
+        id: sessionId,
+        title: buildSessionTitle(messages),
+        createdAt,
+        updatedAt: new Date().toISOString(),
+        messages
+      });
+      setHistorySessions(updatedSessions);
+    }, HISTORY_SAVE_DELAY_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [activeSessionId, messages]);
 
   const ask = useCallback(
-    async (message: string, image?: GuideImageAttachment | null) => {
+    async (message: string, attachment?: GuideAttachment | null) => {
       const trimmed = message.trim();
 
-      if ((!trimmed && !image) || loading) {
+      if ((!trimmed && !attachment) || loading) {
         return;
       }
 
+      const history = buildConversationHistory(messages);
       const assistantMessageId = crypto.randomUUID();
+      const attachmentIsImage = Boolean(
+        attachment &&
+        (attachment.kind === 'image' || attachment.mimeType.toLowerCase().startsWith('image/'))
+      );
       let streamedAnswer = '';
-      let receivedStreamDelta = false;
       let receivedResult = false;
 
       activeStreamRef.current?.close();
-      clearTypingTimer();
-      clearSpeechStartFallbackTimer();
-      activeTypewriterRef.current = null;
+      const previousTypewriter = activeTypewriterRef.current;
+      if (previousTypewriter) {
+        finishTypewriter(previousTypewriter);
+      }
       setLoading(true);
       setError(null);
       setLatestAnswer('');
@@ -348,36 +387,49 @@ export function useGuideChat() {
         {
           id: crypto.randomUUID(),
           role: 'user',
-          content: trimmed || '请分析这张图片',
-          imagePreviewUrl: image?.dataUrl,
-          imageName: image?.name
+          content: trimmed || (attachmentIsImage ? '请分析这张图片' : '请分析这个附件'),
+          attachmentName: attachment?.name,
+          attachmentKind: attachmentIsImage ? 'image' : attachment?.kind,
+          attachmentPreviewUrl: attachmentIsImage ? attachment?.dataUrl : undefined,
+          imagePreviewUrl: attachmentIsImage ? attachment?.dataUrl : undefined,
+          imageName: attachmentIsImage ? attachment?.name : undefined
         },
-        { id: assistantMessageId, role: 'assistant', content: '', streaming: true }
+        {
+          id: assistantMessageId,
+          role: 'assistant',
+          content: attachment
+            ? attachmentIsImage
+              ? IMAGE_ANALYSIS_STATUS
+              : DOCUMENT_ANALYSIS_STATUS
+            : '',
+          streaming: true
+        }
       ]);
 
       try {
         await new Promise<void>((resolve, reject) => {
-          activeStreamRef.current = streamGuideAnswer(trimmed, image, {
+          const handlers: GuideChatStreamHandlers = {
             onDelta: (delta) => {
               streamedAnswer += delta;
-              receivedStreamDelta = true;
-              void paceAssistantAnswer(assistantMessageId, streamedAnswer);
+              paceAssistantAnswer(assistantMessageId, streamedAnswer);
             },
-            onSpeechTimeline: setSpeechTimeline,
+            onSpeechTimeline: (timeline) => {
+              setSpeechTimeline(timeline);
+              syncSpeechDuration(timeline.text, timeline.durationMs);
+            },
             onResult: (response) => {
               receivedResult = true;
+              paceAssistantAnswer(
+                assistantMessageId,
+                response.answer,
+                response.speechTimeline.durationMs
+              );
+              scheduleSpeechStartFallback(response.answer);
               setLatestAnswer(response.answer);
               setRouteCards(response.cards);
               setSpeechTimeline(response.speechTimeline);
-
-              if (receivedStreamDelta) {
-                scheduleSpeechStartFallback(response.answer);
-                void paceAssistantAnswer(assistantMessageId, response.answer).then(resolve, reject);
-                return;
-              }
-
-              scheduleSpeechStartFallback(response.answer);
-              void typeAssistantAnswer(assistantMessageId, response.answer).then(resolve, reject);
+              updateAssistantKnowledge(assistantMessageId, response);
+              resolve();
             },
             onError: reject,
             onDone: () => {
@@ -385,10 +437,15 @@ export function useGuideChat() {
                 reject(new Error('Guide stream ended before the answer was ready.'));
               }
             }
-          });
+          };
+
+          activeStreamRef.current =
+            history.length > 0
+              ? streamGuideAnswer(trimmed, attachment, handlers, history)
+              : streamGuideAnswer(trimmed, attachment, handlers);
         });
       } catch (caught) {
-        activeTypewriterRef.current = null;
+        discardTypewriter();
         setMessages((current) => current.filter((message) => message.id !== assistantMessageId));
         setError(caught instanceof Error ? caught.message : '数字导游暂时没有回答成功');
       } finally {
@@ -397,14 +454,184 @@ export function useGuideChat() {
       }
     },
     [
-      clearSpeechStartFallbackTimer,
-      clearTypingTimer,
       loading,
+      messages,
+      discardTypewriter,
+      finishTypewriter,
       paceAssistantAnswer,
       scheduleSpeechStartFallback,
-      typeAssistantAnswer
+      syncSpeechDuration,
+      updateAssistantKnowledge,
+      updateAssistantMessage
     ]
   );
 
-  return { messages, routeCards, latestAnswer, speechTimeline, loading, error, ask };
+  const beginExternalQuestion = useCallback(
+    (sessionId: string, message: string): boolean => {
+      const trimmed = message.trim();
+
+      if (!trimmed || loading || activeExternalSessionRef.current) {
+        return false;
+      }
+
+      activeStreamRef.current?.close();
+      activeExternalSessionRef.current = sessionId;
+      setLoading(true);
+      setError(null);
+      setLatestAnswer('');
+      setSpeechTimeline(null);
+      setMessages((current) => [
+        ...current,
+        {
+          id: crypto.randomUUID(),
+          role: 'user',
+          content: trimmed
+        }
+      ]);
+
+      return true;
+    },
+    [loading]
+  );
+
+  const completeExternalQuestion = useCallback(
+    (
+      sessionId: string,
+      response: {
+        answer: string;
+        cards: RouteCard[];
+        speechTimeline: GuideSpeechTimeline;
+        retrievedKnowledge?: ChatMessage['retrievedKnowledge'];
+      }
+    ) => {
+      if (
+        activeExternalSessionRef.current !== sessionId ||
+        completedExternalSessionsRef.current.has(sessionId)
+      ) {
+        return;
+      }
+
+      completedExternalSessionsRef.current.add(sessionId);
+      activeExternalSessionRef.current = null;
+      const assistantMessageId = crypto.randomUUID();
+      const previousTypewriter = activeTypewriterRef.current;
+      if (previousTypewriter) {
+        finishTypewriter(previousTypewriter);
+      }
+      setLatestAnswer(response.answer);
+      setRouteCards(response.cards);
+      setSpeechTimeline(response.speechTimeline);
+      setMessages((current) => [
+        ...current,
+        {
+          id: assistantMessageId,
+          role: 'assistant',
+          content: '',
+          streaming: true,
+          retrievedKnowledge: response.retrievedKnowledge ?? []
+        }
+      ]);
+      paceAssistantAnswer(assistantMessageId, response.answer, response.speechTimeline.durationMs);
+      scheduleSpeechStartFallback(response.answer);
+      setLoading(false);
+    },
+    [finishTypewriter, paceAssistantAnswer, scheduleSpeechStartFallback]
+  );
+
+  const failExternalQuestion = useCallback((sessionId: string, message: string) => {
+    if (activeExternalSessionRef.current !== sessionId) {
+      return;
+    }
+
+    activeExternalSessionRef.current = null;
+    setError(message);
+    setLoading(false);
+  }, []);
+
+  const resetConversation = useCallback(() => {
+    activeStreamRef.current?.close();
+    activeStreamRef.current = null;
+    activeExternalSessionRef.current = null;
+    discardTypewriter();
+    const nextSessionId = crypto.randomUUID();
+    activeSessionIdRef.current = nextSessionId;
+    sessionCreatedAtRef.current = new Date().toISOString();
+    setActiveSessionId(nextSessionId);
+    setMessages([]);
+    setRouteCards([]);
+    setLatestAnswer('');
+    setSpeechTimeline(null);
+    setLoading(false);
+    setError(null);
+  }, [discardTypewriter]);
+
+  const startNewConversation = useCallback(() => {
+    resetConversation();
+  }, [resetConversation]);
+
+  const openConversation = useCallback(
+    (sessionId: string) => {
+      const session =
+        historySessions.find((item) => item.id === sessionId) ??
+        loadGuideChatHistory().find((item) => item.id === sessionId);
+      if (!session) {
+        return false;
+      }
+
+      activeStreamRef.current?.close();
+      activeStreamRef.current = null;
+      activeExternalSessionRef.current = null;
+      discardTypewriter();
+      suppressNextHistorySaveRef.current = true;
+      activeSessionIdRef.current = session.id;
+      sessionCreatedAtRef.current = session.createdAt;
+      setActiveSessionId(session.id);
+      setMessages(session.messages);
+      setRouteCards([]);
+      setLatestAnswer(
+        [...session.messages].reverse().find((message) => message.role === 'assistant')?.content ??
+          ''
+      );
+      setSpeechTimeline(null);
+      setLoading(false);
+      setError(null);
+      return true;
+    },
+    [discardTypewriter, historySessions]
+  );
+
+  const deleteConversation = useCallback(
+    (sessionId: string) => {
+      setHistorySessions(removeGuideChatHistory(sessionId));
+      if (activeSessionIdRef.current === sessionId) {
+        resetConversation();
+      }
+    },
+    [resetConversation]
+  );
+
+  const clearConversationHistory = useCallback(() => {
+    clearGuideChatHistory();
+    setHistorySessions([]);
+    resetConversation();
+  }, [resetConversation]);
+
+  return {
+    messages,
+    historySessions,
+    activeSessionId,
+    routeCards,
+    latestAnswer,
+    speechTimeline,
+    loading,
+    error,
+    ask,
+    startNewConversation,
+    openConversation,
+    deleteConversation,
+    clearConversationHistory,
+    beginExternalQuestion,
+    completeExternalQuestion,
+    failExternalQuestion
+  };
 }
