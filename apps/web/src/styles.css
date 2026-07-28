@@ -3920,7 +3920,6 @@ body {
 
 .video-danmaku-item--scroll {
   top: calc(9% + (var(--danmaku-row) * 12%));
-  animation: video-danmaku-scroll var(--danmaku-speed) linear both;
 }
 
 .video-danmaku-item--top,
@@ -3937,10 +3936,6 @@ body {
 
 .video-danmaku-item--bottom {
   bottom: calc(15% + (var(--danmaku-row) * 7%));
-}
-
-.video-danmaku-layer.is-paused .video-danmaku-item {
-  animation-play-state: paused;
 }
 
 .video-subtitle {
@@ -4081,15 +4076,6 @@ body {
   accent-color: #8ff0d1;
 }
 
-@keyframes video-danmaku-scroll {
-  from {
-    transform: translateX(100vw);
-  }
-  to {
-    transform: translateX(-120%);
-  }
-}
-
 .video-center-skeleton {
   display: grid;
   gap: 10px;
@@ -4139,6 +4125,48 @@ body {
   color: #ffe7a0;
 }
 
+.video-center-error-state > svg,
+.video-inline-error {
+  color: #ffc1aa;
+}
+
+.video-inline-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(255, 159, 123, 0.25);
+  border-radius: 6px;
+  background: rgba(113, 39, 34, 0.2);
+  padding: 9px 10px;
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.video-inline-error button,
+.video-center-error-state button {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(255, 231, 160, 0.38);
+  border-radius: 5px;
+  background: rgba(3, 70, 60, 0.62);
+  padding: 0 10px;
+  color: #fffbe5;
+  font-size: 0.75rem;
+  font-weight: 750;
+}
+
+.video-inline-error button:hover,
+.video-inline-error button:focus-visible,
+.video-center-error-state button:hover,
+.video-center-error-state button:focus-visible {
+  border-color: rgba(186, 248, 220, 0.82);
+  background: #baf8dc;
+  color: #164a3b;
+}
+
 @keyframes video-center-shimmer {
   to {
     background-position: -200% 0;
@@ -4178,8 +4206,14 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .video-center-skeleton span {
+  .video-center-skeleton span,
+  .video-danmaku-item--scroll {
     animation: none;
+  }
+
+  .video-danmaku-item--scroll {
+    left: 50% !important;
+    transform: translateX(-50%) !important;
   }
 }
 

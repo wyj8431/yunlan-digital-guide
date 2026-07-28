@@ -1,6 +1,10 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { VideoPlayer } from '../src/video/VideoPlayer';
+import {
+  canUseLiveSubtitleRecognition,
+  resolveSubtitleDisplay
+} from '../src/video/subtitleFallback';
 import type { Danmaku, VideoDetail } from '../src/types/video';
 
 const video: VideoDetail = {
@@ -32,44 +36,76 @@ function setCurrentTime(element: HTMLVideoElement, seconds: number) {
   Object.defineProperty(element, 'currentTime', { configurable: true, value: seconds });
 }
 
+function renderPlayer() {
+  const result = render(
+    <VideoPlayer
+      video={video}
+      danmaku={danmaku}
+      preferences={{ speed: 1, fontSize: 18, opacity: 0.9, density: 3 }}
+      onClockChange={() => undefined}
+    />
+  );
+  return {
+    ...result,
+    player: screen.getByLabelText('西湖晨光播放器') as HTMLVideoElement,
+    layer: result.container.querySelector('.video-danmaku-layer') as HTMLElement
+  };
+}
+
 describe('VideoPlayer', () => {
   afterEach(() => cleanup());
 
-  it('uses the video clock for synchronized subtitle and danmaku rendering', () => {
-    render(
-      <VideoPlayer
-        video={video}
-        danmaku={danmaku}
-        preferences={{ speed: 1, fontSize: 18, opacity: 0.9, density: 3 }}
-        onClockChange={() => undefined}
-      />
-    );
-    const player = screen.getByLabelText('西湖晨光播放器') as HTMLVideoElement;
+  it('positions danmaku deterministically from the video clock and resets after seeking', () => {
+    const { player } = renderPlayer();
+    setCurrentTime(player, 6);
+    fireEvent.timeUpdate(player);
+
+    const message = screen.getByText('好美');
+    expect(Number.parseFloat(message.style.left)).toBeCloseTo((6 / 7) * 100);
+
+    setCurrentTime(player, 10);
+    fireEvent.seeking(player);
+    fireEvent.seeked(player);
+    expect(Number.parseFloat(screen.getByText('好美').style.left)).toBeCloseTo((2 / 7) * 100);
+  });
+
+  it('freezes on pause, waiting, stalled and seeking until playback resumes', () => {
+    const { player, layer } = renderPlayer();
+
+    fireEvent.playing(player);
+    expect(layer).not.toHaveClass('is-paused');
+    fireEvent.waiting(player);
+    expect(layer).toHaveClass('is-paused');
+    fireEvent.playing(player);
+    fireEvent.stalled(player);
+    expect(layer).toHaveClass('is-paused');
+    fireEvent.playing(player);
+    fireEvent.seeking(player);
+    expect(layer).toHaveClass('is-paused');
+    fireEvent.pause(player);
+    expect(layer).toHaveClass('is-paused');
+  });
+
+  it('keeps danmaku out of the accessibility tree and localizes subtitle announcements', () => {
+    const { player, layer, container } = renderPlayer();
+    expect(layer).toHaveAttribute('aria-hidden', 'true');
+    expect(container.querySelector('.video-player')).not.toHaveAttribute('aria-live');
 
     setCurrentTime(player, 5);
     fireEvent.timeUpdate(player);
-
-    expect(screen.getByText('湖面泛起晨光。')).toBeInTheDocument();
-    expect(screen.getByText('好美')).toBeInTheDocument();
+    expect(screen.getByText('湖面泛起晨光。').closest('.video-subtitle')).toHaveAttribute(
+      'aria-live',
+      'polite'
+    );
   });
 
-  it('freezes the danmaku layer on pause and recalculates it on seeking', () => {
-    render(
-      <VideoPlayer
-        video={video}
-        danmaku={danmaku}
-        preferences={{ speed: 1, fontSize: 18, opacity: 0.9, density: 3 }}
-        onClockChange={() => undefined}
-      />
+  it('continues preset subtitles when live recognition is unsupported or fails', () => {
+    expect(canUseLiveSubtitleRecognition({})).toBe(false);
+    expect(resolveSubtitleDisplay(video.subtitleCues, 5_000, { status: 'unsupported' }).text).toBe(
+      '湖面泛起晨光。'
     );
-    const player = screen.getByLabelText('西湖晨光播放器') as HTMLVideoElement;
-    const layer = screen.getByLabelText('弹幕层');
-
-    fireEvent.pause(player);
-    expect(layer).toHaveClass('is-paused');
-
-    setCurrentTime(player, 12);
-    fireEvent.seeked(player);
-    expect(screen.queryByText('好美')).not.toBeInTheDocument();
+    expect(resolveSubtitleDisplay(video.subtitleCues, 5_000, { status: 'failed' }).text).toBe(
+      '湖面泛起晨光。'
+    );
   });
 });

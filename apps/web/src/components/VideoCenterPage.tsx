@@ -36,14 +36,25 @@ export function VideoCenterPage({ onReturnHome }: VideoCenterPageProps) {
     selectedVideoId,
     detailsByVideoId,
     danmakuByVideoId,
+    detailStatusByVideoId,
+    detailErrorByVideoId,
+    danmakuStatusByVideoId,
+    danmakuErrorByVideoId,
     status,
-    detailStatus,
     error
   } = useSelector((state: RootState) => state.video);
   const [preferences, setPreferences] = useState<DanmakuPreferences>(defaultDanmakuPreferences);
   const [currentMs, setCurrentMs] = useState(0);
   const selectedVideo = videos.find((video) => video.id === selectedVideoId) ?? null;
   const selectedDetail = selectedVideoId ? detailsByVideoId[selectedVideoId] : undefined;
+  const selectedDetailStatus = selectedVideoId
+    ? (detailStatusByVideoId[selectedVideoId] ?? 'idle')
+    : 'idle';
+  const selectedDetailError = selectedVideoId ? detailErrorByVideoId[selectedVideoId] : undefined;
+  const selectedDanmakuStatus = selectedVideoId
+    ? (danmakuStatusByVideoId[selectedVideoId] ?? 'idle')
+    : 'idle';
+  const selectedDanmakuError = selectedVideoId ? danmakuErrorByVideoId[selectedVideoId] : undefined;
 
   useEffect(() => {
     setPreferences(loadDanmakuPreferences());
@@ -137,8 +148,20 @@ export function VideoCenterPage({ onReturnHome }: VideoCenterPageProps) {
           ) : null}
         </aside>
 
-        <section className="video-center-selection" aria-live="polite">
-          {selectedDetail ? (
+        <section className="video-center-selection">
+          {selectedDetailStatus === 'error' && !selectedDetail ? (
+            <div className="video-center-selection-empty video-center-error-state" role="alert">
+              <AlertTriangle aria-hidden="true" size={32} />
+              <p>{selectedDetailError}</p>
+              <button
+                type="button"
+                onClick={() => selectedVideoId && void dispatch(loadVideoDetail(selectedVideoId))}
+              >
+                <RefreshCw aria-hidden="true" size={16} />
+                重新加载视频详情
+              </button>
+            </div>
+          ) : selectedDetail ? (
             <>
               <VideoPlayer
                 video={selectedDetail}
@@ -161,7 +184,38 @@ export function VideoCenterPage({ onReturnHome }: VideoCenterPageProps) {
                       <dd>{selectedDetail.subtitleCues.length} 条预置时间轴</dd>
                     </div>
                   </dl>
+                  {selectedDetailStatus === 'error' ? (
+                    <div className="video-inline-error" role="alert">
+                      <span>{selectedDetailError}</span>
+                      <button
+                        type="button"
+                        onClick={() => void dispatch(loadVideoDetail(selectedDetail.id))}
+                      >
+                        重新加载视频详情
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
+
+                {selectedDanmakuStatus === 'error' ? (
+                  <div className="video-inline-error" role="alert">
+                    <span>{selectedDanmakuError}</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void dispatch(
+                          loadDanmaku({
+                            videoId: selectedDetail.id,
+                            fromMs: 0,
+                            toMs: selectedDetail.durationMs
+                          })
+                        )
+                      }
+                    >
+                      重新加载弹幕
+                    </button>
+                  </div>
+                ) : null}
 
                 <DanmakuComposer
                   currentMs={currentMs}
@@ -234,7 +288,7 @@ export function VideoCenterPage({ onReturnHome }: VideoCenterPageProps) {
                 </section>
               </div>
             </>
-          ) : selectedVideo || detailStatus === 'loading' ? (
+          ) : selectedVideo || selectedDetailStatus === 'loading' ? (
             <div className="video-center-selection-empty">
               <Film aria-hidden="true" size={32} />
               <p>正在准备视频、预置字幕与弹幕时间轴</p>

@@ -78,6 +78,57 @@ describe('VideoCenterPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '运河夜航' }));
 
     expect(await screen.findByRole('heading', { name: '运河夜航' })).toBeInTheDocument();
+    expect(document.querySelector('.video-center-selection')).not.toHaveAttribute('aria-live');
+  });
+
+  it('shows a per-video detail error and retries only that detail', async () => {
+    let detailAttempts = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((request: RequestInfo | URL) => {
+        const url = String(request);
+        if (url === '/api/videos') return Promise.resolve(json({ videos }));
+        if (url.includes('/danmaku?')) return Promise.resolve(json({ danmaku: [] }));
+        detailAttempts += 1;
+        return detailAttempts === 1
+          ? Promise.resolve(json({ message: '视频详情暂时不可用' }, 503))
+          : Promise.resolve(json({ video: { ...videos[0], subtitleCues: [] } }));
+      })
+    );
+    renderPage();
+
+    expect(await screen.findByText('视频详情暂时不可用（HTTP 503）')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '重新加载视频详情' }));
+
+    expect(await screen.findByRole('heading', { name: '西湖晨光' })).toBeInTheDocument();
+    expect(detailAttempts).toBe(2);
+  });
+
+  it('shows an inline danmaku error and retries the current video window', async () => {
+    let danmakuAttempts = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((request: RequestInfo | URL) => {
+        const url = String(request);
+        if (url === '/api/videos') return Promise.resolve(json({ videos }));
+        if (url.includes('/danmaku?')) {
+          danmakuAttempts += 1;
+          return danmakuAttempts === 1
+            ? Promise.resolve(json({ message: '弹幕暂时不可用' }, 503))
+            : Promise.resolve(json({ danmaku: [] }));
+        }
+        return Promise.resolve(json({ video: { ...videos[0], subtitleCues: [] } }));
+      })
+    );
+    renderPage();
+
+    expect(await screen.findByText('弹幕暂时不可用（HTTP 503）')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '重新加载弹幕' }));
+
+    await waitFor(() =>
+      expect(screen.queryByText('弹幕暂时不可用（HTTP 503）')).not.toBeInTheDocument()
+    );
+    expect(danmakuAttempts).toBe(2);
   });
 
   it('offers a retry after a list error', async () => {

@@ -14,9 +14,11 @@ export type VideoState = {
   selectedVideoId: string | null;
   detailsByVideoId: Record<string, VideoDetail | undefined>;
   danmakuByVideoId: Record<string, Danmaku[] | undefined>;
+  detailStatusByVideoId: Record<string, VideoLoadStatus | undefined>;
+  detailErrorByVideoId: Record<string, string | null | undefined>;
+  danmakuStatusByVideoId: Record<string, VideoLoadStatus | undefined>;
+  danmakuErrorByVideoId: Record<string, string | null | undefined>;
   status: VideoLoadStatus;
-  detailStatus: VideoLoadStatus;
-  danmakuStatus: VideoLoadStatus;
   error: string | null;
 };
 
@@ -25,9 +27,11 @@ const initialState: VideoState = {
   selectedVideoId: null,
   detailsByVideoId: {},
   danmakuByVideoId: {},
+  detailStatusByVideoId: {},
+  detailErrorByVideoId: {},
+  danmakuStatusByVideoId: {},
+  danmakuErrorByVideoId: {},
   status: 'idle',
-  detailStatus: 'idle',
-  danmakuStatus: 'idle',
   error: null
 };
 
@@ -86,25 +90,35 @@ const videoSlice = createSlice({
         state.status = 'error';
         state.error = action.error.message ?? '视频列表加载失败，请稍后重试。';
       })
-      .addCase(loadVideoDetail.pending, (state) => {
-        state.detailStatus = 'loading';
+      .addCase(loadVideoDetail.pending, (state, action) => {
+        const videoId = action.meta.arg;
+        state.detailStatusByVideoId[videoId] = 'loading';
+        state.detailErrorByVideoId[videoId] = null;
       })
       .addCase(loadVideoDetail.fulfilled, (state, action) => {
         state.detailsByVideoId[action.payload.id] = action.payload;
-        state.detailStatus = 'ready';
+        state.detailStatusByVideoId[action.payload.id] = 'ready';
+        state.detailErrorByVideoId[action.payload.id] = null;
       })
-      .addCase(loadVideoDetail.rejected, (state) => {
-        state.detailStatus = 'error';
+      .addCase(loadVideoDetail.rejected, (state, action) => {
+        const videoId = action.meta.arg;
+        state.detailStatusByVideoId[videoId] = 'error';
+        state.detailErrorByVideoId[videoId] = action.error.message ?? '视频详情加载失败，请重试。';
       })
-      .addCase(loadDanmaku.pending, (state) => {
-        state.danmakuStatus = 'loading';
+      .addCase(loadDanmaku.pending, (state, action) => {
+        const videoId = action.meta.arg.videoId;
+        state.danmakuStatusByVideoId[videoId] = 'loading';
+        state.danmakuErrorByVideoId[videoId] = null;
       })
       .addCase(loadDanmaku.fulfilled, (state, action) => {
         state.danmakuByVideoId[action.payload.videoId] = action.payload.danmaku;
-        state.danmakuStatus = 'ready';
+        state.danmakuStatusByVideoId[action.payload.videoId] = 'ready';
+        state.danmakuErrorByVideoId[action.payload.videoId] = null;
       })
-      .addCase(loadDanmaku.rejected, (state) => {
-        state.danmakuStatus = 'error';
+      .addCase(loadDanmaku.rejected, (state, action) => {
+        const videoId = action.meta.arg.videoId;
+        state.danmakuStatusByVideoId[videoId] = 'error';
+        state.danmakuErrorByVideoId[videoId] = action.error.message ?? '弹幕加载失败，请重试。';
       })
       .addCase(sendDanmaku.fulfilled, (state, action) => {
         const existing = state.danmakuByVideoId[action.payload.videoId] ?? [];
