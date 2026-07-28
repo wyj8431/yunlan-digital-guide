@@ -239,6 +239,16 @@ export class VideoRepository {
 
   private seedDatabase(): void {
     this.database.transaction(() => {
+      const temporaryRange = this.database
+        .prepare('SELECT COALESCE(MAX(sort_order), -1) + 1 AS start FROM videos')
+        .get() as { start: number };
+      const moveExistingVideo = this.database.prepare(
+        'UPDATE videos SET sort_order = ? WHERE id = ?'
+      );
+      VIDEO_SEEDS.forEach((video, index) => {
+        moveExistingVideo.run(temporaryRange.start + index, video.id);
+      });
+
       const insertVideo = this.database.prepare(
         `INSERT INTO videos (
            id, title, description, cover_url, video_url, duration_ms, sort_order

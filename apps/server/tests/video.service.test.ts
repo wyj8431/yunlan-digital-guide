@@ -272,6 +272,31 @@ describe('video service', () => {
     expect(countSubtitleCues(service)).toBe(SUBTITLE_CUE_SEEDS.length);
   });
 
+  it('restores the final seed order when existing video sort orders were swapped', () => {
+    repository?.close();
+    repository = undefined;
+
+    const database = new Database(databasePath);
+    try {
+      database.transaction(() => {
+        database
+          .prepare('UPDATE videos SET sort_order = ? WHERE id = ?')
+          .run(-1, VIDEO_SEEDS[0].id);
+        database.prepare('UPDATE videos SET sort_order = ? WHERE id = ?').run(0, VIDEO_SEEDS[1].id);
+        database.prepare('UPDATE videos SET sort_order = ? WHERE id = ?').run(1, VIDEO_SEEDS[0].id);
+      })();
+    } finally {
+      database.close();
+    }
+
+    repository = new VideoRepository(databasePath);
+    service = new VideoService(repository);
+
+    expect(service.listVideos().map((video) => video.id)).toEqual(
+      VIDEO_SEEDS.map((video) => video.id)
+    );
+  });
+
   it('closes the database when schema or seed initialization fails', () => {
     const brokenDatabasePath = join(directory!, 'broken.sqlite');
     const database = new Database(brokenDatabasePath);
