@@ -1,7 +1,23 @@
-import { AlertTriangle, ArrowLeft, Film, RefreshCw } from 'lucide-react';
-import { useEffect } from 'react';
+import { AlertTriangle, ArrowLeft, Film, RefreshCw, SlidersHorizontal } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { loadVideos, selectVideo, type AppDispatch, type RootState } from '../store/videoStore';
+import {
+  loadDanmaku,
+  loadVideoDetail,
+  loadVideos,
+  selectVideo,
+  sendDanmaku,
+  type AppDispatch,
+  type RootState
+} from '../store/videoStore';
+import type { DanmakuPreferences } from '../video/danmakuPreferences';
+import {
+  defaultDanmakuPreferences,
+  loadDanmakuPreferences,
+  saveDanmakuPreferences
+} from '../video/danmakuPreferences';
+import { DanmakuComposer } from '../video/DanmakuComposer';
+import { VideoPlayer } from '../video/VideoPlayer';
 
 type VideoCenterPageProps = {
   onReturnHome: () => void;
@@ -15,12 +31,42 @@ function formatDuration(durationMs: number) {
 
 export function VideoCenterPage({ onReturnHome }: VideoCenterPageProps) {
   const dispatch = useDispatch<AppDispatch>();
-  const { videos, selectedVideoId, status, error } = useSelector((state: RootState) => state.video);
+  const {
+    videos,
+    selectedVideoId,
+    detailsByVideoId,
+    danmakuByVideoId,
+    status,
+    detailStatus,
+    error
+  } = useSelector((state: RootState) => state.video);
+  const [preferences, setPreferences] = useState<DanmakuPreferences>(defaultDanmakuPreferences);
+  const [currentMs, setCurrentMs] = useState(0);
   const selectedVideo = videos.find((video) => video.id === selectedVideoId) ?? null;
+  const selectedDetail = selectedVideoId ? detailsByVideoId[selectedVideoId] : undefined;
 
   useEffect(() => {
+    setPreferences(loadDanmakuPreferences());
     void dispatch(loadVideos());
   }, [dispatch]);
+
+  useEffect(() => {
+    if (!selectedVideoId) return;
+    setCurrentMs(0);
+    void dispatch(loadVideoDetail(selectedVideoId));
+  }, [dispatch, selectedVideoId]);
+
+  useEffect(() => {
+    if (!selectedDetail) return;
+    void dispatch(
+      loadDanmaku({ videoId: selectedDetail.id, fromMs: 0, toMs: selectedDetail.durationMs })
+    );
+  }, [dispatch, selectedDetail]);
+
+  function updatePreferences(next: DanmakuPreferences) {
+    setPreferences(next);
+    saveDanmakuPreferences(next);
+  }
 
   return (
     <main className="video-center-page">
@@ -33,14 +79,14 @@ export function VideoCenterPage({ onReturnHome }: VideoCenterPageProps) {
           <span>影像导览</span>
           <h1>视频中心</h1>
         </div>
-        <p>选择一段景观影像，播放与弹幕功能将在此继续呈现。</p>
+        <p>选择一段景观影像，以视频时间轴同步浏览字幕、弹幕与现场留言。</p>
       </header>
 
       <section className="video-center-workspace" aria-label="视频浏览工作区">
         <aside className="video-center-list" aria-label="视频列表">
           <div className="video-center-list-heading">
             <span>全部影像</span>
-            <strong>{status === 'ready' ? videos.length : '—'}</strong>
+            <strong>{status === 'ready' ? videos.length : '...'}</strong>
           </div>
 
           {status === 'loading' ? (
@@ -92,25 +138,107 @@ export function VideoCenterPage({ onReturnHome }: VideoCenterPageProps) {
         </aside>
 
         <section className="video-center-selection" aria-live="polite">
-          {selectedVideo ? (
+          {selectedDetail ? (
             <>
-              <img src={selectedVideo.coverUrl} alt="" />
-              <div>
-                <span>当前选择</span>
-                <h2>{selectedVideo.title}</h2>
-                <p>{selectedVideo.description}</p>
-                <dl>
-                  <div>
-                    <dt>时长</dt>
-                    <dd>{formatDuration(selectedVideo.durationMs)}</dd>
+              <VideoPlayer
+                video={selectedDetail}
+                danmaku={danmakuByVideoId[selectedDetail.id] ?? []}
+                preferences={preferences}
+                onClockChange={setCurrentMs}
+              />
+              <div className="video-center-controls">
+                <div className="video-center-copy">
+                  <span>当前影像</span>
+                  <h2>{selectedDetail.title}</h2>
+                  <p>{selectedDetail.description}</p>
+                  <dl>
+                    <div>
+                      <dt>时长</dt>
+                      <dd>{formatDuration(selectedDetail.durationMs)}</dd>
+                    </div>
+                    <div>
+                      <dt>字幕</dt>
+                      <dd>{selectedDetail.subtitleCues.length} 条预置时间轴</dd>
+                    </div>
+                  </dl>
+                </div>
+
+                <DanmakuComposer
+                  currentMs={currentMs}
+                  onSubmit={async (input) => {
+                    await dispatch(sendDanmaku({ videoId: selectedDetail.id, input })).unwrap();
+                  }}
+                />
+
+                <section className="danmaku-preferences" aria-label="弹幕显示设置">
+                  <div className="danmaku-preferences-heading">
+                    <SlidersHorizontal aria-hidden="true" size={15} />
+                    <span>弹幕显示</span>
                   </div>
-                  <div>
-                    <dt>播放地址</dt>
-                    <dd>已就绪</dd>
-                  </div>
-                </dl>
+                  <label>
+                    速度
+                    <input
+                      aria-label="弹幕速度"
+                      type="range"
+                      min="0.5"
+                      max="2"
+                      step="0.25"
+                      value={preferences.speed}
+                      onChange={(event) =>
+                        updatePreferences({ ...preferences, speed: Number(event.target.value) })
+                      }
+                    />
+                  </label>
+                  <label>
+                    字号
+                    <input
+                      aria-label="弹幕字号"
+                      type="range"
+                      min="14"
+                      max="28"
+                      step="1"
+                      value={preferences.fontSize}
+                      onChange={(event) =>
+                        updatePreferences({ ...preferences, fontSize: Number(event.target.value) })
+                      }
+                    />
+                  </label>
+                  <label>
+                    透明度
+                    <input
+                      aria-label="弹幕透明度"
+                      type="range"
+                      min="0.3"
+                      max="1"
+                      step="0.1"
+                      value={preferences.opacity}
+                      onChange={(event) =>
+                        updatePreferences({ ...preferences, opacity: Number(event.target.value) })
+                      }
+                    />
+                  </label>
+                  <label>
+                    密度
+                    <input
+                      aria-label="弹幕密度"
+                      type="range"
+                      min="1"
+                      max="6"
+                      step="1"
+                      value={preferences.density}
+                      onChange={(event) =>
+                        updatePreferences({ ...preferences, density: Number(event.target.value) })
+                      }
+                    />
+                  </label>
+                </section>
               </div>
             </>
+          ) : selectedVideo || detailStatus === 'loading' ? (
+            <div className="video-center-selection-empty">
+              <Film aria-hidden="true" size={32} />
+              <p>正在准备视频、预置字幕与弹幕时间轴</p>
+            </div>
           ) : (
             <div className="video-center-selection-empty">
               <Film aria-hidden="true" size={32} />
