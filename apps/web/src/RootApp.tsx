@@ -39,7 +39,7 @@ export function RootApp() {
   }
 
   if (route.kind === 'exhibition') {
-    return <ExhibitionPage />;
+    return <ExhibitionPage onReturnHome={() => navigate('explore')} />;
   }
 
   if (route.kind === 'videos') {

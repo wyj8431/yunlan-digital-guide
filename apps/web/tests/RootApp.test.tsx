@@ -22,6 +22,10 @@ vi.mock('../src/App', () => ({
   )
 }));
 
+vi.mock('../src/components/ExhibitionPage', () => ({
+  ExhibitionPage: () => <h1>3D 展馆</h1>
+}));
+
 vi.mock('../src/lab/lip-sync/components/LipSyncStage', () => ({
   LipSyncStage: () => <section aria-label="本地 3D 数字人口型预览" />
 }));

@@ -6410,3 +6410,204 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+.exhibition-page {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #173f35;
+  color: #f8faf5;
+}
+
+.exhibition-canvas-host,
+.exhibition-canvas-host canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.exhibition-topbar {
+  position: absolute;
+  z-index: 3;
+  top: 20px;
+  left: 22px;
+  right: 22px;
+  display: grid;
+  grid-template-columns: 42px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.exhibition-topbar button,
+.exhibition-return-hall,
+.exhibit-dialog button,
+.exhibit-dialog a {
+  border: 1px solid rgba(197, 163, 90, 0.62);
+  background: rgba(242, 249, 242, 0.86);
+  color: #173f35;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.exhibition-topbar button {
+  min-width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.exhibition-topbar svg,
+.exhibition-return-hall svg,
+.exhibit-dialog svg {
+  width: 18px;
+  height: 18px;
+}
+.exhibition-topbar div {
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.55);
+}
+.exhibition-topbar span {
+  font-size: 12px;
+}
+.exhibition-topbar h1 {
+  margin: 2px 0 0;
+  font-size: 24px;
+  letter-spacing: 0;
+}
+.exhibition-topbar .exhibition-service {
+  gap: 8px;
+  padding: 0 14px;
+}
+
+.exhibition-hint,
+.exhibition-return-hall {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+}
+
+.exhibition-render-error {
+  position: absolute;
+  z-index: 2;
+  inset: 50% auto auto 50%;
+  width: min(420px, calc(100vw - 40px));
+  margin: 0;
+  transform: translate(-50%, -50%);
+  padding: 16px;
+  background: rgba(244, 249, 242, 0.94);
+  color: #173f35;
+  text-align: center;
+}
+
+.exhibition-hint {
+  margin: 0;
+  padding: 8px 12px;
+  background: rgba(20, 54, 46, 0.72);
+  font-size: 12px;
+}
+
+.exhibition-return-hall {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+}
+
+.exhibit-dialog {
+  position: absolute;
+  z-index: 4;
+  right: 24px;
+  bottom: 24px;
+  width: min(360px, calc(100vw - 48px));
+  padding: 22px;
+  background: rgba(244, 249, 242, 0.95);
+  color: #173f35;
+  border-left: 3px solid #c5a35a;
+  box-shadow: 0 16px 40px rgba(11, 34, 29, 0.22);
+}
+
+.exhibit-dialog > span {
+  font-size: 12px;
+  color: #53746a;
+}
+.exhibit-dialog h2 {
+  margin: 6px 34px 8px 0;
+  font-size: 21px;
+  letter-spacing: 0;
+}
+.exhibit-dialog p {
+  margin: 0;
+  color: #38574f;
+  line-height: 1.65;
+}
+.exhibit-dialog-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 34px;
+  height: 34px;
+}
+.exhibit-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+.exhibit-dialog-actions button,
+.exhibit-dialog-actions a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 12px;
+  text-decoration: none;
+  font-size: 13px;
+}
+.exhibition-topbar button:hover,
+.exhibition-return-hall:hover,
+.exhibit-dialog button:hover,
+.exhibit-dialog a:hover {
+  background: #c9ebd2;
+}
+
+@media (max-width: 640px) {
+  .exhibition-topbar {
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    grid-template-columns: 40px 1fr 40px;
+  }
+  .exhibition-topbar h1 {
+    font-size: 19px;
+  }
+  .exhibition-topbar div > span {
+    display: none;
+  }
+  .exhibition-topbar .exhibition-service {
+    padding: 0;
+  }
+  .exhibition-service span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  .exhibit-dialog {
+    right: 12px;
+    bottom: 62px;
+    width: calc(100vw - 24px);
+    padding: 18px;
+  }
+  .exhibition-hint {
+    bottom: 12px;
+    white-space: nowrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .exhibition-page * {
+    scroll-behavior: auto;
+  }
+}
