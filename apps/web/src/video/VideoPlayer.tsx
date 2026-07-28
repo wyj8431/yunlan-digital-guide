@@ -1,4 +1,4 @@
-import { Captions, MessageSquareText } from 'lucide-react';
+import { Captions, MessageSquareText, Mic, MicOff } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { Danmaku, VideoDetail } from '../types/video';
@@ -6,9 +6,13 @@ import { getDanmakuProgress, getVisibleDanmaku } from './danmaku';
 import type { DanmakuPreferences } from './danmakuPreferences';
 import {
   canUseLiveSubtitleRecognition,
+  createLiveSubtitleRecognition,
+  disposeLiveSubtitleRecognition,
+  readRecognitionTranscript,
   resolveSubtitleDisplay,
   type LiveSubtitleState
 } from './subtitleFallback';
+import './liveSubtitle.css';
 
 type PlaybackState = 'paused' | 'playing' | 'buffering' | 'seeking' | 'ended';
 
@@ -23,15 +27,58 @@ export function VideoPlayer({ video, danmaku, preferences, onClockChange }: Vide
   const videoRef = useRef<HTMLVideoElement>(null);
   const [currentMs, setCurrentMs] = useState(0);
   const [playbackState, setPlaybackState] = useState<PlaybackState>('paused');
-  const liveSubtitleState = useMemo<LiveSubtitleState>(
-    () => (canUseLiveSubtitleRecognition() ? { status: 'idle' } : { status: 'unsupported' }),
-    []
+  const recognitionSupported = useMemo(() => canUseLiveSubtitleRecognition(), []);
+  const [recognitionEnabled, setRecognitionEnabled] = useState(false);
+  const [liveSubtitleState, setLiveSubtitleState] = useState<LiveSubtitleState>(() =>
+    recognitionSupported ? { status: 'idle' } : { status: 'unsupported' }
   );
 
   useEffect(() => {
     setCurrentMs(0);
     setPlaybackState('paused');
   }, [video.id]);
+
+  useEffect(() => {
+    if (!recognitionEnabled) {
+      setLiveSubtitleState(recognitionSupported ? { status: 'idle' } : { status: 'unsupported' });
+      return;
+    }
+
+    const recognition = createLiveSubtitleRecognition();
+    if (!recognition) {
+      setLiveSubtitleState({ status: 'unsupported' });
+      return;
+    }
+
+    let disposed = false;
+    setLiveSubtitleState({ status: 'listening' });
+    recognition.onresult = (event) => {
+      if (disposed) return;
+      const transcript = readRecognitionTranscript(event);
+      setLiveSubtitleState(transcript ? { status: 'ready', transcript } : { status: 'listening' });
+    };
+    recognition.onerror = () => {
+      if (!disposed) setLiveSubtitleState({ status: 'failed' });
+    };
+    recognition.onend = () => {
+      if (!disposed) {
+        setLiveSubtitleState((current) =>
+          current.status === 'failed' ? current : { status: 'idle' }
+        );
+      }
+    };
+
+    try {
+      recognition.start();
+    } catch {
+      setLiveSubtitleState({ status: 'failed' });
+    }
+
+    return () => {
+      disposed = true;
+      disposeLiveSubtitleRecognition(recognition);
+    };
+  }, [recognitionEnabled, recognitionSupported, video.id]);
 
   const syncClock = useCallback(
     (element: HTMLVideoElement) => {
@@ -136,6 +183,22 @@ export function VideoPlayer({ video, danmaku, preferences, onClockChange }: Vide
       <div className="video-player-title">
         <MessageSquareText aria-hidden="true" size={16} />
         <span>视频时间轴驱动字幕与弹幕</span>
+        {recognitionSupported ? (
+          <button
+            className={`video-live-subtitle-toggle${recognitionEnabled ? ' is-enabled' : ''}`}
+            type="button"
+            aria-label={recognitionEnabled ? '关闭实时字幕' : '启用实时字幕'}
+            aria-pressed={recognitionEnabled}
+            title={recognitionEnabled ? '关闭实时字幕' : '启用实时字幕'}
+            onClick={() => setRecognitionEnabled((enabled) => !enabled)}
+          >
+            {recognitionEnabled ? (
+              <Mic aria-hidden="true" size={15} />
+            ) : (
+              <MicOff aria-hidden="true" size={15} />
+            )}
+          </button>
+        ) : null}
       </div>
     </section>
   );

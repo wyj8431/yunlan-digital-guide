@@ -1,0 +1,19 @@
+.video-live-subtitle-toggle {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  margin-left: auto;
+  place-items: center;
+  border: 1px solid rgba(119, 243, 228, 0.2);
+  border-radius: 50%;
+  background: rgba(2, 45, 43, 0.72);
+  color: rgba(228, 255, 248, 0.7);
+}
+
+.video-live-subtitle-toggle:hover,
+.video-live-subtitle-toggle:focus-visible,
+.video-live-subtitle-toggle.is-enabled {
+  border-color: rgba(186, 248, 220, 0.82);
+  background: #baf8dc;
+  color: #164a3b;
+}

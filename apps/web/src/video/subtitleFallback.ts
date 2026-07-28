@@ -9,14 +9,59 @@ export type SubtitleDisplay = {
   source: 'preset' | 'live';
 };
 
+type RecognitionScope = Pick<Window, 'SpeechRecognition' | 'webkitSpeechRecognition'>;
+
+export function getSpeechRecognitionConstructor(
+  scope: RecognitionScope | undefined = typeof window === 'undefined' ? undefined : window
+): (new () => SpeechRecognition) | undefined {
+  return scope?.SpeechRecognition ?? scope?.webkitSpeechRecognition;
+}
+
 export function canUseLiveSubtitleRecognition(
-  scope:
-    Pick<Window, 'SpeechRecognition' | 'webkitSpeechRecognition'> | undefined = typeof window ===
-  'undefined'
-    ? undefined
-    : window
+  scope: RecognitionScope | undefined = typeof window === 'undefined' ? undefined : window
 ): boolean {
-  return Boolean(scope?.SpeechRecognition || scope?.webkitSpeechRecognition);
+  return Boolean(getSpeechRecognitionConstructor(scope));
+}
+
+export function createLiveSubtitleRecognition(
+  scope: RecognitionScope | undefined = typeof window === 'undefined' ? undefined : window
+): SpeechRecognition | null {
+  const Recognition = getSpeechRecognitionConstructor(scope);
+  if (!Recognition) return null;
+
+  const recognition = new Recognition();
+  recognition.lang = 'zh-CN';
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  return recognition;
+}
+
+export function readRecognitionTranscript(event: SpeechRecognitionEvent): string {
+  let transcript = '';
+  for (let index = event.resultIndex; index < event.results.length; index += 1) {
+    transcript += event.results[index]?.[0]?.transcript ?? '';
+  }
+  return transcript.trim();
+}
+
+export function disposeLiveSubtitleRecognition(recognition: SpeechRecognition): void {
+  recognition.onresult = null;
+  recognition.onerror = null;
+  recognition.onend = null;
+  recognition.onnomatch = null;
+  recognition.onspeechend = null;
+  recognition.onaudioend = null;
+
+  try {
+    recognition.stop();
+  } catch {
+    // Some implementations throw when recognition never reached the running state.
+  }
+  try {
+    recognition.abort();
+  } catch {
+    // Abort is best-effort during teardown.
+  }
 }
 
 export function resolveSubtitleDisplay(

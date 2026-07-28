@@ -1,5 +1,5 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { VideoPlayer } from '../src/video/VideoPlayer';
 import {
   canUseLiveSubtitleRecognition,
@@ -32,6 +32,34 @@ const danmaku: Danmaku[] = [
   }
 ];
 
+class MockSpeechRecognition implements SpeechRecognition {
+  static instances: MockSpeechRecognition[] = [];
+  lang = '';
+  continuous = false;
+  interimResults = false;
+  onresult: SpeechRecognition['onresult'] = null;
+  onend: SpeechRecognition['onend'] = null;
+  onerror: SpeechRecognition['onerror'] = null;
+  onnomatch: SpeechRecognition['onnomatch'] = null;
+  onspeechend: SpeechRecognition['onspeechend'] = null;
+  onaudioend: SpeechRecognition['onaudioend'] = null;
+  start = vi.fn();
+  stop = vi.fn();
+  abort = vi.fn();
+  addEventListener = vi.fn();
+  removeEventListener = vi.fn();
+  dispatchEvent = vi.fn(() => true);
+
+  constructor() {
+    MockSpeechRecognition.instances.push(this);
+  }
+}
+
+function installSpeechRecognition() {
+  MockSpeechRecognition.instances = [];
+  window.SpeechRecognition = MockSpeechRecognition;
+}
+
 function setCurrentTime(element: HTMLVideoElement, seconds: number) {
   Object.defineProperty(element, 'currentTime', { configurable: true, value: seconds });
 }
@@ -53,7 +81,12 @@ function renderPlayer() {
 }
 
 describe('VideoPlayer', () => {
-  afterEach(() => cleanup());
+  afterEach(() => {
+    cleanup();
+    delete window.SpeechRecognition;
+    delete window.webkitSpeechRecognition;
+    vi.restoreAllMocks();
+  });
 
   it('positions danmaku deterministically from the video clock and resets after seeking', () => {
     const { player } = renderPlayer();
@@ -107,5 +140,52 @@ describe('VideoPlayer', () => {
     expect(resolveSubtitleDisplay(video.subtitleCues, 5_000, { status: 'failed' }).text).toBe(
       '湖面泛起晨光。'
     );
+  });
+
+  it('retains preset subtitles and never pauses video when recognition errors', () => {
+    installSpeechRecognition();
+    const { player } = renderPlayer();
+    const pauseSpy = vi.spyOn(player, 'pause');
+    setCurrentTime(player, 5);
+    fireEvent.timeUpdate(player);
+    fireEvent.click(screen.getByRole('button', { name: '启用实时字幕' }));
+
+    const recognition = MockSpeechRecognition.instances[0];
+    expect(recognition).toMatchObject({ lang: 'zh-CN', continuous: true, interimResults: true });
+    expect(recognition.start).toHaveBeenCalledTimes(1);
+
+    act(() => recognition.onerror?.call(recognition, new Event('error')));
+
+    expect(screen.getByText('湖面泛起晨光。')).toBeInTheDocument();
+    expect(pauseSpy).not.toHaveBeenCalled();
+  });
+
+  it('shows recognition results and cleans up handlers when disabled', () => {
+    installSpeechRecognition();
+    renderPlayer();
+    fireEvent.click(screen.getByRole('button', { name: '启用实时字幕' }));
+    const recognition = MockSpeechRecognition.instances[0];
+
+    act(() =>
+      recognition.onresult?.call(recognition, {
+        resultIndex: 0,
+        results: {
+          0: {
+            0: { transcript: '现场识别字幕', confidence: 1 },
+            isFinal: false,
+            length: 1
+          },
+          length: 1
+        }
+      } as unknown as SpeechRecognitionEvent)
+    );
+    expect(screen.getByText('现场识别字幕')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '关闭实时字幕' }));
+    expect(recognition.stop).toHaveBeenCalledTimes(1);
+    expect(recognition.abort).toHaveBeenCalledTimes(1);
+    expect(recognition.onresult).toBeNull();
+    expect(recognition.onerror).toBeNull();
+    expect(screen.getByText('预置字幕将在播放时同步显示')).toBeInTheDocument();
   });
 });
