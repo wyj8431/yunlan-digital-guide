@@ -1895,8 +1895,8 @@ body {
   transform: translateX(12px);
 }
 
-.home-destination-link:hover,
-.home-destination-link:focus-visible {
+.home-destination-links a:hover,
+.home-destination-links a:focus-visible {
   border-color: rgba(255, 240, 168, 0.88);
   background: #baf8dc;
   color: #164a3b;
@@ -1904,7 +1904,7 @@ body {
   outline: none;
 }
 
-.home-destination-link:focus-visible {
+.home-destination-links a:focus-visible {
   box-shadow: 0 0 0 3px rgba(186, 248, 220, 0.38);
 }
 

@@ -1,4 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { HomeDestinationLinks } from '../src/components/HomeDestinationLinks';
 
@@ -16,5 +18,24 @@ describe('HomeDestinationLinks', () => {
 
     expect(icons).toHaveLength(2);
     icons.forEach((icon) => expect(icon).toHaveAttribute('aria-hidden', 'true'));
+  });
+
+  it('supports keyboard focus with the complete destination focus style', () => {
+    const { container } = render(<HomeDestinationLinks />);
+    const exhibitionLink = within(container).getByRole('link', { name: '3D 展馆' });
+
+    exhibitionLink.focus();
+
+    expect(exhibitionLink).toHaveFocus();
+
+    const styles = readFileSync(resolve(process.cwd(), 'src/styles.css'), 'utf8');
+    const focusRule = styles.match(
+      /\.home-destination-links a:focus-visible\s*\{(?<declarations>[^}]*)\}/
+    )?.groups?.declarations;
+
+    expect(focusRule).toContain('border-color: rgba(255, 240, 168, 0.88);');
+    expect(focusRule).toContain('background: #baf8dc;');
+    expect(focusRule).toContain('color: #164a3b;');
+    expect(focusRule).toContain('opacity: 1;');
   });
 });
