@@ -43,7 +43,7 @@ export function RootApp() {
   }
 
   if (route.kind === 'videos') {
-    return <VideoCenterPage />;
+    return <VideoCenterPage onReturnHome={() => navigate('explore')} />;
   }
 
   return <App activeView={route.view} onNavigate={navigate} />;

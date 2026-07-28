@@ -1,7 +1,9 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { Provider } from 'react-redux';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { RootApp } from '../src/RootApp';
 import type { TourismView } from '../src/routing/appRoute';
+import { store } from '../src/store/videoStore';
 
 vi.mock('../src/App', () => ({
   App: ({
@@ -33,7 +35,11 @@ describe('RootApp', () => {
   it('renders the lip sync lab for the exact lab route', () => {
     window.history.pushState({}, '', '/lab/lip-sync');
 
-    render(<RootApp />);
+    render(
+      <Provider store={store}>
+        <RootApp />
+      </Provider>
+    );
 
     expect(screen.getByRole('heading', { name: '口型与性能实验室' })).toBeInTheDocument();
     expect(screen.queryByText(/guide-app-/)).not.toBeInTheDocument();
@@ -49,7 +55,11 @@ describe('RootApp', () => {
   ])('renders the %s tourism route as %s', (pathname, view) => {
     window.history.pushState({}, '', pathname);
 
-    render(<RootApp />);
+    render(
+      <Provider store={store}>
+        <RootApp />
+      </Provider>
+    );
 
     expect(screen.getByText(`guide-app-${view}`)).toBeInTheDocument();
   });
@@ -60,7 +70,11 @@ describe('RootApp', () => {
   ])('renders the destination page for %s', (pathname, heading) => {
     window.history.pushState({}, '', pathname);
 
-    render(<RootApp />);
+    render(
+      <Provider store={store}>
+        <RootApp />
+      </Provider>
+    );
 
     expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument();
     expect(screen.queryByText(/guide-app-/)).not.toBeInTheDocument();
@@ -68,7 +82,11 @@ describe('RootApp', () => {
 
   it('pushes a new URL when the app requests navigation', () => {
     window.history.pushState({}, '', '/');
-    render(<RootApp />);
+    render(
+      <Provider store={store}>
+        <RootApp />
+      </Provider>
+    );
 
     fireEvent.click(screen.getByRole('button', { name: 'go-map' }));
 
@@ -78,7 +96,11 @@ describe('RootApp', () => {
 
   it('updates the rendered page when browser history changes', () => {
     window.history.pushState({}, '', '/home');
-    render(<RootApp />);
+    render(
+      <Provider store={store}>
+        <RootApp />
+      </Provider>
+    );
 
     act(() => {
       window.history.pushState({}, '', '/profile');
@@ -90,7 +112,11 @@ describe('RootApp', () => {
 
   it('updates a destination page when browser history changes', () => {
     window.history.pushState({}, '', '/');
-    render(<RootApp />);
+    render(
+      <Provider store={store}>
+        <RootApp />
+      </Provider>
+    );
 
     act(() => {
       window.history.pushState({}, '', '/videos');
