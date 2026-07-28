@@ -12,6 +12,9 @@
 - WebSocket 流式回答，文字像打字机一样逐步出现
 - 讯飞虚拟人 SDK 接入，支持动作切换和说话
 - 本地 Three.js 数字人兜底，支持估算口型同步
+- 右上角低透明度入口，可进入独立的室内 3D 展馆和视频中心
+- 室内 3D 展馆支持鼠标观察、WASD 漫游、碰撞、展品交互和西湖数字沙盘
+- 视频中心支持 Redux 状态、SQLite 弹幕、敏感词过滤、同步字幕和实时识别降级
 - 语音输入：浏览器通过 `/api/voice` WebSocket 发送 16 kHz、单声道 PCM16，实时接收讯飞 ASR 转写并自动提交
 - 语音回复：优先后端讯飞 TTS + WebAudio 播放时钟，失败时回退浏览器朗读
 
@@ -28,6 +31,14 @@ npm run dev
 - 后端：http://localhost:8787
 - 口型实验室：http://localhost:5173/lab/lip-sync
 - 在线接口文档：http://localhost:8787/api/docs
+
+主要路由：
+
+- 数字人客服首页：http://localhost:5173/
+- 3D 展馆：http://localhost:5173/exhibition
+- 视频中心：http://localhost:5173/videos
+
+演示时先启动前后端并打开首页，将鼠标移到右上角入口可显示浅绿色高亮；两个入口分别打开独立页面。视频种子当前使用占位媒体 URL，公开演示前须按 `docs/integration/digital-human-3d-video.md` 替换为自有或明确授权素材。
 
 ## 环境变量
 
@@ -129,5 +140,7 @@ npm --workspace apps/web run test -- useGuideChat QuestionInput
 - OpenAPI JSON：`http://localhost:8787/api/docs/openapi.json`
 - 第三阶段联调清单：`docs/integration/phase-3b-xfyun-voice.md`
 - Phase 3B 浏览器验收：`apps/web/tests/phase3b.browser.test.js`
+- 数字人、3D 展馆与视频中心联调：`docs/integration/digital-human-3d-video.md`
+- 首页入口浏览器验收：`apps/web/tests/home-entry.browser.test.js`
 - 设计规格：`docs/superpowers/specs/2026-07-19-yunlan-ancient-town-digital-guide-design.md`
 - 语音口型性能规格：`docs/superpowers/specs/2026-07-20-phase-three-voice-lip-sync-performance-design.md`
