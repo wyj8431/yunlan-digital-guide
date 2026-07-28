@@ -83,9 +83,15 @@ export class VideoRepository {
 
   constructor(databasePath: string) {
     this.database = new Database(databasePath);
-    this.database.pragma('foreign_keys = ON');
-    this.initializeSchema();
-    this.seedEmptyDatabase();
+
+    try {
+      this.database.pragma('foreign_keys = ON');
+      this.initializeSchema();
+      this.seedDatabase();
+    } catch (caught) {
+      this.close();
+      throw caught;
+    }
   }
 
   listVideos(): VideoSummary[] {
@@ -226,23 +232,24 @@ export class VideoRepository {
         ON danmaku(video_id, timestamp_ms, id);
       CREATE INDEX IF NOT EXISTS subtitle_cues_video_time_idx
         ON subtitle_cues(video_id, start_ms, id);
+      CREATE UNIQUE INDEX IF NOT EXISTS subtitle_cues_natural_key_idx
+        ON subtitle_cues(video_id, start_ms, end_ms, content);
     `);
   }
 
-  private seedEmptyDatabase(): void {
-    const row = this.database.prepare('SELECT COUNT(*) AS count FROM videos').get() as {
-      count: number;
-    };
-
-    if (row.count > 0) {
-      return;
-    }
-
+  private seedDatabase(): void {
     this.database.transaction(() => {
       const insertVideo = this.database.prepare(
         `INSERT INTO videos (
            id, title, description, cover_url, video_url, duration_ms, sort_order
-         ) VALUES (?, ?, ?, ?, ?, ?, ?)`
+         ) VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           title = excluded.title,
+           description = excluded.description,
+           cover_url = excluded.cover_url,
+           video_url = excluded.video_url,
+           duration_ms = excluded.duration_ms,
+           sort_order = excluded.sort_order`
       );
       VIDEO_SEEDS.forEach((video, index) => {
         insertVideo.run(
@@ -258,14 +265,16 @@ export class VideoRepository {
 
       const insertSubtitleCue = this.database.prepare(
         `INSERT INTO subtitle_cues (video_id, start_ms, end_ms, content)
-         VALUES (?, ?, ?, ?)`
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(video_id, start_ms, end_ms, content) DO NOTHING`
       );
       for (const cue of SUBTITLE_CUE_SEEDS) {
         insertSubtitleCue.run(cue.videoId, cue.startMs, cue.endMs, cue.content);
       }
 
       const insertKeyword = this.database.prepare(
-        'INSERT INTO sensitive_keywords (keyword) VALUES (?)'
+        `INSERT INTO sensitive_keywords (keyword) VALUES (?)
+         ON CONFLICT(keyword) DO NOTHING`
       );
       for (const keyword of SENSITIVE_KEYWORD_SEEDS) {
         insertKeyword.run(keyword);
