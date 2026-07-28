@@ -1908,6 +1908,19 @@ body {
   box-shadow: 0 0 0 3px rgba(186, 248, 220, 0.38);
 }
 
+@media (max-width: 760px) {
+  .home-destination-links {
+    position: static;
+    grid-column: 1;
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .home-destination-link--exhibition {
+    transform: none;
+  }
+}
+
 .destination-page {
   display: grid;
   min-height: 100vh;
@@ -2974,14 +2987,18 @@ body {
 }
 
 @media (max-width: 760px) {
-  .app-shell,
-  .app-shell.app-centered {
+  .app-shell {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto auto minmax(560px, 72vh) auto auto;
+    grid-template-rows: auto auto auto minmax(560px, 72vh) auto auto;
     gap: 14px;
     padding: 14px;
   }
 
+  .app-shell.app-centered {
+    grid-template-rows: auto auto;
+  }
+
+  .home-destination-links,
   .app-title,
   .guide-panel,
   .digital-human-panel,

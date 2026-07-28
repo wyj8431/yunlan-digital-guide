@@ -97,6 +97,54 @@ describe('App speech and typewriter sync', () => {
     expect(speakMock).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps destination links available while Explore scenic data is loading', () => {
+    fetchScenicAreaMock.mockReturnValueOnce(new Promise(() => {}));
+
+    render(<App />);
+
+    expect(screen.getByRole('link', { name: '3D 展馆' })).toHaveAttribute('href', '/exhibition');
+    expect(screen.getByRole('link', { name: '视频中心' })).toHaveAttribute('href', '/videos');
+  });
+
+  it('keeps destination links available when Explore scenic data fails', async () => {
+    fetchScenicAreaMock.mockRejectedValueOnce(new Error('offline'));
+
+    render(<App />);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(screen.getByRole('link', { name: '3D 展馆' })).toHaveAttribute('href', '/exhibition');
+    expect(screen.getByRole('link', { name: '视频中心' })).toHaveAttribute('href', '/videos');
+  });
+
+  it('does not add destination links to a non-Explore loading route', () => {
+    fetchScenicAreaMock.mockReturnValueOnce(new Promise(() => {}));
+
+    render(<App activeView="home" />);
+
+    expect(screen.queryByRole('link', { name: '3D 展馆' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '视频中心' })).not.toBeInTheDocument();
+  });
+
+  it('places destination links after the Explore title for narrow-screen flow', async () => {
+    const { container } = render(<App />);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const title = container.querySelector('.app-title');
+    const destinationLinks = container.querySelector('.home-destination-links');
+
+    expect(title).not.toBeNull();
+    expect(destinationLinks).not.toBeNull();
+    expect(
+      title!.compareDocumentPosition(destinationLinks!) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
   it('renders a dedicated page for a non-Explore route', async () => {
     const onNavigate = vi.fn();
     const { container } = render(<App activeView="home" onNavigate={onNavigate} />);

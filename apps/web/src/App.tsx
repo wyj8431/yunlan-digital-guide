@@ -70,12 +70,24 @@ export function App({ activeView = 'explore', onNavigate = ignoreNavigation }: A
     );
   }
 
+  const exploreDestinationLinks = activeView === 'explore' ? <HomeDestinationLinks /> : null;
+
   if (loadError) {
-    return <main className="app-shell app-centered">{loadError}</main>;
+    return (
+      <main className="app-shell app-centered">
+        {exploreDestinationLinks}
+        <p>{loadError}</p>
+      </main>
+    );
   }
 
   if (!scenicArea) {
-    return <main className="app-shell app-centered">正在加载乌镇景区资料...</main>;
+    return (
+      <main className="app-shell app-centered">
+        {exploreDestinationLinks}
+        <p>正在加载乌镇景区资料...</p>
+      </main>
+    );
   }
 
   const visibleRouteCards =
@@ -105,7 +117,6 @@ export function App({ activeView = 'explore', onNavigate = ignoreNavigation }: A
 
   return (
     <main className="app-shell">
-      <HomeDestinationLinks />
       <header className="app-title">
         <div className="app-title-row">
           <span aria-hidden="true" />
@@ -114,6 +125,8 @@ export function App({ activeView = 'explore', onNavigate = ignoreNavigation }: A
         </div>
         <p>Smart Cultural Tourism · Holographic Guide</p>
       </header>
+
+      <HomeDestinationLinks />
 
       <GuidePanel
         scenicArea={scenicArea}

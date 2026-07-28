@@ -38,4 +38,16 @@ describe('HomeDestinationLinks', () => {
     expect(focusRule).toContain('color: #164a3b;');
     expect(focusRule).toContain('opacity: 1;');
   });
+
+  it('moves into the page grid below the title on narrow screens', () => {
+    const styles = readFileSync(resolve(process.cwd(), 'src/styles.css'), 'utf8');
+    const narrowScreenRule = styles.match(
+      /@media \(max-width: 760px\)\s*\{\s*\.home-destination-links\s*\{(?<declarations>[^}]*)\}/
+    )?.groups?.declarations;
+
+    expect(narrowScreenRule).toContain('position: static;');
+    expect(narrowScreenRule).toContain('grid-column: 1;');
+    expect(narrowScreenRule).toContain('width: 100%;');
+    expect(narrowScreenRule).toContain('justify-content: flex-end;');
+  });
 });
