@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { App } from './App';
+import { ExhibitionPage } from './components/ExhibitionPage';
+import { VideoCenterPage } from './components/VideoCenterPage';
 import { LipSyncLab } from './lab/lip-sync/LipSyncLab';
 import {
   pathForTourismView,
@@ -32,9 +34,17 @@ export function RootApp() {
     document.body.scrollTop = 0;
   }, []);
 
-  return route.kind === 'lip-sync-lab' ? (
-    <LipSyncLab />
-  ) : (
-    <App activeView={route.view} onNavigate={navigate} />
-  );
+  if (route.kind === 'lip-sync-lab') {
+    return <LipSyncLab />;
+  }
+
+  if (route.kind === 'exhibition') {
+    return <ExhibitionPage />;
+  }
+
+  if (route.kind === 'videos') {
+    return <VideoCenterPage />;
+  }
+
+  return <App activeView={route.view} onNavigate={navigate} />;
 }

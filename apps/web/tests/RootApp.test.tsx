@@ -54,6 +54,18 @@ describe('RootApp', () => {
     expect(screen.getByText(`guide-app-${view}`)).toBeInTheDocument();
   });
 
+  it.each([
+    ['/exhibition', '3D 展馆'],
+    ['/videos', '视频中心']
+  ])('renders the destination page for %s', (pathname, heading) => {
+    window.history.pushState({}, '', pathname);
+
+    render(<RootApp />);
+
+    expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument();
+    expect(screen.queryByText(/guide-app-/)).not.toBeInTheDocument();
+  });
+
   it('pushes a new URL when the app requests navigation', () => {
     window.history.pushState({}, '', '/');
     render(<RootApp />);
@@ -74,5 +86,17 @@ describe('RootApp', () => {
     });
 
     expect(screen.getByText('guide-app-profile')).toBeInTheDocument();
+  });
+
+  it('updates a destination page when browser history changes', () => {
+    window.history.pushState({}, '', '/');
+    render(<RootApp />);
+
+    act(() => {
+      window.history.pushState({}, '', '/videos');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+
+    expect(screen.getByRole('heading', { name: '视频中心' })).toBeInTheDocument();
   });
 });

@@ -14,9 +14,16 @@ describe('resolveAppRoute', () => {
     expect(resolveAppRoute('/history')).toEqual({ kind: 'tourism', view: 'history' });
   });
 
+  it('resolves the exhibition and video center routes', () => {
+    expect(resolveAppRoute('/exhibition')).toEqual({ kind: 'exhibition' });
+    expect(resolveAppRoute('/videos')).toEqual({ kind: 'videos' });
+  });
+
   it('normalizes trailing slashes and keeps the lip sync lab route', () => {
     expect(resolveAppRoute('/map/')).toEqual({ kind: 'tourism', view: 'map' });
     expect(resolveAppRoute('/lab/lip-sync')).toEqual({ kind: 'lip-sync-lab' });
+    expect(resolveAppRoute('/exhibition/')).toEqual({ kind: 'exhibition' });
+    expect(resolveAppRoute('/videos/')).toEqual({ kind: 'videos' });
   });
 
   it('falls back to Explore for unknown paths', () => {

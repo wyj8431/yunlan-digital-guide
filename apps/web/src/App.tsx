@@ -3,6 +3,7 @@ import { fetchScenicArea } from './api/guideApi';
 import { DigitalHumanStage } from './components/DigitalHumanStage';
 import { GuidePanel } from './components/GuidePanel';
 import { HistoryPage } from './components/HistoryPage';
+import { HomeDestinationLinks } from './components/HomeDestinationLinks';
 import { ScenicPanel } from './components/ScenicPanel';
 import { TourismNav } from './components/TourismNav';
 import { TourismPage } from './components/TourismPage';
@@ -104,6 +105,7 @@ export function App({ activeView = 'explore', onNavigate = ignoreNavigation }: A
 
   return (
     <main className="app-shell">
+      <HomeDestinationLinks />
       <header className="app-title">
         <div className="app-title-row">
           <span aria-hidden="true" />

@@ -9,7 +9,11 @@ export type TourismView =
   | 'map'
   | 'voice';
 
-export type AppRoute = { kind: 'lip-sync-lab' } | { kind: 'tourism'; view: TourismView };
+export type AppRoute =
+  | { kind: 'lip-sync-lab' }
+  | { kind: 'tourism'; view: TourismView }
+  | { kind: 'exhibition' }
+  | { kind: 'videos' };
 
 const VIEW_PATHS: Record<TourismView, string> = {
   explore: '/',
@@ -40,6 +44,14 @@ export function resolveAppRoute(pathname: string): AppRoute {
 
   if (normalizedPathname === '/lab/lip-sync') {
     return { kind: 'lip-sync-lab' };
+  }
+
+  if (normalizedPathname === '/exhibition') {
+    return { kind: 'exhibition' };
+  }
+
+  if (normalizedPathname === '/videos') {
+    return { kind: 'videos' };
   }
 
   return {
