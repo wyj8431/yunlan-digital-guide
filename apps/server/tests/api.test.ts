@@ -51,8 +51,14 @@ describe('server api', () => {
         expect(body.paths).toHaveProperty('/api/guide/chat');
         expect(body.paths).toHaveProperty('/api/destinations');
         expect(body.paths).toHaveProperty('/api/voice');
+        expect(body.paths).toHaveProperty('/api/videos');
+        expect(body.paths).toHaveProperty('/api/videos/{videoId}/danmaku');
+        expect(body.tags).toEqual(
+          expect.arrayContaining([expect.objectContaining({ name: 'Video' })])
+        );
         expect(body.components.schemas).toHaveProperty('GuideChatResponse');
         expect(body.components.schemas).toHaveProperty('GuideAttachment');
+        expect(body.components.schemas).toHaveProperty('VideoSummary');
       });
   });
 

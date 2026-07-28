@@ -36,6 +36,7 @@ export function createOpenApiDocument(serverUrl: string) {
       { name: 'Guide', description: '景区导游智能体问答与检索' },
       { name: 'Speech', description: '讯飞 ASR/TTS 兼容接口' },
       { name: 'Virtual Human', description: '讯飞虚拟人配置' },
+      { name: 'Video', description: '示例视频、字幕和弹幕' },
       { name: 'Realtime', description: 'WebSocket 实时会话协议' }
     ],
     paths: {
@@ -241,6 +242,131 @@ export function createOpenApiDocument(serverUrl: string) {
           }
         }
       },
+      '/api/videos': {
+        get: {
+          tags: ['Video'],
+          summary: '获取示例视频列表',
+          responses: {
+            '200': jsonResponse('六条示例视频', {
+              type: 'object',
+              required: ['videos'],
+              properties: {
+                videos: { type: 'array', items: { $ref: '#/components/schemas/VideoSummary' } }
+              }
+            }),
+            '500': jsonResponse(
+              '视频服务异常',
+              errorSchema('VIDEO_STORAGE_ERROR', 'INTERNAL_ERROR')
+            )
+          }
+        }
+      },
+      '/api/videos/{videoId}': {
+        get: {
+          tags: ['Video'],
+          summary: '获取视频详情和预置字幕',
+          parameters: [{ name: 'videoId', in: 'path', required: true, schema: { type: 'string' } }],
+          responses: {
+            '200': jsonResponse('视频详情', {
+              type: 'object',
+              required: ['video'],
+              properties: { video: { $ref: '#/components/schemas/VideoDetail' } }
+            }),
+            '400': jsonResponse('视频 ID 无效', errorSchema('INVALID_VIDEO_ID')),
+            '404': jsonResponse('视频不存在', errorSchema('VIDEO_NOT_FOUND')),
+            '500': jsonResponse(
+              '视频服务异常',
+              errorSchema('VIDEO_STORAGE_ERROR', 'INTERNAL_ERROR')
+            )
+          }
+        }
+      },
+      '/api/videos/{videoId}/subtitles': {
+        get: {
+          tags: ['Video'],
+          summary: '获取视频预置字幕时间轴',
+          parameters: [{ name: 'videoId', in: 'path', required: true, schema: { type: 'string' } }],
+          responses: {
+            '200': jsonResponse('预置字幕', {
+              type: 'object',
+              required: ['subtitles'],
+              properties: {
+                subtitles: { type: 'array', items: { $ref: '#/components/schemas/SubtitleCue' } }
+              }
+            }),
+            '400': jsonResponse('视频 ID 无效', errorSchema('INVALID_VIDEO_ID')),
+            '404': jsonResponse('视频不存在', errorSchema('VIDEO_NOT_FOUND')),
+            '500': jsonResponse(
+              '视频服务异常',
+              errorSchema('VIDEO_STORAGE_ERROR', 'INTERNAL_ERROR')
+            )
+          }
+        }
+      },
+      '/api/videos/{videoId}/danmaku': {
+        get: {
+          tags: ['Video'],
+          summary: '按播放时间范围获取弹幕',
+          parameters: [
+            { name: 'videoId', in: 'path', required: true, schema: { type: 'string' } },
+            { name: 'from', in: 'query', required: true, schema: { type: 'integer', minimum: 0 } },
+            { name: 'to', in: 'query', required: true, schema: { type: 'integer', minimum: 0 } }
+          ],
+          responses: {
+            '200': jsonResponse('指定时间窗口的弹幕', {
+              type: 'object',
+              required: ['danmaku'],
+              properties: {
+                danmaku: { type: 'array', items: { $ref: '#/components/schemas/Danmaku' } }
+              }
+            }),
+            '400': jsonResponse(
+              '请求参数无效',
+              errorSchema('INVALID_VIDEO_ID', 'INVALID_DANMAKU_WINDOW')
+            ),
+            '404': jsonResponse('视频不存在', errorSchema('VIDEO_NOT_FOUND')),
+            '500': jsonResponse(
+              '视频服务异常',
+              errorSchema('VIDEO_STORAGE_ERROR', 'INTERNAL_ERROR')
+            )
+          }
+        },
+        post: {
+          tags: ['Video'],
+          summary: '校验、过滤并保存一条弹幕',
+          parameters: [{ name: 'videoId', in: 'path', required: true, schema: { type: 'string' } }],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': { schema: { $ref: '#/components/schemas/CreateDanmakuInput' } }
+            }
+          },
+          responses: {
+            '201': jsonResponse('已保存的弹幕', {
+              type: 'object',
+              required: ['danmaku'],
+              properties: { danmaku: { $ref: '#/components/schemas/Danmaku' } }
+            }),
+            '400': jsonResponse(
+              '请求参数无效',
+              errorSchema(
+                'INVALID_VIDEO_ID',
+                'INVALID_DANMAKU_INPUT',
+                'INVALID_JSON',
+                'INVALID_DANMAKU_CONTENT',
+                'INVALID_DANMAKU_TIMESTAMP',
+                'INVALID_DANMAKU_POSITION',
+                'INVALID_DANMAKU_COLOR'
+              )
+            ),
+            '404': jsonResponse('视频不存在', errorSchema('VIDEO_NOT_FOUND')),
+            '500': jsonResponse(
+              '视频服务异常',
+              errorSchema('VIDEO_STORAGE_ERROR', 'INTERNAL_ERROR')
+            )
+          }
+        }
+      },
       '/api/guide/chat/stream': {
         get: {
           tags: ['Realtime'],
@@ -262,6 +388,74 @@ export function createOpenApiDocument(serverUrl: string) {
     },
     components: {
       schemas: {
+        VideoSummary: {
+          type: 'object',
+          required: ['id', 'title', 'description', 'coverUrl', 'videoUrl', 'durationMs'],
+          properties: {
+            id: { type: 'string' },
+            title: { type: 'string' },
+            description: { type: 'string' },
+            coverUrl: { type: 'string' },
+            videoUrl: { type: 'string' },
+            durationMs: { type: 'integer', minimum: 1 }
+          }
+        },
+        VideoDetail: {
+          allOf: [
+            { $ref: '#/components/schemas/VideoSummary' },
+            {
+              type: 'object',
+              required: ['subtitleCues'],
+              properties: {
+                subtitleCues: { type: 'array', items: { $ref: '#/components/schemas/SubtitleCue' } }
+              }
+            }
+          ]
+        },
+        SubtitleCue: {
+          type: 'object',
+          required: ['id', 'videoId', 'startMs', 'endMs', 'content'],
+          properties: {
+            id: { type: 'integer' },
+            videoId: { type: 'string' },
+            startMs: { type: 'integer', minimum: 0 },
+            endMs: { type: 'integer', minimum: 1 },
+            content: { type: 'string' }
+          }
+        },
+        Danmaku: {
+          type: 'object',
+          required: [
+            'id',
+            'videoId',
+            'timestampMs',
+            'content',
+            'nickname',
+            'color',
+            'position',
+            'createdAt'
+          ],
+          properties: {
+            id: { type: 'integer' },
+            videoId: { type: 'string' },
+            timestampMs: { type: 'integer', minimum: 0 },
+            content: { type: 'string' },
+            nickname: { type: 'string' },
+            color: { type: 'string', enum: ['#ffffff', '#f5d76e', '#aee7ff', '#ffc0cb'] },
+            position: { type: 'string', enum: ['scroll', 'top', 'bottom'] },
+            createdAt: { type: 'string', format: 'date-time' }
+          }
+        },
+        CreateDanmakuInput: {
+          type: 'object',
+          required: ['content', 'timestampMs', 'color', 'position'],
+          properties: {
+            content: { type: 'string', minLength: 1, maxLength: 80 },
+            timestampMs: { type: 'integer', minimum: 0 },
+            color: { type: 'string', enum: ['#ffffff', '#f5d76e', '#aee7ff', '#ffc0cb'] },
+            position: { type: 'string', enum: ['scroll', 'top', 'bottom'] }
+          }
+        },
         ScenicAreaSummary: {
           type: 'object',
           required: ['scenicArea', 'spots', 'routes', 'services', 'quickQuestions'],

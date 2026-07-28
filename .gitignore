@@ -22,3 +22,4 @@ history-scroll-fixed-desktop.png
 tmp/
 apps/web/public/models/CesiumMan.glb
 apps/web/public/models/xbot.glb
+apps/server/data/*.sqlite

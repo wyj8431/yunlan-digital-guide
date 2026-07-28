@@ -8,6 +8,8 @@ const env = readEnv();
 const app = createApp();
 const server = createServer(app.callback());
 
+server.once('close', () => app.close());
+
 attachGuideWebSocketServer(server);
 attachVoiceWebSocketServer(server);
 
