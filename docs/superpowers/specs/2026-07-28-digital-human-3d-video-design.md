@@ -1,150 +1,150 @@
-# Digital Human, 3D Exhibition, and Video Center Design
+# 数字人、3D 展馆与视频中心设计规格
 
-## Goal
+## 一、项目目标
 
-Extend the existing digital tourism guide into a desktop-browser experience with two new independent pages:
+在现有数字文旅导览项目上增加两个独立页面：
 
-- A 3D exhibition hall with first-person roaming and a lightweight West Lake scene.
-- A video center with server-backed video data, editable danmaku, keyword filtering, subtitles, and an optional live speech-recognition enhancement.
+- 3D 展馆：支持第一人称漫游、碰撞检测、展品互动，以及轻量化的西湖场景。
+- 视频中心：支持后端视频列表、弹幕、敏感词过滤、字幕和可选的实时语音识别。
 
-The existing digital-human homepage remains the product entry point. The core version is due on 2026-08-01 and the complete demonstration version is due on 2026-08-05.
+现有数字人首页继续作为统一入口。2026-08-01 交付核心演示版，2026-08-05 交付完整演示版。
 
-## Scope and Delivery Boundary
+## 二、交付范围
 
-The 2026-08-05 demonstration version includes:
+2026-08-05 的完整演示版包含：
 
-- Existing text and voice digital-human consultation, including speech output and graceful text-only fallback.
-- A desktop-only 3D exhibition hall with mouse-look, `W/A/S/D` movement, room and object collision detection, interactive exhibits, and a lightweight West Lake scene.
-- Six legally usable sample videos, Redux Toolkit video-list state, playback, subtitles, danmaku, danmaku preferences, keyword filtering, and persistent danmaku records.
-- A Node backend API, SQLite persistence, OpenAPI documentation, focused unit and browser tests, and a run guide.
+- 现有文字、语音数字人客服，语音不可用时自动退回文字交互。
+- 仅面向电脑浏览器的 3D 展馆：鼠标控制视角、`W/A/S/D` 移动、房间和物体碰撞、可点击展品、轻量化西湖场景。
+- 6 条合法示例视频、Redux Toolkit 视频列表状态、播放、字幕、弹幕、弹幕样式设置、敏感词过滤和弹幕持久化。
+- 独立 Node 后端接口、SQLite 数据库、OpenAPI 接口文档、关键单元测试和浏览器测试、启动说明。
 
-The following are deliberately out of scope for this delivery:
+本次不包含：
 
-- Account registration, sign-in, role permissions, and a video-management back office.
-- Mobile virtual joystick controls.
-- Survey-grade or film-grade West Lake modeling.
-- Third-party production content-moderation services.
+- 注册登录、角色权限、视频上传和视频管理后台。
+- 手机虚拟摇杆和移动端 3D 操作。
+- 测绘级、影视级的西湖精细建模。
+- 第三方正式内容审核服务。
 
-## Navigation and Homepage
+## 三、首页入口与导航
 
-The current digital-human homepage stays visually intact. It is the unified consultation and recommendation experience.
+现有数字人首页的主体视觉和数字人动作保持不变，仍承担咨询和推荐职责。
 
-Two direct navigation buttons are added in the upper-right header safe area:
+在首页右上角顶部安全区加入两个直接跳转入口：
 
-| Entry         | Route         | Behavior                                  |
-| ------------- | ------------- | ----------------------------------------- |
-| 3D Exhibition | `/exhibition` | Opens the independent 3D exhibition page. |
-| Video Center  | `/videos`     | Opens the independent video center page.  |
+| 入口名称 | 跳转路由      | 作用                     |
+| -------- | ------------- | ------------------------ |
+| 3D 展馆  | `/exhibition` | 打开独立的 3D 展馆页面。 |
+| 视频中心 | `/videos`     | 打开独立的视频中心页面。 |
 
-The buttons must not overlap the digital-human stage, its existing action controls, or the left and right content panels.
+两个入口不得遮挡数字人、既有数字人动作按钮、左侧聊天内容和右侧信息内容。
 
-Visual interaction rules:
+入口视觉和交互规则：
 
-- Idle state uses approximately 14% opacity so the entries blend into the existing low-contrast information layers.
-- Hover and keyboard focus use a light mint-green surface, dark green text and icon color, a restrained gold border, and a small shadow.
-- Activation navigates immediately. No dropdown, drawer, or expanding panel is used.
-- The two buttons remain top-only controls; the existing bottom navigation is not widened or reordered.
+- 默认透明度约为 14%，与左右信息层一样弱化显示。
+- 鼠标悬停或键盘聚焦时，使用浅薄荷绿色背景、深绿色文字和图标、淡金色边框及轻微阴影。
+- 点击后立即跳转，不使用下拉菜单、抽屉或向下展开效果。
+- 两个入口只放在右上角，不修改现有底部导航的顺序和宽度。
 
-The digital-human assistant keeps existing tourism guidance. It additionally recognizes exhibition and video requests, replies with a concise recommendation, and provides direct navigation to the matching page.
+数字人客服继续回答现有旅游咨询问题，同时能够识别“展馆”“视频推荐”等问题，并给出简短推荐和跳转入口。
 
-## 3D Exhibition Page
+## 四、3D 展馆页面
 
-### Scene Direction
+### 视觉方向
 
-The primary scene is a contemporary West Lake indoor exhibition hall. Its material palette is stone white, celadon green, and dark wood. The room uses consistent materials across walls, floor, ceiling, and exhibition fixtures.
+主场景为“西湖当代展馆”室内空间，使用石灰白、青瓷绿和深木色。墙面、地面、天花和展陈装置使用统一的材质风格。
 
-The room contains wall art, chandeliers, exhibition tables, a bicycle, a car, and a small amount of greenery. Each floor-level obstacle is represented by a collision volume.
+展馆内包含壁画、吊灯、展桌、自行车、汽车和少量绿植。所有位于地面的主要装饰物都要有碰撞体。
 
-### Navigation and Interaction
+### 漫游和展品互动
 
-- Desktop browser only.
-- Mouse movement controls camera direction.
-- `W`, `A`, `S`, and `D` control movement.
-- The camera remains inside the room through room-boundary collision checks.
-- The camera cannot pass through decorative objects, tables, bicycles, cars, or exhibit plinths.
-- Clicking an exhibit opens a concise image-and-text introduction with an explicit action to view a related video. It does not force navigation.
-- A floating, collapsed digital-human entry remains available on this page and opens the existing consultation experience when requested.
+- 只支持电脑浏览器。
+- 鼠标移动控制相机朝向。
+- `W`、`A`、`S`、`D` 控制前后左右移动。
+- 使用房间边界碰撞，确保相机不能走出房间。
+- 使用物体碰撞，确保相机不能穿过展桌、自行车、汽车、展台和主要装饰物。
+- 点击展品后显示简洁图文介绍，并提供“观看相关视频”按钮；用户不会因误点而被强制跳走。
+- 页面保留一个收起状态的数字人客服入口，用户需要时再展开咨询。
 
-### West Lake Scene
+### 西湖场景
 
-The indoor hall contains an interactive West Lake digital-sandbox exhibit. Activating it switches to a separate lightweight West Lake roaming scene with representative water, bridge, trees, and landmark composition. A persistent return control returns the visitor to the indoor hall.
+室内展馆中放置“西湖数字沙盘”展项。点击后切换到独立、轻量化的西湖漫游场景，展示湖面、桥、树木和代表性景观，并提供固定的“返回展馆”控制。
 
-The West Lake scene is intentionally optimized for the demonstration deadline: it is a coherent, roamable low-poly scene rather than an exact geographic reconstruction.
+西湖场景以可漫游、画面完整和性能稳定为目标，采用低多边形表达，不追求精确复刻真实地理环境。
 
-## Video Center Page
+## 五、视频中心页面
 
-### Video List and Playback
+### 视频列表与播放
 
-- The page displays six backend-provided sample videos with title, cover, duration, and short description.
-- Redux Toolkit owns loading, success, failure, and cached video-list state.
-- The selected video plays in the primary player; the list remains available for quick switching.
-- A collapsed digital-human entry is available without obscuring video controls or danmaku.
+- 显示后端提供的 6 条示例视频，每条包括标题、封面、时长和简介。
+- 使用 Redux Toolkit 管理视频列表的加载、成功、失败和缓存状态。
+- 用户点击列表切换当前视频，播放器在主区域播放。
+- 页面保留收起状态的数字人客服入口，但不能遮挡播放器控制条和弹幕。
 
-### Danmaku
+### 弹幕
 
-- A danmaku record stores video ID, playback timestamp, sanitized content, generated anonymous nickname, color, position, and creation time.
-- Users are anonymous. The server assigns a display name such as `Visitor 1024`.
-- Viewer preferences control display speed, font size, opacity, and density. They are saved locally in the browser.
-- A submitted danmaku selects its own color and position: scrolling, top, or bottom.
-- The video element is the single playback clock. Pausing freezes danmaku and subtitles; resuming restarts both; seeking re-renders records relevant to the new timestamp.
-- Video-specific danmaku is queried by timestamp window so replaying the same video at the same position shows the matching records.
+- 每条弹幕保存视频编号、播放时间、过滤后的内容、系统生成的匿名昵称、颜色、位置和创建时间。
+- 用户匿名发送，后端生成类似 `游客 1024` 的显示昵称。
+- 观看者可调整全局弹幕速度、字号、透明度和显示密度，设置保存在浏览器中。
+- 用户发送单条弹幕时可选择颜色和位置：滚动、顶部或底部。
+- 视频播放器的播放时间是唯一时间基准：视频暂停时弹幕和字幕同步暂停；继续播放时同步继续；拖动进度条时只显示该时间点对应的弹幕。
+- 弹幕按“视频编号 + 播放时间”查询，因此再次播放同一视频、到达相同位置时，会显示对应的弹幕记录。
 
-### Keyword Filtering
+### 敏感词过滤
 
-- The backend owns a preset keyword list.
-- Every submitted danmaku is validated and sanitized on the backend before storage and response.
-- Each keyword match is replaced with `****`.
-- No keyword-management UI or third-party moderation service is included in this delivery.
+- 敏感词表由后端预置和管理。
+- 每条弹幕在保存前都由后端校验和过滤。
+- 命中的敏感词统一替换为 `****`。
+- 本期不提供敏感词管理页面，也不接入第三方审核服务。
 
-### Speech Text
+### 字幕与语音识别
 
-- Each sample video has a pre-authored subtitle timeline. This is the primary, reliable experience.
-- Real-time speech recognition is an optional enhancement. When available, it can add live recognition text.
-- Recognition failure, permission denial, unsupported environments, or network issues automatically fall back to the subtitle timeline without interrupting playback.
+- 每条示例视频都提供预先制作的字幕时间轴，作为稳定的默认体验。
+- 实时语音识别属于增强能力，服务可用时可叠加显示实时文本。
+- 识别失败、用户拒绝权限、浏览器不支持或网络异常时，自动继续使用预置字幕，不中断视频播放。
 
-## Backend and Data
+## 六、后端、数据与接口
 
-The existing Node backend gains focused video modules without replacing the established digital-human and voice modules.
+在现有 Node 后端中新增聚焦的视频模块，不替换已有的数字人和语音模块。
 
-### Persistence
+### 数据保存
 
-SQLite is used for video metadata, danmaku, sensitive keywords, and subtitle timeline data. It requires no separately managed database service and preserves records across backend restarts.
+使用 SQLite 保存视频元数据、弹幕、敏感词和字幕时间轴。SQLite 是项目内的本地数据库文件，不需要单独启动数据库服务；后端重启后数据仍然保留。
 
-### API Surface
+### 接口列表
 
-The API is documented through the existing OpenAPI documentation route.
+接口通过现有 OpenAPI 文档页面说明。
 
-| Endpoint                                     | Purpose                                                         |
-| -------------------------------------------- | --------------------------------------------------------------- |
-| `GET /api/videos`                            | Return the six sample-video records.                            |
-| `GET /api/videos/:videoId`                   | Return selected-video metadata.                                 |
-| `GET /api/videos/:videoId/danmaku?from=&to=` | Return sanitized danmaku for a playback-time window.            |
-| `POST /api/videos/:videoId/danmaku`          | Validate, sanitize, persist, and return one new danmaku record. |
-| `GET /api/videos/:videoId/subtitles`         | Return the pre-authored subtitle timeline.                      |
+| 接口                                         | 作用                               |
+| -------------------------------------------- | ---------------------------------- |
+| `GET /api/videos`                            | 获取 6 条示例视频。                |
+| `GET /api/videos/:videoId`                   | 获取指定视频的详情。               |
+| `GET /api/videos/:videoId/danmaku?from=&to=` | 按播放时间范围获取过滤后的弹幕。   |
+| `POST /api/videos/:videoId/danmaku`          | 校验、过滤、保存并返回一条新弹幕。 |
+| `GET /api/videos/:videoId/subtitles`         | 获取该视频的预置字幕时间轴。       |
 
-Request validation rejects unknown videos, invalid timestamps, unsupported colors or positions, and content outside the allowed length. The frontend shows a compact inline error and keeps the player usable.
+后端拒绝不存在的视频、非法播放时间、不支持的颜色或位置、超过长度限制的内容。前端显示简短行内错误提示，但播放器保持可用。
 
-## Quality and Verification
+## 七、质量与测试
 
-Tests cover:
+需要覆盖以下验证：
 
-- Route availability and direct navigation from the homepage.
-- Redux Toolkit loading, success, and failure states for video data.
-- Backend keyword replacement, validation, timestamp queries, and SQLite persistence.
-- Danmaku behavior when playing, pausing, resuming, seeking, and switching videos.
-- Subtitle fallback when real-time recognition is unavailable.
-- 3D room boundary collision and representative object collision.
-- Browser verification of nonblank 3D rendering, desktop layout, top-right entry hover behavior, and no overlap with the existing action controls.
+- 首页右上角两个入口可以跳转到正确页面。
+- Redux Toolkit 获取视频列表时的加载、成功和失败状态。
+- 后端敏感词替换、参数校验、按时间查询和 SQLite 持久化。
+- 视频播放、暂停、继续、拖动进度条、切换视频时的弹幕行为。
+- 实时语音识别不可用时的字幕降级。
+- 3D 房间边界碰撞和主要物体碰撞。
+- 浏览器验证 3D 画面不为空、电脑端布局正常、右上角悬停高亮正常、且不遮挡既有动作按钮。
 
-The implementation includes OpenAPI documentation, sample-data attribution, and concise startup instructions.
+项目还会提供 OpenAPI 接口文档、示例素材来源说明和简洁启动说明。
 
-## Implementation Order
+## 八、实施顺序
 
-1. Add route shells and the top-right homepage entries without altering existing digital-human actions.
-2. Add video data, SQLite persistence, API documentation, and Redux Toolkit state.
-3. Deliver video playback, subtitles, danmaku, filtering, and preference controls.
-4. Deliver the indoor 3D exhibition hall, controls, collisions, and exhibit interactions.
-5. Add the lightweight West Lake scene and digital-sandbox transition.
-6. Add real-time recognition as a progressive enhancement, then complete integration and browser tests.
+1. 新增页面路由和首页右上角入口，不影响已有数字人动作按钮。
+2. 新增视频数据、SQLite、后端接口、OpenAPI 文档和 Redux Toolkit 状态。
+3. 完成视频播放、字幕、弹幕、敏感词过滤和样式设置。
+4. 完成室内 3D 展馆、相机控制、碰撞和展品互动。
+5. 增加轻量化西湖场景和数字沙盘切换。
+6. 将实时语音识别作为增强能力接入，完成整体联调和浏览器测试。
 
-The order ensures that the 2026-08-01 core flow is demonstrable before the West Lake extension and optional recognition enhancement are finalized.
+这个顺序确保 2026-08-01 前能够演示核心流程，再在 2026-08-05 前补齐西湖场景和实时语音识别增强能力。
