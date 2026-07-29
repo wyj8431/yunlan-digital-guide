@@ -15,6 +15,16 @@ export const ROOM_BOUNDS: Collider = {
 };
 
 export const PLAYER_RADIUS = 0.4;
+export const MAX_FRAME_DELTA_SECONDS = 0.1;
+
+export function clampFrameDelta(delta: number): number {
+  return Math.min(MAX_FRAME_DELTA_SECONDS, Math.max(0, delta));
+}
+
+export function normalizeMovement(delta: Point2): Point2 {
+  const length = Math.hypot(delta.x, delta.z);
+  return length > 1 ? { x: delta.x / length, z: delta.z / length } : delta;
+}
 
 export function clampToRoom(point: Point2, bounds: Collider, radius: number): Point2 {
   return {
@@ -31,6 +41,7 @@ export function canMoveTo(
 ): boolean {
   const candidate = { x: point.x + delta.x, z: point.z + delta.z };
 
+  // 将玩家半径扩展到展品包围盒上，边缘刚好接触时仍允许移动。
   return !colliders.some(
     (collider) =>
       candidate.x + radius > collider.minX &&
@@ -38,4 +49,29 @@ export function canMoveTo(
       candidate.z + radius > collider.minZ &&
       candidate.z - radius < collider.maxZ
   );
+}
+
+export function resolveMovement(
+  point: Point2,
+  delta: Point2,
+  colliders: Collider[],
+  bounds: Collider,
+  radius: number
+): Point2 {
+  const target = clampToRoom({ x: point.x + delta.x, z: point.z + delta.z }, bounds, radius);
+  if (canMoveTo(target, { x: 0, z: 0 }, colliders, radius)) {
+    return target;
+  }
+
+  const xOnly = clampToRoom({ x: target.x, z: point.z }, bounds, radius);
+  if (canMoveTo(xOnly, { x: 0, z: 0 }, colliders, radius)) {
+    return xOnly;
+  }
+
+  const zOnly = clampToRoom({ x: point.x, z: target.z }, bounds, radius);
+  if (canMoveTo(zOnly, { x: 0, z: 0 }, colliders, radius)) {
+    return zOnly;
+  }
+
+  return point;
 }
