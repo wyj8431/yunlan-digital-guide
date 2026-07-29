@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { EXHIBITION_LAYOUT, assertMainAisleClear } from '../src/exhibition/exhibitionLayout';
 import * as THREE from 'three';
 import { applyHallPbrTextures, createHallMaterials } from '../src/exhibition/exhibitionMaterials';
-import { createJiangnanHall } from '../src/exhibition/scene/createJiangnanHall';
+import {
+  JIANGNAN_HALL_COLLIDERS,
+  createJiangnanHall
+} from '../src/exhibition/scene/createJiangnanHall';
 
 describe('realistic Jiangnan hall', () => {
   it('builds the required full-scale architectural groups', () => {
@@ -25,6 +28,10 @@ describe('realistic Jiangnan hall', () => {
 
   it('preserves the 2.4 metre central aisle', () => {
     expect(assertMainAisleClear(EXHIBITION_LAYOUT, 2.4)).toBe(true);
+    expect(JIANGNAN_HALL_COLLIDERS).toHaveLength(4);
+    expect(
+      JIANGNAN_HALL_COLLIDERS.every((collider) => collider.maxX <= -1.7 || collider.minX >= 1.7)
+    ).toBe(true);
   });
 
   it('calibrates PBR texture color spaces, repeats, and anisotropy', () => {

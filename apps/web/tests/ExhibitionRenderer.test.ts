@@ -39,6 +39,7 @@ vi.mock('../src/exhibition/quality/PostProcessingPipeline', () => ({
 vi.mock('../src/exhibition/scene/createJiangnanHall', async () => {
   const THREE = await import('three');
   return {
+    JIANGNAN_HALL_COLLIDERS: [],
     createJiangnanHall: () => {
       const hall = new THREE.Group();
       hall.name = 'jiangnan-museum-hall';

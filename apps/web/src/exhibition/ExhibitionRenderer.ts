@@ -19,7 +19,7 @@ import { ExhibitionAssetLoader } from './assets/ExhibitionAssetLoader';
 import { EXHIBITION_ASSETS } from './assets/exhibitionAssets';
 import { PostProcessingPipeline } from './quality/PostProcessingPipeline';
 import { QualityDowngradeController } from './quality/qualityProfile';
-import { createJiangnanHall } from './scene/createJiangnanHall';
+import { JIANGNAN_HALL_COLLIDERS, createJiangnanHall } from './scene/createJiangnanHall';
 
 export type ExhibitionRendererOptions = {
   host: HTMLElement;
@@ -71,9 +71,12 @@ export class ExhibitionRenderer {
   private readonly pointer = new THREE.Vector2();
   private readonly clock = new THREE.Clock();
   private readonly pressedKeys = new Set<string>();
-  private readonly colliders: Collider[] = EXHIBITION_LAYOUT.flatMap((item) =>
-    item.blocksMovement && item.collider ? [item.collider] : []
-  );
+  private readonly colliders: Collider[] = [
+    ...JIANGNAN_HALL_COLLIDERS,
+    ...EXHIBITION_LAYOUT.flatMap((item) =>
+      item.blocksMovement && item.collider ? [item.collider] : []
+    )
+  ];
   private readonly exhibitRoots: THREE.Object3D[] = [];
   private readonly materials: HallMaterials = createHallMaterials();
   private readonly resizeObserver: ResizeObserver;

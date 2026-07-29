@@ -1,6 +1,14 @@
 import * as THREE from 'three';
 import { HALL_DIMENSIONS } from '../exhibitionLayout';
 import type { HallMaterials } from '../exhibitionMaterials';
+import type { Collider } from '../collision';
+
+export const JIANGNAN_HALL_COLLIDERS: Collider[] = [
+  { minX: -8, maxX: -1.7, minZ: 7.5, maxZ: 7.95 },
+  { minX: 1.7, maxX: 8, minZ: 7.5, maxZ: 7.95 },
+  { minX: -7.45, maxX: -6.25, minZ: -8.2, maxZ: -1.1 },
+  { minX: 6.25, maxX: 7.45, minZ: -8.2, maxZ: -1.1 }
+];
 
 function box(
   width: number,
