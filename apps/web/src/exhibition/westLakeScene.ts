@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { disposeObject3D } from '../lib/three/disposeObject3D';
-import type { LoadedExhibitionAssets } from './assets/ExhibitionAssetLoader';
+import { ExhibitionAssetLoader, type LoadedExhibitionAssets } from './assets/ExhibitionAssetLoader';
+import { EXHIBITION_ASSETS } from './assets/exhibitionAssets';
+import { ExhibitionAudio } from './audio/ExhibitionAudio';
 import {
   PLAYER_RADIUS,
   clampFrameDelta,
@@ -38,6 +40,9 @@ export class WestLakeScene {
   private readonly scene = new THREE.Scene();
   private readonly camera = new THREE.PerspectiveCamera(68, 1, 0.08, 100);
   private readonly renderer: THREE.WebGLRenderer;
+  private readonly assetLoader: ExhibitionAssetLoader;
+  private readonly audioListener: THREE.AudioListener;
+  private readonly audio: ExhibitionAudio;
   private readonly environment = createWestLakeEnvironment(EMPTY_ASSETS, QUALITY_PROFILES.high);
   private readonly pipeline: PostProcessingPipeline;
   private readonly observer: ResizeObserver;
@@ -70,6 +75,7 @@ export class WestLakeScene {
     this.looking = false;
   };
   private readonly handlePointerDown = () => {
+    void this.unlockAudio();
     this.looking = true;
     this.renderer.domElement.requestPointerLock?.();
   };
@@ -103,6 +109,15 @@ export class WestLakeScene {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 0.9;
     this.options.host.appendChild(this.renderer.domElement);
+    this.audioListener = new THREE.AudioListener();
+    this.audio = new ExhibitionAudio(this.audioListener, new Map());
+    this.audio.setScene('lake');
+    this.audio.setWaterPosition(0, 0, 0);
+    this.assetLoader = new ExhibitionAssetLoader(
+      this.renderer,
+      EXHIBITION_ASSETS.filter((asset) => ['lake-ambience', 'footstep-stone'].includes(asset.id))
+    );
+    void this.loadAudioBuffers();
     this.scene.add(new THREE.HemisphereLight('#fffbea', '#315c50', 0.92));
     const sun = new THREE.DirectionalLight('#fff4d6', 1.05);
     sun.position.set(4, 8, 5);
@@ -131,6 +146,17 @@ export class WestLakeScene {
     };
   }
 
+  setMuted(muted: boolean) {
+    this.audio.setMuted(muted);
+  }
+
+  async unlockAudio() {
+    await this.audio.unlock();
+    if (!this.disposed && this.audio.isUnlocked() && this.audioListener.parent !== this.camera) {
+      this.camera.add(this.audioListener);
+    }
+  }
+
   dispose() {
     if (this.disposed) return;
     this.disposed = true;
@@ -145,6 +171,8 @@ export class WestLakeScene {
     this.environment.dispose();
     this.scene.remove(this.environment.root);
     disposeObject3D(this.scene);
+    this.audio.dispose();
+    this.assetLoader.dispose();
     this.pipeline.dispose();
     this.renderer.dispose();
     this.renderer.forceContextLoss();
@@ -186,8 +214,10 @@ export class WestLakeScene {
         z: (-Math.cos(this.yaw) * input.z - Math.sin(this.yaw) * input.x) * distance
       }
     );
+    const travelled = Math.hypot(next.x - this.camera.position.x, next.z - this.camera.position.z);
     this.camera.position.x = next.x;
     this.camera.position.z = next.z;
+    this.audio.updateTravelledDistance(travelled);
   }
 
   private render = () => {
@@ -219,5 +249,10 @@ export class WestLakeScene {
     this.environment.setZoneVisible('shore', shorelineVisible);
     this.environment.setZoneVisible('vegetation', shorelineVisible);
     this.environment.setZoneVisible('distance', distanceVisible);
+  }
+
+  private async loadAudioBuffers() {
+    const loaded = await this.assetLoader.load(() => undefined);
+    if (!this.disposed) this.audio.setBuffers(loaded.audio);
   }
 }

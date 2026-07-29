@@ -18,6 +18,7 @@ import {
 } from './exhibitionMaterials';
 import { ExhibitionAssetLoader } from './assets/ExhibitionAssetLoader';
 import { EXHIBITION_ASSETS } from './assets/exhibitionAssets';
+import { ExhibitionAudio } from './audio/ExhibitionAudio';
 import { PostProcessingPipeline } from './quality/PostProcessingPipeline';
 import { QUALITY_PROFILES, QualityDowngradeController } from './quality/qualityProfile';
 import { JIANGNAN_HALL_COLLIDERS, createJiangnanHall } from './scene/createJiangnanHall';
@@ -69,6 +70,8 @@ export class ExhibitionRenderer {
   private readonly camera = new THREE.PerspectiveCamera(68, 1, 0.08, 80);
   private readonly renderer: THREE.WebGLRenderer;
   private readonly assetLoader: ExhibitionAssetLoader;
+  private readonly audioListener: THREE.AudioListener;
+  private readonly audio: ExhibitionAudio;
   private readonly pipeline: PostProcessingPipeline;
   private readonly raycaster = new THREE.Raycaster();
   private readonly pointer = new THREE.Vector2();
@@ -114,6 +117,7 @@ export class ExhibitionRenderer {
 
   private readonly handlePointerDown = () => {
     if (!this.interactionEnabled) return;
+    void this.unlockAudio();
     this.looking = true;
     this.renderer.domElement.requestPointerLock?.();
   };
@@ -158,7 +162,10 @@ export class ExhibitionRenderer {
   private readonly handleClick = (event: MouseEvent) => {
     if (!this.interactionEnabled) return;
     const exhibitId = this.findExhibitId(event.clientX, event.clientY);
-    if (exhibitId) this.options.onExhibitSelect(exhibitId);
+    if (exhibitId) {
+      this.audio.playNarration(exhibitId);
+      this.options.onExhibitSelect(exhibitId);
+    }
   };
 
   private findExhibitId(clientX: number, clientY: number): string | null {
@@ -201,6 +208,9 @@ export class ExhibitionRenderer {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.options.host.appendChild(this.renderer.domElement);
     RectAreaLightUniformsLib.init();
+    this.audioListener = new THREE.AudioListener();
+    this.audio = new ExhibitionAudio(this.audioListener, new Map());
+    this.audio.setScene('hall');
 
     const hallAssets = EXHIBITION_ASSETS.filter((asset) =>
       [
@@ -211,7 +221,13 @@ export class ExhibitionRenderer {
         'bicycle',
         'shuttle',
         'tea-set',
-        'silk-garment'
+        'silk-garment',
+        'hall-ambience',
+        'footstep-stone',
+        'narration-bicycle',
+        'narration-shuttle',
+        'narration-tea-set',
+        'narration-silk-garment'
       ].includes(asset.id)
     );
     this.assetLoader = new ExhibitionAssetLoader(this.renderer, hallAssets);
@@ -222,6 +238,7 @@ export class ExhibitionRenderer {
     );
 
     this.setupHall();
+    void this.loadHallAudio();
     void this.loadHallEnvironment();
     this.pipeline = new PostProcessingPipeline({
       renderer: this.renderer,
@@ -267,6 +284,26 @@ export class ExhibitionRenderer {
       this.renderer.domElement.style.cursor = '';
       document.exitPointerLock?.();
     }
+    if (enabled) this.audio.stopNarration();
+  }
+
+  setMuted(muted: boolean) {
+    this.audio.setMuted(muted);
+  }
+
+  async unlockAudio() {
+    await this.audio.unlock();
+    if (!this.disposed && this.audio.isUnlocked() && this.audioListener.parent !== this.camera) {
+      this.camera.add(this.audioListener);
+    }
+  }
+
+  playNarration(exhibitId: string) {
+    return this.audio.playNarration(exhibitId);
+  }
+
+  stopNarration() {
+    this.audio.stopNarration();
   }
 
   dispose() {
@@ -286,6 +323,7 @@ export class ExhibitionRenderer {
     this.renderer.domElement.removeEventListener('click', this.handleClick);
     // 同时释放几何体、材质、WebGL 上下文和画布，防止重复进出页面耗尽显存。
     disposeObject3D(this.scene);
+    this.audio.dispose();
     this.assetLoader.dispose();
     this.pipeline.dispose();
     this.renderer.dispose();
@@ -330,6 +368,11 @@ export class ExhibitionRenderer {
       this.exhibitGroup.add(root);
       this.exhibitRoots.push(root);
     }
+  }
+
+  private async loadHallAudio() {
+    const loaded = await this.assetLoader.load(() => undefined);
+    if (!this.disposed) this.audio.setBuffers(loaded.audio);
   }
 
   private createLighting() {
@@ -470,7 +513,10 @@ export class ExhibitionRenderer {
     const strafeInput =
       Number(this.pressedKeys.has('KeyD') || this.pressedKeys.has('ArrowRight')) -
       Number(this.pressedKeys.has('KeyA') || this.pressedKeys.has('ArrowLeft'));
-    if (forwardInput === 0 && strafeInput === 0) return;
+    if (forwardInput === 0 && strafeInput === 0) {
+      this.audio.updateTravelledDistance(0);
+      return;
+    }
 
     const input = normalizeMovement({ x: strafeInput, z: forwardInput });
     const distance = MOVE_SPEED * deltaSeconds;
@@ -485,7 +531,9 @@ export class ExhibitionRenderer {
       ROOM_BOUNDS,
       PLAYER_RADIUS
     );
+    const travelled = Math.hypot(next.x - this.camera.position.x, next.z - this.camera.position.z);
     this.camera.position.x = next.x;
     this.camera.position.z = next.z;
+    this.audio.updateTravelledDistance(travelled);
   }
 }
