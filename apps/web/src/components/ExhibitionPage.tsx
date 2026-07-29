@@ -1,3 +1,4 @@
+// 3D 展馆页面管理大厅、展品详情和西湖沙盘三个交互层级。
 import { ArrowLeft, Bot, ExternalLink, Map, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { ExhibitionRenderer } from '../exhibition/ExhibitionRenderer';
@@ -5,6 +6,7 @@ import { WestLakeScene } from '../exhibition/westLakeScene';
 
 type ExhibitionPageProps = { onReturnHome: () => void };
 type SceneMode = 'hall' | 'lake';
+type ActiveRenderer = ExhibitionRenderer | WestLakeScene;
 
 const EXHIBITS: Record<string, { title: string; description: string; sandTable?: boolean }> = {
   'west-lake-map': {
@@ -32,9 +34,11 @@ const EXHIBITS: Record<string, { title: string; description: string; sandTable?:
 
 export function ExhibitionPage({ onReturnHome }: ExhibitionPageProps) {
   const hostRef = useRef<HTMLDivElement>(null);
+  const rendererRef = useRef<ActiveRenderer | null>(null);
   const [mode, setMode] = useState<SceneMode>('hall');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [renderError, setRenderError] = useState(false);
+  const [transitioning, setTransitioning] = useState(false);
   const selected = selectedId ? EXHIBITS[selectedId] : undefined;
 
   useEffect(() => {
@@ -46,14 +50,38 @@ export function ExhibitionPage({ onReturnHome }: ExhibitionPageProps) {
         mode === 'hall'
           ? new ExhibitionRenderer({ host, onExhibitSelect: setSelectedId })
           : new WestLakeScene({ host });
-      return () => renderer.dispose();
+      rendererRef.current = renderer;
+      setTransitioning(false);
+      return () => {
+        if (rendererRef.current === renderer) rendererRef.current = null;
+        renderer.dispose();
+      };
     } catch {
       setRenderError(true);
+      setTransitioning(false);
       return undefined;
     }
   }, [mode]);
 
+  useEffect(() => {
+    if (mode !== 'hall') return;
+    const renderer = rendererRef.current;
+    if (renderer instanceof ExhibitionRenderer) {
+      renderer.setInteractionEnabled(!selected);
+    }
+  }, [mode, selected]);
+
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSelectedId(null);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, []);
+
   function enterLakeScene() {
+    if (transitioning) return;
+    setTransitioning(true);
     setSelectedId(null);
     setMode('lake');
   }
@@ -69,6 +97,11 @@ export function ExhibitionPage({ onReturnHome }: ExhibitionPageProps) {
         <p className="exhibition-render-error" role="alert">
           3D 场景暂时无法加载，请检查浏览器图形加速设置。
         </p>
+      )}
+      {transitioning && (
+        <div className="exhibition-transition" data-testid="scene-transition" role="status">
+          正在进入西湖全景
+        </div>
       )}
 
       <header className="exhibition-topbar">
@@ -109,7 +142,7 @@ export function ExhibitionPage({ onReturnHome }: ExhibitionPageProps) {
           <p>{selected.description}</p>
           <div className="exhibit-dialog-actions">
             {selected.sandTable && (
-              <button type="button" onClick={enterLakeScene}>
+              <button type="button" onClick={enterLakeScene} disabled={transitioning}>
                 <Map aria-hidden="true" />
                 进入西湖沙盘
               </button>

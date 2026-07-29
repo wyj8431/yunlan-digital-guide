@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const rendererState = vi.hoisted(() => ({
   hallDispose: vi.fn(),
   lakeDispose: vi.fn(),
+  setInteractionEnabled: vi.fn(),
   selectExhibit: null as null | ((id: string) => void)
 }));
 
@@ -14,6 +15,7 @@ vi.mock('../src/exhibition/ExhibitionRenderer', () => ({
       rendererState.selectExhibit = options.onExhibitSelect;
     }
     dispose = rendererState.hallDispose;
+    setInteractionEnabled = rendererState.setInteractionEnabled;
   }
 }));
 
@@ -51,9 +53,11 @@ describe('ExhibitionPage', () => {
     act(() => rendererState.selectExhibit?.('west-lake-bicycle'));
 
     expect(screen.getByRole('dialog', { name: '西湖绿道自行车' })).toBeInTheDocument();
+    expect(rendererState.setInteractionEnabled).toHaveBeenLastCalledWith(false);
     expect(screen.getByRole('link', { name: '去视频中心' })).toHaveAttribute('href', '/videos');
-    fireEvent.click(screen.getByRole('button', { name: '关闭展品介绍' }));
+    fireEvent.keyDown(window, { key: 'Escape' });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(rendererState.setInteractionEnabled).toHaveBeenLastCalledWith(true);
   });
 
   it('switches from the sand table to West Lake and returns to the hall', () => {
