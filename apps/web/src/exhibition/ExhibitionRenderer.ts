@@ -8,7 +8,7 @@ import {
   resolveMovement,
   type Collider
 } from './collision';
-import { EXHIBITION_LAYOUT, HALL_DIMENSIONS, findExhibitLayout } from './exhibitionLayout';
+import { EXHIBITION_LAYOUT, findExhibitLayout } from './exhibitionLayout';
 import {
   EXHIBITION_COLORS as COLORS,
   createHallMaterials,
@@ -16,6 +16,7 @@ import {
 } from './exhibitionMaterials';
 import { PostProcessingPipeline } from './quality/PostProcessingPipeline';
 import { QualityDowngradeController } from './quality/qualityProfile';
+import { createJiangnanHall } from './scene/createJiangnanHall';
 
 export type ExhibitionRendererOptions = {
   host: HTMLElement;
@@ -274,64 +275,10 @@ export class ExhibitionRenderer {
   }
 
   private setupHall() {
-    this.scene.add(this.createHallShell());
+    this.scene.add(createJiangnanHall(this.materials));
     this.scene.add(this.createLighting());
     this.scene.add(this.createExhibits());
     this.scene.add(this.createGreenery());
-  }
-
-  private createHallShell() {
-    const shell = new THREE.Group();
-    shell.name = 'hall-shell';
-
-    const floor = createBox(
-      HALL_DIMENSIONS.width,
-      0.18,
-      HALL_DIMENSIONS.depth,
-      this.materials.floor
-    );
-    floor.position.set(0, -0.09, 0);
-    floor.receiveShadow = true;
-    shell.add(floor);
-
-    const ceiling = createBox(
-      HALL_DIMENSIONS.width,
-      0.16,
-      HALL_DIMENSIONS.depth,
-      this.materials.ceiling
-    );
-    ceiling.position.set(0, HALL_DIMENSIONS.height - 0.08, 0);
-    shell.add(ceiling);
-
-    const backWall = createBox(
-      HALL_DIMENSIONS.width,
-      HALL_DIMENSIONS.height,
-      0.18,
-      this.materials.wall
-    );
-    backWall.position.set(0, HALL_DIMENSIONS.height / 2, -HALL_DIMENSIONS.depth / 2);
-    const leftWall = createBox(
-      0.18,
-      HALL_DIMENSIONS.height,
-      HALL_DIMENSIONS.depth,
-      this.materials.wall
-    );
-    leftWall.position.set(-HALL_DIMENSIONS.width / 2, HALL_DIMENSIONS.height / 2, 0);
-    const rightWall = createBox(
-      0.18,
-      HALL_DIMENSIONS.height,
-      HALL_DIMENSIONS.depth,
-      this.materials.wall
-    );
-    rightWall.position.set(HALL_DIMENSIONS.width / 2, HALL_DIMENSIONS.height / 2, 0);
-    const entryHeader = createBox(HALL_DIMENSIONS.width, 0.65, 0.18, this.materials.metal);
-    entryHeader.position.set(0, 4.35, 10);
-    shell.add(backWall, leftWall, rightWall, entryHeader);
-
-    const lakeRibbon = createBox(11, 0.035, 1.4, this.materials.water);
-    lakeRibbon.position.set(0, 0.02, -7.7);
-    shell.add(lakeRibbon);
-    return shell;
   }
 
   private createLighting() {

@@ -34,6 +34,17 @@ vi.mock('../src/exhibition/quality/PostProcessingPipeline', () => ({
   }
 }));
 
+vi.mock('../src/exhibition/scene/createJiangnanHall', async () => {
+  const THREE = await import('three');
+  return {
+    createJiangnanHall: () => {
+      const hall = new THREE.Group();
+      hall.name = 'jiangnan-museum-hall';
+      return hall;
+    }
+  };
+});
+
 vi.mock('three', () => {
   class MockNode {
     name = '';
@@ -261,7 +272,7 @@ describe('ExhibitionRenderer', () => {
     expect(state.resizeObservers).toHaveLength(1);
     expect(state.resizeObservers[0]?.observe).toHaveBeenCalledWith(host);
     expect(state.sceneChildren.map((child) => child.name)).toEqual(
-      expect.arrayContaining(['hall-shell', 'hall-lighting', 'exhibits', 'greenery'])
+      expect.arrayContaining(['jiangnan-museum-hall', 'hall-lighting', 'exhibits', 'greenery'])
     );
 
     renderer.dispose();
