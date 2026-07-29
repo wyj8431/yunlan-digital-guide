@@ -30,7 +30,7 @@ Both materials are Poly Haven CC0 assets. Each source JPG was converted independ
 
 ## Project-owned audio
 
-All files are PCM signed 16-bit little-endian WAV at 44.1 kHz. They were generated locally on 2026-07-29 and are owned by the Yunlan project. FFmpeg 8 generated the ambience and footstep tracks from deterministic audio filters. Microsoft Huihui Desktop generated the Chinese narration through Windows System.Speech. `ffmpeg volumedetect` confirmed every file has finite, non-silent mean volume.
+All files are PCM signed 16-bit little-endian WAV at 44.1 kHz. They were generated locally on 2026-07-29 and are owned by the Yunlan project. FFmpeg 8 generated the ambience and footstep tracks from audio filters. Microsoft Huihui Desktop generated the Chinese narration through Windows System.Speech. `ffmpeg volumedetect` confirmed every file has finite, non-silent mean volume.
 
 | ID                     | Generation / spoken text                                                             | Duration |     Bytes | SHA-256                                                            |
 | ---------------------- | ------------------------------------------------------------------------------------ | -------: | --------: | ------------------------------------------------------------------ |
