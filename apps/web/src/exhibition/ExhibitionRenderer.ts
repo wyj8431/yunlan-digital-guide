@@ -22,6 +22,7 @@ import { PostProcessingPipeline } from './quality/PostProcessingPipeline';
 import { QUALITY_PROFILES, QualityDowngradeController } from './quality/qualityProfile';
 import { JIANGNAN_HALL_COLLIDERS, createJiangnanHall } from './scene/createJiangnanHall';
 import { createMuseumCases } from './scene/createMuseumCases';
+import { createRealisticExhibits } from './scene/createRealisticExhibits';
 
 export type ExhibitionRendererOptions = {
   host: HTMLElement;
@@ -80,6 +81,7 @@ export class ExhibitionRenderer {
     )
   ];
   private readonly exhibitRoots: THREE.Object3D[] = [];
+  private readonly exhibitGroup = new THREE.Group();
   private readonly materials: HallMaterials = createHallMaterials();
   private readonly museumCases: ReturnType<typeof createMuseumCases>;
   private readonly resizeObserver: ResizeObserver;
@@ -201,7 +203,16 @@ export class ExhibitionRenderer {
     RectAreaLightUniformsLib.init();
 
     const hallAssets = EXHIBITION_ASSETS.filter((asset) =>
-      ['hall-hdri', 'stone-pbr', 'walnut-pbr', 'display-ies'].includes(asset.id)
+      [
+        'hall-hdri',
+        'stone-pbr',
+        'walnut-pbr',
+        'display-ies',
+        'bicycle',
+        'shuttle',
+        'tea-set',
+        'silk-garment'
+      ].includes(asset.id)
     );
     this.assetLoader = new ExhibitionAssetLoader(this.renderer, hallAssets);
     this.museumCases = createMuseumCases(
@@ -312,6 +323,13 @@ export class ExhibitionRenderer {
     applyHallPbrTextures(this.materials, loaded.textures, anisotropy);
     const iesTexture = loaded.textures.get('display-ies');
     if (iesTexture) this.museumCases.setIesTexture(iesTexture);
+    const realistic = createRealisticExhibits(loaded, EXHIBITION_LAYOUT);
+    for (const child of [...this.exhibitRoots]) child.visible = false;
+    this.exhibitRoots.length = 0;
+    for (const root of realistic.roots.values()) {
+      this.exhibitGroup.add(root);
+      this.exhibitRoots.push(root);
+    }
   }
 
   private createLighting() {
@@ -339,7 +357,7 @@ export class ExhibitionRenderer {
   }
 
   private createExhibits() {
-    const exhibits = new THREE.Group();
+    const exhibits = this.exhibitGroup;
     exhibits.name = 'exhibits';
 
     const bicycle = this.createBicycle();

@@ -13,8 +13,8 @@ describe('exhibition layout metadata', () => {
   it('contains every major interactive exhibit', () => {
     expect(EXHIBITION_LAYOUT.map((item) => item.id)).toEqual(
       expect.arrayContaining([
-        'west-lake-map',
         'silk-and-tea',
+        'silk-garment',
         'west-lake-bicycle',
         'green-mobility-car',
         'west-lake-wall-art'

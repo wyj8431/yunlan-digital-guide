@@ -3,7 +3,7 @@ import type { Collider } from './collision';
 export const HALL_DIMENSIONS = { width: 16, depth: 20, height: 4.8 } as const;
 
 export type ExhibitKind =
-  'sand-table' | 'display-table' | 'bicycle' | 'shuttle' | 'wall-art' | 'plant';
+  'sand-table' | 'display-table' | 'silk-garment' | 'bicycle' | 'shuttle' | 'wall-art' | 'plant';
 
 export type ExhibitLayoutItem = {
   id: string;
@@ -36,15 +36,15 @@ function groundedItem(
 
 export const EXHIBITION_LAYOUT: ExhibitLayoutItem[] = [
   groundedItem({
-    id: 'west-lake-map',
-    kind: 'sand-table',
+    id: 'silk-and-tea',
+    kind: 'display-table',
     position: { x: -3.8, y: 0, z: -1.2 },
     size: { width: 2.8, height: 0.89, depth: 1.7 },
     interactive: true
   }),
   groundedItem({
-    id: 'silk-and-tea',
-    kind: 'display-table',
+    id: 'silk-garment',
+    kind: 'silk-garment',
     position: { x: 3.8, y: 0, z: -1.2 },
     size: { width: 2.5, height: 0.89, depth: 1.5 },
     interactive: true
