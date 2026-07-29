@@ -35,3 +35,45 @@ export function createHallMaterials() {
 }
 
 export type HallMaterials = ReturnType<typeof createHallMaterials>;
+
+function configureTexture(
+  texture: THREE.Texture,
+  repeat: [number, number],
+  anisotropy: number,
+  color: boolean
+) {
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(...repeat);
+  texture.anisotropy = anisotropy;
+  texture.colorSpace = color ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+export function applyHallPbrTextures(
+  materials: HallMaterials,
+  textures: Map<string, THREE.Texture>,
+  anisotropy: number
+) {
+  const apply = (
+    material: THREE.MeshStandardMaterial,
+    assetId: 'stone-pbr' | 'walnut-pbr',
+    repeat: [number, number]
+  ) => {
+    const baseColor = textures.get(`${assetId}:baseColor`);
+    const normal = textures.get(`${assetId}:normal`);
+    const roughness = textures.get(`${assetId}:roughness`);
+    const ao = textures.get(`${assetId}:ao`);
+    if (baseColor) material.map = configureTexture(baseColor, repeat, anisotropy, true);
+    if (normal) material.normalMap = configureTexture(normal, repeat, anisotropy, false);
+    if (roughness) material.roughnessMap = configureTexture(roughness, repeat, anisotropy, false);
+    if (ao) material.aoMap = configureTexture(ao, repeat, anisotropy, false);
+    material.normalScale.set(0.45, 0.45);
+    material.aoMapIntensity = 0.72;
+    material.needsUpdate = true;
+  };
+
+  apply(materials.floor, 'stone-pbr', [8, 10]);
+  apply(materials.wood, 'walnut-pbr', [1.5, 4]);
+}

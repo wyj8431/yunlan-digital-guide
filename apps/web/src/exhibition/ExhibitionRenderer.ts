@@ -11,9 +11,12 @@ import {
 import { EXHIBITION_LAYOUT, findExhibitLayout } from './exhibitionLayout';
 import {
   EXHIBITION_COLORS as COLORS,
+  applyHallPbrTextures,
   createHallMaterials,
   type HallMaterials
 } from './exhibitionMaterials';
+import { ExhibitionAssetLoader } from './assets/ExhibitionAssetLoader';
+import { EXHIBITION_ASSETS } from './assets/exhibitionAssets';
 import { PostProcessingPipeline } from './quality/PostProcessingPipeline';
 import { QualityDowngradeController } from './quality/qualityProfile';
 import { createJiangnanHall } from './scene/createJiangnanHall';
@@ -62,6 +65,7 @@ export class ExhibitionRenderer {
   private readonly scene = new THREE.Scene();
   private readonly camera = new THREE.PerspectiveCamera(68, 1, 0.08, 80);
   private readonly renderer: THREE.WebGLRenderer;
+  private readonly assetLoader: ExhibitionAssetLoader;
   private readonly pipeline: PostProcessingPipeline;
   private readonly raycaster = new THREE.Raycaster();
   private readonly pointer = new THREE.Vector2();
@@ -189,7 +193,13 @@ export class ExhibitionRenderer {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.options.host.appendChild(this.renderer.domElement);
 
+    const hallAssets = EXHIBITION_ASSETS.filter((asset) =>
+      ['hall-hdri', 'stone-pbr', 'walnut-pbr'].includes(asset.id)
+    );
+    this.assetLoader = new ExhibitionAssetLoader(this.renderer, hallAssets);
+
     this.setupHall();
+    void this.loadHallEnvironment();
     this.pipeline = new PostProcessingPipeline({
       renderer: this.renderer,
       scene: this.scene,
@@ -253,6 +263,7 @@ export class ExhibitionRenderer {
     this.renderer.domElement.removeEventListener('click', this.handleClick);
     // 同时释放几何体、材质、WebGL 上下文和画布，防止重复进出页面耗尽显存。
     disposeObject3D(this.scene);
+    this.assetLoader.dispose();
     this.pipeline.dispose();
     this.renderer.dispose();
     this.renderer.forceContextLoss();
@@ -279,6 +290,14 @@ export class ExhibitionRenderer {
     this.scene.add(this.createLighting());
     this.scene.add(this.createExhibits());
     this.scene.add(this.createGreenery());
+  }
+
+  private async loadHallEnvironment() {
+    const loaded = await this.assetLoader.load(() => undefined);
+    if (this.disposed) return;
+    if (loaded.environment) this.scene.environment = loaded.environment;
+    const anisotropy = this.renderer.capabilities?.getMaxAnisotropy?.() ?? 1;
+    applyHallPbrTextures(this.materials, loaded.textures, anisotropy);
   }
 
   private createLighting() {

@@ -13,7 +13,9 @@ const state = vi.hoisted(() => ({
   }>,
   resizeObservers: [] as MockResizeObserver[],
   animationFrames: new Map<number, FrameRequestCallback>(),
-  nextFrameId: 1
+  nextFrameId: 1,
+  assetLoad: vi.fn(),
+  assetDispose: vi.fn()
 }));
 
 class MockResizeObserver {
@@ -44,6 +46,19 @@ vi.mock('../src/exhibition/scene/createJiangnanHall', async () => {
     }
   };
 });
+
+vi.mock('../src/exhibition/assets/ExhibitionAssetLoader', () => ({
+  ExhibitionAssetLoader: class {
+    load = state.assetLoad.mockResolvedValue({
+      models: new Map(),
+      textures: new Map(),
+      environment: null,
+      audio: new Map(),
+      failures: new Map()
+    });
+    dispose = state.assetDispose;
+  }
+}));
 
 vi.mock('three', () => {
   class MockNode {
@@ -271,6 +286,7 @@ describe('ExhibitionRenderer', () => {
     expect(host.querySelector('canvas')).not.toBeNull();
     expect(state.resizeObservers).toHaveLength(1);
     expect(state.resizeObservers[0]?.observe).toHaveBeenCalledWith(host);
+    expect(state.assetLoad).toHaveBeenCalledTimes(1);
     expect(state.sceneChildren.map((child) => child.name)).toEqual(
       expect.arrayContaining(['jiangnan-museum-hall', 'hall-lighting', 'exhibits', 'greenery'])
     );
@@ -413,6 +429,7 @@ describe('ExhibitionRenderer', () => {
     expect(state.textureDispose).toHaveBeenCalled();
     expect(state.rendererDispose).toHaveBeenCalledTimes(1);
     expect(state.forceContextLoss).toHaveBeenCalledTimes(1);
+    expect(state.assetDispose).toHaveBeenCalledTimes(1);
     expect(host.querySelector('canvas')).toBeNull();
   });
 });
