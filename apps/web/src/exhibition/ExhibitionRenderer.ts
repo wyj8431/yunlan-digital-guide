@@ -8,6 +8,12 @@ import {
   type Collider,
   type Point2
 } from './collision';
+import { EXHIBITION_LAYOUT, HALL_DIMENSIONS, findExhibitLayout } from './exhibitionLayout';
+import {
+  EXHIBITION_COLORS as COLORS,
+  createHallMaterials,
+  type HallMaterials
+} from './exhibitionMaterials';
 
 export type ExhibitionRendererOptions = {
   host: HTMLElement;
@@ -25,32 +31,18 @@ const MOVE_SPEED = 3.2;
 const LOOK_SENSITIVITY = 0.0022;
 const MAX_PITCH = Math.PI * 0.45;
 
-const COLORS = {
-  wall: '#edf0e8',
-  ceiling: '#f8f5ec',
-  floor: '#70877b',
-  darkGreen: '#173f35',
-  mint: '#a9d8b8',
-  gold: '#c5a35a',
-  lake: '#73aeb2',
-  ink: '#253632',
-  white: '#f8faf5'
-};
-
-function boxCollider(x: number, z: number, width: number, depth: number): Collider {
-  return {
-    minX: x - width / 2,
-    maxX: x + width / 2,
-    minZ: z - depth / 2,
-    maxZ: z + depth / 2
-  };
-}
-
-function createBox(width: number, height: number, depth: number, color: string, roughness = 0.72) {
-  const mesh = new THREE.Mesh(
-    new THREE.BoxGeometry(width, height, depth),
-    new THREE.MeshStandardMaterial({ color, roughness, metalness: 0.08 })
-  );
+function createBox(
+  width: number,
+  height: number,
+  depth: number,
+  materialOrColor: THREE.Material | string,
+  roughness = 0.72
+) {
+  const material =
+    typeof materialOrColor === 'string'
+      ? new THREE.MeshStandardMaterial({ color: materialOrColor, roughness, metalness: 0.08 })
+      : materialOrColor;
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   return mesh;
@@ -71,8 +63,11 @@ export class ExhibitionRenderer {
   private readonly pointer = new THREE.Vector2();
   private readonly clock = new THREE.Clock();
   private readonly pressedKeys = new Set<string>();
-  private readonly colliders: Collider[] = [];
+  private readonly colliders: Collider[] = EXHIBITION_LAYOUT.flatMap((item) =>
+    item.blocksMovement && item.collider ? [item.collider] : []
+  );
   private readonly exhibitRoots: THREE.Object3D[] = [];
+  private readonly materials: HallMaterials = createHallMaterials();
   private readonly resizeObserver: ResizeObserver;
   private frameId = 0;
   private disposed = false;
@@ -102,6 +97,7 @@ export class ExhibitionRenderer {
   private readonly handlePointerMove = (event: PointerEvent) => {
     if (!this.looking && document.pointerLockElement !== this.renderer.domElement) return;
 
+    // 指针锁定后使用相对位移观察展馆，并限制俯仰角避免镜头翻转。
     this.yaw -= event.movementX * LOOK_SENSITIVITY;
     this.pitch = THREE.MathUtils.clamp(
       this.pitch - event.movementY * LOOK_SENSITIVITY,
@@ -122,6 +118,7 @@ export class ExhibitionRenderer {
     this.raycaster.setFromCamera(this.pointer, this.camera);
     const intersections = this.raycaster.intersectObjects(this.exhibitRoots, true);
 
+    // 命中的通常是展品子网格，向父级查找统一标记的展品 ID。
     for (const intersection of intersections) {
       let object: THREE.Object3D | null = intersection.object;
       while (object) {
@@ -191,6 +188,7 @@ export class ExhibitionRenderer {
     window.removeEventListener('pointerup', this.handlePointerUp);
     this.renderer.domElement.removeEventListener('pointerdown', this.handlePointerDown);
     this.renderer.domElement.removeEventListener('click', this.handleClick);
+    // 同时释放几何体、材质、WebGL 上下文和画布，防止重复进出页面耗尽显存。
     disposeObject3D(this.scene);
     this.renderer.dispose();
     this.renderer.forceContextLoss();
@@ -220,26 +218,51 @@ export class ExhibitionRenderer {
     const shell = new THREE.Group();
     shell.name = 'hall-shell';
 
-    const floor = createBox(16, 0.18, 20, COLORS.floor, 0.88);
+    const floor = createBox(
+      HALL_DIMENSIONS.width,
+      0.18,
+      HALL_DIMENSIONS.depth,
+      this.materials.floor
+    );
     floor.position.set(0, -0.09, 0);
     floor.receiveShadow = true;
     shell.add(floor);
 
-    const ceiling = createBox(16, 0.16, 20, COLORS.ceiling, 0.95);
-    ceiling.position.set(0, 4.72, 0);
+    const ceiling = createBox(
+      HALL_DIMENSIONS.width,
+      0.16,
+      HALL_DIMENSIONS.depth,
+      this.materials.ceiling
+    );
+    ceiling.position.set(0, HALL_DIMENSIONS.height - 0.08, 0);
     shell.add(ceiling);
 
-    const backWall = createBox(16, 4.8, 0.18, COLORS.wall);
-    backWall.position.set(0, 2.4, -10);
-    const leftWall = createBox(0.18, 4.8, 20, COLORS.wall);
-    leftWall.position.set(-8, 2.4, 0);
-    const rightWall = createBox(0.18, 4.8, 20, COLORS.wall);
-    rightWall.position.set(8, 2.4, 0);
-    const entryHeader = createBox(16, 0.65, 0.18, COLORS.darkGreen);
+    const backWall = createBox(
+      HALL_DIMENSIONS.width,
+      HALL_DIMENSIONS.height,
+      0.18,
+      this.materials.wall
+    );
+    backWall.position.set(0, HALL_DIMENSIONS.height / 2, -HALL_DIMENSIONS.depth / 2);
+    const leftWall = createBox(
+      0.18,
+      HALL_DIMENSIONS.height,
+      HALL_DIMENSIONS.depth,
+      this.materials.wall
+    );
+    leftWall.position.set(-HALL_DIMENSIONS.width / 2, HALL_DIMENSIONS.height / 2, 0);
+    const rightWall = createBox(
+      0.18,
+      HALL_DIMENSIONS.height,
+      HALL_DIMENSIONS.depth,
+      this.materials.wall
+    );
+    rightWall.position.set(HALL_DIMENSIONS.width / 2, HALL_DIMENSIONS.height / 2, 0);
+    const entryHeader = createBox(HALL_DIMENSIONS.width, 0.65, 0.18, this.materials.metal);
     entryHeader.position.set(0, 4.35, 10);
     shell.add(backWall, leftWall, rightWall, entryHeader);
 
-    const lakeRibbon = createBox(11, 0.035, 1.4, COLORS.lake, 0.25);
+    const lakeRibbon = createBox(11, 0.035, 1.4, this.materials.water);
     lakeRibbon.position.set(0, 0.02, -7.7);
     shell.add(lakeRibbon);
     return shell;
@@ -274,8 +297,22 @@ export class ExhibitionRenderer {
     const exhibits = new THREE.Group();
     exhibits.name = 'exhibits';
 
-    const mapTable = this.createDisplayTable('west-lake-map', -3.8, -1.2, 2.8, 1.7);
-    const craftTable = this.createDisplayTable('silk-and-tea', 3.8, -1.2, 2.5, 1.5);
+    const mapLayout = findExhibitLayout('west-lake-map');
+    const craftLayout = findExhibitLayout('silk-and-tea');
+    const mapTable = this.createDisplayTable(
+      mapLayout.id,
+      mapLayout.position.x,
+      mapLayout.position.z,
+      mapLayout.size.width,
+      mapLayout.size.depth
+    );
+    const craftTable = this.createDisplayTable(
+      craftLayout.id,
+      craftLayout.position.x,
+      craftLayout.position.z,
+      craftLayout.size.width,
+      craftLayout.size.depth
+    );
     const bicycle = this.createBicycle();
     const car = this.createCar();
     const wallArt = this.createWallArt();
@@ -308,13 +345,13 @@ export class ExhibitionRenderer {
     table.add(base, glass);
     markExhibit(table, exhibitId);
     this.exhibitRoots.push(table);
-    this.colliders.push(boxCollider(x, z, width, depth));
     return table;
   }
 
   private createWallArt() {
     const art = new THREE.Group();
-    art.position.set(0, 2.45, -9.82);
+    const layout = findExhibitLayout('west-lake-wall-art');
+    art.position.set(layout.position.x, layout.position.y, layout.position.z);
     const frame = createBox(6.6, 2.5, 0.12, COLORS.gold, 0.4);
     const canvas = createBox(6.22, 2.12, 0.08, COLORS.white, 0.92);
     canvas.position.z = 0.09;
@@ -330,7 +367,8 @@ export class ExhibitionRenderer {
 
   private createBicycle() {
     const bicycle = new THREE.Group();
-    bicycle.position.set(-4.3, 0.72, -5.6);
+    const layout = findExhibitLayout('west-lake-bicycle');
+    bicycle.position.set(layout.position.x, layout.position.y, layout.position.z);
     const metal = new THREE.MeshStandardMaterial({
       color: COLORS.gold,
       metalness: 0.78,
@@ -352,14 +390,14 @@ export class ExhibitionRenderer {
     bicycle.add(frameBar, seat, handle);
     markExhibit(bicycle, 'west-lake-bicycle');
     this.exhibitRoots.push(bicycle);
-    this.colliders.push(boxCollider(-4.3, -5.6, 2.5, 1.2));
     return bicycle;
   }
 
   private createCar() {
     const car = new THREE.Group();
-    car.position.set(3.6, 0, -5.6);
-    const body = createBox(3.3, 0.68, 1.45, '#497c68', 0.28);
+    const layout = findExhibitLayout('green-mobility-car');
+    car.position.set(layout.position.x, layout.position.y, layout.position.z);
+    const body = createBox(3.3, 0.68, 1.45, COLORS.car, 0.28);
     body.position.y = 0.72;
     const cabin = createBox(1.65, 0.62, 1.18, COLORS.mint, 0.18);
     cabin.position.set(-0.15, 1.28, 0);
@@ -377,31 +415,25 @@ export class ExhibitionRenderer {
     }
     markExhibit(car, 'green-mobility-car');
     this.exhibitRoots.push(car);
-    this.colliders.push(boxCollider(3.6, -5.6, 3.7, 1.9));
     return car;
   }
 
   private createGreenery() {
     const greenery = new THREE.Group();
     greenery.name = 'greenery';
-    for (const [x, z] of [
-      [-6.7, -8.4],
-      [6.7, -8.4],
-      [-6.7, 7.8],
-      [6.7, 7.8]
-    ] as Array<[number, number]>) {
+    for (const item of EXHIBITION_LAYOUT.filter((candidate) => candidate.kind === 'plant')) {
+      const { x, z } = item.position;
       const planter = createBox(0.9, 0.58, 0.9, COLORS.gold, 0.8);
       planter.position.set(x, 0.29, z);
       const stem = createBox(0.12, 1.15, 0.12, COLORS.darkGreen);
       stem.position.set(x, 1.1, z);
       const crown = new THREE.Mesh(
         new THREE.SphereGeometry(0.72, 12, 8),
-        new THREE.MeshStandardMaterial({ color: '#5e9870', roughness: 0.9 })
+        new THREE.MeshStandardMaterial({ color: COLORS.foliage, roughness: 0.9 })
       );
       crown.position.set(x, 1.75, z);
       crown.castShadow = true;
       greenery.add(planter, stem, crown);
-      this.colliders.push(boxCollider(x, z, 1.05, 1.05));
     }
     return greenery;
   }
@@ -439,6 +471,7 @@ export class ExhibitionRenderer {
     };
     const current: Point2 = { x: this.camera.position.x, z: this.camera.position.z };
 
+    // X、Z 轴分别判定碰撞，使玩家撞到展台后仍可沿其边缘滑动。
     if (canMoveTo(current, { x: delta.x, z: 0 }, this.colliders, PLAYER_RADIUS)) {
       const next = clampToRoom(
         { x: current.x + delta.x, z: current.z },
