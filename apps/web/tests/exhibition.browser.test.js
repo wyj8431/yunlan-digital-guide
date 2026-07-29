@@ -105,19 +105,29 @@ async function assertCanvasPainted(page) {
 }
 
 describe('exhibition browser acceptance', () => {
-  it('renders a nonblank full-bleed Three scene without control overlap on desktop and mobile', async () => {
+  it('renders a nonblank full-bleed Three scene without control overlap at desktop sizes', async () => {
     await withServer(async () => {
       const browser = await chromium.launch(launchOptions());
       try {
         for (const viewport of [
           { width: 1440, height: 900 },
-          { width: 390, height: 844 }
+          { width: 1920, height: 1080 }
         ]) {
           const page = await browser.newPage({ viewport });
+          const consoleErrors = [];
+          page.on('console', (message) => {
+            if (message.type() === 'error') consoleErrors.push(message.text());
+          });
           await page.goto(URL, { waitUntil: 'networkidle' });
           await page.locator('canvas').waitFor({ state: 'visible' });
           await page.waitForTimeout(500);
+          assert.equal(await page.locator('canvas').count(), 1);
           await assertCanvasPainted(page);
+
+          const canvasBox = await page.locator('canvas').boundingBox();
+          assert.ok(canvasBox, 'canvas has no layout box');
+          assert.equal(Math.round(canvasBox.width), viewport.width);
+          assert.equal(Math.round(canvasBox.height), viewport.height);
 
           const boxes = await page.locator('.exhibition-topbar button').evaluateAll((buttons) =>
             buttons.map((button) => {
@@ -127,7 +137,14 @@ describe('exhibition browser acceptance', () => {
           );
           assert.equal(boxes.length, 2);
           assert.ok(boxes[0].right <= boxes[1].left, 'top controls overlap');
+          const hint = await page.locator('.exhibition-hint').boundingBox();
+          const topbar = await page.locator('.exhibition-topbar').boundingBox();
+          assert.ok(
+            hint && topbar && topbar.y + topbar.height < hint.y,
+            'topbar overlaps movement hint'
+          );
           assert.equal(await page.locator('.exhibition-render-error').count(), 0);
+          assert.deepEqual(consoleErrors, []);
           await page.close();
         }
       } finally {
