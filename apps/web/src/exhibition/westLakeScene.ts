@@ -8,6 +8,7 @@ import {
   type Collider,
   type Point2
 } from './collision';
+import { PostProcessingPipeline } from './quality/PostProcessingPipeline';
 
 type WestLakeSceneOptions = { host: HTMLElement };
 
@@ -131,6 +132,7 @@ export class WestLakeScene {
   private readonly scene = new THREE.Scene();
   private readonly camera = new THREE.PerspectiveCamera(68, 1, 0.08, 100);
   private readonly renderer: THREE.WebGLRenderer;
+  private readonly pipeline: PostProcessingPipeline;
   private readonly observer: ResizeObserver;
   private readonly clock = new THREE.Clock();
   private readonly pressedKeys = new Set<string>();
@@ -187,6 +189,12 @@ export class WestLakeScene {
     sun.position.set(4, 8, 5);
     sun.castShadow = true;
     this.scene.add(sun, createWestLakeModel());
+    this.pipeline = new PostProcessingPipeline({
+      renderer: this.renderer,
+      scene: this.scene,
+      camera: this.camera,
+      reducedMotion: this.reducedMotion
+    });
     this.attachListeners();
     this.observer = new ResizeObserver(() => this.resize());
     this.observer.observe(options.host);
@@ -214,6 +222,7 @@ export class WestLakeScene {
     this.renderer.domElement.removeEventListener('pointerdown', this.handlePointerDown);
     this.motionQuery.removeEventListener('change', this.handleMotionChange);
     disposeObject3D(this.scene);
+    this.pipeline.dispose();
     this.renderer.dispose();
     this.renderer.forceContextLoss();
     this.renderer.domElement.remove();
@@ -235,6 +244,7 @@ export class WestLakeScene {
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height, false);
+    this.pipeline.resize(width, height, window.devicePixelRatio || 1);
   }
 
   private updateMovement(deltaSeconds: number) {
@@ -259,12 +269,13 @@ export class WestLakeScene {
 
   private render = () => {
     if (this.disposed) return;
-    this.updateMovement(clampFrameDelta(this.clock.getDelta()));
+    const deltaSeconds = clampFrameDelta(this.clock.getDelta());
+    this.updateMovement(deltaSeconds);
     if (!this.reducedMotion) {
       const water = this.scene.getObjectByName('lake-water');
       if (water) water.position.y = Math.sin(performance.now() * 0.0008) * 0.015;
     }
-    this.renderer.render(this.scene, this.camera);
+    this.pipeline.render(deltaSeconds);
     this.frameId = requestAnimationFrame(this.render);
   };
 }

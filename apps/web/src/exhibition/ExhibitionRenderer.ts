@@ -14,6 +14,7 @@ import {
   createHallMaterials,
   type HallMaterials
 } from './exhibitionMaterials';
+import { PostProcessingPipeline } from './quality/PostProcessingPipeline';
 
 export type ExhibitionRendererOptions = {
   host: HTMLElement;
@@ -59,6 +60,7 @@ export class ExhibitionRenderer {
   private readonly scene = new THREE.Scene();
   private readonly camera = new THREE.PerspectiveCamera(68, 1, 0.08, 80);
   private readonly renderer: THREE.WebGLRenderer;
+  private readonly pipeline: PostProcessingPipeline;
   private readonly raycaster = new THREE.Raycaster();
   private readonly pointer = new THREE.Vector2();
   private readonly clock = new THREE.Clock();
@@ -177,6 +179,14 @@ export class ExhibitionRenderer {
     this.options.host.appendChild(this.renderer.domElement);
 
     this.setupHall();
+    this.pipeline = new PostProcessingPipeline({
+      renderer: this.renderer,
+      scene: this.scene,
+      camera: this.camera,
+      reducedMotion:
+        typeof window.matchMedia === 'function' &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    });
     this.attachListeners();
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(this.options.host);
@@ -191,6 +201,7 @@ export class ExhibitionRenderer {
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height, false);
+    this.pipeline.resize(width, height, window.devicePixelRatio || 1);
   }
 
   getCameraPose(): ExhibitionCameraPose {
@@ -231,6 +242,7 @@ export class ExhibitionRenderer {
     this.renderer.domElement.removeEventListener('click', this.handleClick);
     // 同时释放几何体、材质、WebGL 上下文和画布，防止重复进出页面耗尽显存。
     disposeObject3D(this.scene);
+    this.pipeline.dispose();
     this.renderer.dispose();
     this.renderer.forceContextLoss();
 
@@ -493,8 +505,9 @@ export class ExhibitionRenderer {
 
   private renderFrame() {
     if (this.disposed) return;
-    this.updateMovement(clampFrameDelta(this.clock.getDelta()));
-    this.renderer.render(this.scene, this.camera);
+    const deltaSeconds = clampFrameDelta(this.clock.getDelta());
+    this.updateMovement(deltaSeconds);
+    this.pipeline.render(deltaSeconds);
     this.scheduleFrame();
   }
 

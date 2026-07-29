@@ -25,6 +25,14 @@ class MockResizeObserver {
   }
 }
 
+vi.mock('../src/exhibition/quality/PostProcessingPipeline', () => ({
+  PostProcessingPipeline: class {
+    render = state.render;
+    resize = vi.fn();
+    dispose = vi.fn();
+  }
+}));
+
 vi.mock('three', () => {
   class MockNode {
     name = '';
