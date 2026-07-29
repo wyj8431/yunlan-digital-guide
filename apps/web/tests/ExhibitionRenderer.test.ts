@@ -323,6 +323,56 @@ describe('ExhibitionRenderer', () => {
     renderer.dispose();
   });
 
+  it('stops movement while interaction is disabled and clears input on blur', () => {
+    const renderer = new ExhibitionRenderer({ host, onExhibitSelect: vi.fn() });
+    const runFrame = () => {
+      const entry = state.animationFrames.entries().next().value as
+        [number, FrameRequestCallback] | undefined;
+      expect(entry).toBeDefined();
+      if (!entry) return;
+      state.animationFrames.delete(entry[0]);
+      entry[1](100);
+    };
+
+    const before = renderer.getCameraPose();
+    renderer.setInteractionEnabled(false);
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' }));
+    runFrame();
+    expect(renderer.getCameraPose()).toEqual(before);
+
+    renderer.setInteractionEnabled(true);
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' }));
+    window.dispatchEvent(new Event('blur'));
+    runFrame();
+    expect(renderer.getCameraPose()).toEqual(before);
+
+    renderer.dispose();
+  });
+
+  it('shows a pointer cursor while hovering the nearest interactive exhibit', () => {
+    const renderer = new ExhibitionRenderer({ host, onExhibitSelect: vi.fn() });
+    const canvas = host.querySelector('canvas') as HTMLCanvasElement;
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 0,
+      left: 0,
+      top: 0,
+      right: 960,
+      bottom: 540,
+      width: 960,
+      height: 540,
+      toJSON: () => ({})
+    });
+    state.raycastIntersections.push({
+      object: { userData: { exhibitId: 'west-lake-bicycle' }, parent: null }
+    });
+
+    canvas.dispatchEvent(new MouseEvent('pointermove', { clientX: 200, clientY: 120 }));
+
+    expect(canvas.style.cursor).toBe('pointer');
+    renderer.dispose();
+  });
+
   it('disconnects observers and releases all renderer resources exactly once', () => {
     const keydownSpy = vi.spyOn(window, 'removeEventListener');
     const canvasRemoveSpy = vi.spyOn(HTMLCanvasElement.prototype, 'removeEventListener');

@@ -3,10 +3,10 @@ import { disposeObject3D } from '../lib/three/disposeObject3D';
 import {
   PLAYER_RADIUS,
   ROOM_BOUNDS,
-  canMoveTo,
-  clampToRoom,
-  type Collider,
-  type Point2
+  clampFrameDelta,
+  normalizeMovement,
+  resolveMovement,
+  type Collider
 } from './collision';
 import { EXHIBITION_LAYOUT, HALL_DIMENSIONS, findExhibitLayout } from './exhibitionLayout';
 import {
@@ -72,10 +72,12 @@ export class ExhibitionRenderer {
   private frameId = 0;
   private disposed = false;
   private looking = false;
+  private interactionEnabled = true;
   private yaw = 0;
   private pitch = 0;
 
   private readonly handleKeyDown = (event: KeyboardEvent) => {
+    if (!this.interactionEnabled) return;
     if (event.code.startsWith('Key') || event.code.startsWith('Arrow')) {
       this.pressedKeys.add(event.code);
     }
@@ -86,6 +88,7 @@ export class ExhibitionRenderer {
   };
 
   private readonly handlePointerDown = () => {
+    if (!this.interactionEnabled) return;
     this.looking = true;
     this.renderer.domElement.requestPointerLock?.();
   };
@@ -95,6 +98,7 @@ export class ExhibitionRenderer {
   };
 
   private readonly handlePointerMove = (event: PointerEvent) => {
+    if (!this.interactionEnabled) return;
     if (!this.looking && document.pointerLockElement !== this.renderer.domElement) return;
 
     // 指针锁定后使用相对位移观察展馆，并限制俯仰角避免镜头翻转。
@@ -107,13 +111,38 @@ export class ExhibitionRenderer {
     this.applyCameraRotation();
   };
 
+  private readonly handleBlur = () => {
+    this.pressedKeys.clear();
+    this.looking = false;
+  };
+
+  private readonly handlePointerLockChange = () => {
+    this.looking = document.pointerLockElement === this.renderer.domElement;
+  };
+
+  private readonly handlePointerHover = (event: PointerEvent) => {
+    if (!this.interactionEnabled || document.pointerLockElement === this.renderer.domElement) {
+      this.renderer.domElement.style.cursor = '';
+      return;
+    }
+    this.renderer.domElement.style.cursor = this.findExhibitId(event.clientX, event.clientY)
+      ? 'pointer'
+      : '';
+  };
+
   private readonly handleClick = (event: MouseEvent) => {
+    if (!this.interactionEnabled) return;
+    const exhibitId = this.findExhibitId(event.clientX, event.clientY);
+    if (exhibitId) this.options.onExhibitSelect(exhibitId);
+  };
+
+  private findExhibitId(clientX: number, clientY: number): string | null {
     const bounds = this.renderer.domElement.getBoundingClientRect();
-    if (bounds.width <= 0 || bounds.height <= 0) return;
+    if (bounds.width <= 0 || bounds.height <= 0) return null;
 
     this.pointer.set(
-      ((event.clientX - bounds.left) / bounds.width) * 2 - 1,
-      -((event.clientY - bounds.top) / bounds.height) * 2 + 1
+      ((clientX - bounds.left) / bounds.width) * 2 - 1,
+      -((clientY - bounds.top) / bounds.height) * 2 + 1
     );
     this.raycaster.setFromCamera(this.pointer, this.camera);
     const intersections = this.raycaster.intersectObjects(this.exhibitRoots, true);
@@ -124,13 +153,13 @@ export class ExhibitionRenderer {
       while (object) {
         const exhibitId = object.userData.exhibitId;
         if (typeof exhibitId === 'string') {
-          this.options.onExhibitSelect(exhibitId);
-          return;
+          return exhibitId;
         }
         object = object.parent;
       }
     }
-  };
+    return null;
+  }
 
   constructor(private readonly options: ExhibitionRendererOptions) {
     this.scene.background = new THREE.Color('#dfe6df');
@@ -176,6 +205,15 @@ export class ExhibitionRenderer {
     };
   }
 
+  setInteractionEnabled(enabled: boolean) {
+    this.interactionEnabled = enabled;
+    if (!enabled) {
+      this.handleBlur();
+      this.renderer.domElement.style.cursor = '';
+      document.exitPointerLock?.();
+    }
+  }
+
   dispose() {
     if (this.disposed) return;
     this.disposed = true;
@@ -186,7 +224,10 @@ export class ExhibitionRenderer {
     window.removeEventListener('keyup', this.handleKeyUp);
     window.removeEventListener('pointermove', this.handlePointerMove);
     window.removeEventListener('pointerup', this.handlePointerUp);
+    window.removeEventListener('blur', this.handleBlur);
+    document.removeEventListener('pointerlockchange', this.handlePointerLockChange);
     this.renderer.domElement.removeEventListener('pointerdown', this.handlePointerDown);
+    this.renderer.domElement.removeEventListener('pointermove', this.handlePointerHover);
     this.renderer.domElement.removeEventListener('click', this.handleClick);
     // 同时释放几何体、材质、WebGL 上下文和画布，防止重复进出页面耗尽显存。
     disposeObject3D(this.scene);
@@ -203,7 +244,10 @@ export class ExhibitionRenderer {
     window.addEventListener('keyup', this.handleKeyUp);
     window.addEventListener('pointermove', this.handlePointerMove);
     window.addEventListener('pointerup', this.handlePointerUp);
+    window.addEventListener('blur', this.handleBlur);
+    document.addEventListener('pointerlockchange', this.handlePointerLockChange);
     this.renderer.domElement.addEventListener('pointerdown', this.handlePointerDown);
+    this.renderer.domElement.addEventListener('pointermove', this.handlePointerHover);
     this.renderer.domElement.addEventListener('click', this.handleClick);
   }
 
@@ -449,7 +493,7 @@ export class ExhibitionRenderer {
 
   private renderFrame() {
     if (this.disposed) return;
-    this.updateMovement(Math.min(this.clock.getDelta(), 0.05));
+    this.updateMovement(clampFrameDelta(this.clock.getDelta()));
     this.renderer.render(this.scene, this.camera);
     this.scheduleFrame();
   }
@@ -463,31 +507,20 @@ export class ExhibitionRenderer {
       Number(this.pressedKeys.has('KeyA') || this.pressedKeys.has('ArrowLeft'));
     if (forwardInput === 0 && strafeInput === 0) return;
 
-    const magnitude = Math.hypot(forwardInput, strafeInput) || 1;
-    const distance = (MOVE_SPEED * deltaSeconds) / magnitude;
+    const input = normalizeMovement({ x: strafeInput, z: forwardInput });
+    const distance = MOVE_SPEED * deltaSeconds;
     const delta = {
-      x: (-Math.sin(this.yaw) * forwardInput + Math.cos(this.yaw) * strafeInput) * distance,
-      z: (-Math.cos(this.yaw) * forwardInput - Math.sin(this.yaw) * strafeInput) * distance
+      x: (-Math.sin(this.yaw) * input.z + Math.cos(this.yaw) * input.x) * distance,
+      z: (-Math.cos(this.yaw) * input.z - Math.sin(this.yaw) * input.x) * distance
     };
-    const current: Point2 = { x: this.camera.position.x, z: this.camera.position.z };
-
-    // X、Z 轴分别判定碰撞，使玩家撞到展台后仍可沿其边缘滑动。
-    if (canMoveTo(current, { x: delta.x, z: 0 }, this.colliders, PLAYER_RADIUS)) {
-      const next = clampToRoom(
-        { x: current.x + delta.x, z: current.z },
-        ROOM_BOUNDS,
-        PLAYER_RADIUS
-      );
-      this.camera.position.x = next.x;
-      current.x = next.x;
-    }
-    if (canMoveTo(current, { x: 0, z: delta.z }, this.colliders, PLAYER_RADIUS)) {
-      const next = clampToRoom(
-        { x: current.x, z: current.z + delta.z },
-        ROOM_BOUNDS,
-        PLAYER_RADIUS
-      );
-      this.camera.position.z = next.z;
-    }
+    const next = resolveMovement(
+      { x: this.camera.position.x, z: this.camera.position.z },
+      delta,
+      this.colliders,
+      ROOM_BOUNDS,
+      PLAYER_RADIUS
+    );
+    this.camera.position.x = next.x;
+    this.camera.position.z = next.z;
   }
 }
