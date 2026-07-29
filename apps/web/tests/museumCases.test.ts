@@ -45,4 +45,58 @@ describe('museum display cases', () => {
       )
     ).toBe(true);
   });
+
+  it('creates IES track spots and contact shadow receivers without shadowing glass or labels', () => {
+    const result = createMuseumCases(
+      EXHIBITION_LAYOUT,
+      createHallMaterials(),
+      QUALITY_PROFILES.high
+    );
+    const iesTexture = { isTexture: true } as never;
+
+    result.setIesTexture(iesTexture);
+
+    expect(result.iesLights).toHaveLength(4);
+    expect(result.iesLights.every((light) => light.iesMap === iesTexture)).toBe(true);
+    expect(result.contactShadows).toHaveLength(4);
+    expect(result.contactShadows.every((shadow) => shadow.receiveShadow)).toBe(true);
+    expect(result.glassMeshes.every((glass) => glass.castShadow === false)).toBe(true);
+    expect(result.labels.every((label) => label.castShadow === false)).toBe(true);
+  });
+
+  it('eases proximity lighting without replacing materials or lights', () => {
+    const result = createMuseumCases(
+      EXHIBITION_LAYOUT,
+      createHallMaterials(),
+      QUALITY_PROFILES.high
+    );
+    const exhibitId = 'west-lake-bicycle';
+    const label = result.labels.find((candidate) => candidate.userData.exhibitId === exhibitId)!;
+    const material = label.material;
+    const light = result.focusLights.get(exhibitId)![0];
+
+    result.setProximity(exhibitId, 1);
+    result.update(0.16);
+
+    expect(label.material).toBe(material);
+    expect(result.focusLights.get(exhibitId)![0]).toBe(light);
+    expect(light.intensity).toBeGreaterThan(2.6);
+    expect(light.intensity).toBeLessThan(5);
+
+    result.update(0.16);
+    expect(light.intensity).toBeCloseTo(5, 5);
+  });
+
+  it('keeps every display system outside the 2.4 metre central aisle', () => {
+    const result = createMuseumCases(
+      EXHIBITION_LAYOUT,
+      createHallMaterials(),
+      QUALITY_PROFILES.high
+    );
+    const cases = result.root.children.filter(
+      (child) => child.name.endsWith('plinth') || child.name.endsWith('case')
+    );
+
+    expect(cases.every((display) => Math.abs(display.position.x) - 1.4 >= 1.2)).toBe(true);
+  });
 });

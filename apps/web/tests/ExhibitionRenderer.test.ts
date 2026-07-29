@@ -15,7 +15,10 @@ const state = vi.hoisted(() => ({
   animationFrames: new Map<number, FrameRequestCallback>(),
   nextFrameId: 1,
   assetLoad: vi.fn(),
-  assetDispose: vi.fn()
+  assetDispose: vi.fn(),
+  assetIds: [] as string[],
+  museumUpdate: vi.fn(),
+  museumSetIesTexture: vi.fn()
 }));
 
 class MockResizeObserver {
@@ -48,11 +51,37 @@ vi.mock('../src/exhibition/scene/createJiangnanHall', async () => {
   };
 });
 
+vi.mock('../src/exhibition/scene/createMuseumCases', async () => {
+  const THREE = await import('three');
+  return {
+    createMuseumCases: () => {
+      const root = new THREE.Group();
+      root.name = 'museum-cases';
+      return {
+        root,
+        areaLights: [],
+        labels: [],
+        focusLights: new Map(),
+        glassMaterials: [],
+        glassMeshes: [],
+        iesLights: [],
+        contactShadows: [],
+        setIesTexture: state.museumSetIesTexture,
+        setProximity: vi.fn(),
+        update: state.museumUpdate
+      };
+    }
+  };
+});
+
 vi.mock('../src/exhibition/assets/ExhibitionAssetLoader', () => ({
   ExhibitionAssetLoader: class {
+    constructor(_renderer: unknown, assets: Array<{ id: string }>) {
+      state.assetIds = assets.map((asset) => asset.id);
+    }
     load = state.assetLoad.mockResolvedValue({
       models: new Map(),
-      textures: new Map(),
+      textures: new Map([['display-ies', { isTexture: true }]]),
       environment: null,
       audio: new Map(),
       failures: new Map()
@@ -211,12 +240,19 @@ vi.mock('three', () => {
     AmbientLight: class extends MockNode {},
     DirectionalLight: class extends MockNode {
       castShadow = false;
-      shadow = { mapSize: { set: vi.fn() } };
+      shadow = {
+        mapSize: { set: vi.fn() },
+        camera: { left: 0, right: 0, top: 0, bottom: 0, near: 0, far: 0 }
+      };
     },
     PointLight: class extends MockNode {},
     CatmullRomCurve3: class {},
     MathUtils: {
-      clamp: (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
+      clamp: (value: number, min: number, max: number) => Math.min(max, Math.max(min, value)),
+      smoothstep: (value: number, min: number, max: number) => {
+        const x = Math.min(1, Math.max(0, (value - min) / (max - min)));
+        return x * x * (3 - 2 * x);
+      }
     },
     PCFSoftShadowMap: 1,
     DoubleSide: 2,
@@ -256,6 +292,7 @@ describe('ExhibitionRenderer', () => {
     state.resizeObservers.length = 0;
     state.animationFrames.clear();
     state.nextFrameId = 1;
+    state.assetIds = [];
     vi.clearAllMocks();
 
     host = document.createElement('div');
@@ -282,16 +319,21 @@ describe('ExhibitionRenderer', () => {
     vi.unstubAllGlobals();
   });
 
-  it('creates a named contemporary West Lake hall and observes its host size', () => {
+  it('creates the Jiangnan hall with museum cases and loads its IES profile', async () => {
     const renderer = new ExhibitionRenderer({ host, onExhibitSelect: vi.fn() });
+
+    await Promise.resolve();
+    await Promise.resolve();
 
     expect(host.querySelector('canvas')).not.toBeNull();
     expect(state.resizeObservers).toHaveLength(1);
     expect(state.resizeObservers[0]?.observe).toHaveBeenCalledWith(host);
     expect(state.assetLoad).toHaveBeenCalledTimes(1);
     expect(state.sceneChildren.map((child) => child.name)).toEqual(
-      expect.arrayContaining(['jiangnan-museum-hall', 'hall-lighting', 'exhibits'])
+      expect.arrayContaining(['jiangnan-museum-hall', 'museum-cases', 'hall-lighting', 'exhibits'])
     );
+    expect(state.assetIds).toContain('display-ies');
+    expect(state.museumSetIesTexture).toHaveBeenCalledWith({ isTexture: true });
     expect(state.sceneChildren.map((child) => child.name)).not.toContain('greenery');
 
     renderer.dispose();
@@ -332,6 +374,7 @@ describe('ExhibitionRenderer', () => {
     window.dispatchEvent(lookEvent);
 
     expect(state.render).toHaveBeenCalled();
+    expect(state.museumUpdate).toHaveBeenCalledWith(0.1);
     expect(renderer.getCameraPose().yaw).not.toBe(0);
     expect(renderer.getCameraPose().pitch).not.toBe(0);
 

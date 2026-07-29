@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
 import { disposeObject3D } from '../lib/three/disposeObject3D';
 import {
   PLAYER_RADIUS,
@@ -18,8 +19,9 @@ import {
 import { ExhibitionAssetLoader } from './assets/ExhibitionAssetLoader';
 import { EXHIBITION_ASSETS } from './assets/exhibitionAssets';
 import { PostProcessingPipeline } from './quality/PostProcessingPipeline';
-import { QualityDowngradeController } from './quality/qualityProfile';
+import { QUALITY_PROFILES, QualityDowngradeController } from './quality/qualityProfile';
 import { JIANGNAN_HALL_COLLIDERS, createJiangnanHall } from './scene/createJiangnanHall';
+import { createMuseumCases } from './scene/createMuseumCases';
 
 export type ExhibitionRendererOptions = {
   host: HTMLElement;
@@ -79,6 +81,7 @@ export class ExhibitionRenderer {
   ];
   private readonly exhibitRoots: THREE.Object3D[] = [];
   private readonly materials: HallMaterials = createHallMaterials();
+  private readonly museumCases: ReturnType<typeof createMuseumCases>;
   private readonly resizeObserver: ResizeObserver;
   private frameId = 0;
   private disposed = false;
@@ -195,11 +198,17 @@ export class ExhibitionRenderer {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.options.host.appendChild(this.renderer.domElement);
+    RectAreaLightUniformsLib.init();
 
     const hallAssets = EXHIBITION_ASSETS.filter((asset) =>
-      ['hall-hdri', 'stone-pbr', 'walnut-pbr'].includes(asset.id)
+      ['hall-hdri', 'stone-pbr', 'walnut-pbr', 'display-ies'].includes(asset.id)
     );
     this.assetLoader = new ExhibitionAssetLoader(this.renderer, hallAssets);
+    this.museumCases = createMuseumCases(
+      EXHIBITION_LAYOUT,
+      this.materials,
+      QUALITY_PROFILES[this.qualityController.getLevel()]
+    );
 
     this.setupHall();
     void this.loadHallEnvironment();
@@ -290,6 +299,7 @@ export class ExhibitionRenderer {
 
   private setupHall() {
     this.scene.add(createJiangnanHall(this.materials));
+    this.scene.add(this.museumCases.root);
     this.scene.add(this.createLighting());
     this.scene.add(this.createExhibits());
   }
@@ -300,6 +310,8 @@ export class ExhibitionRenderer {
     if (loaded.environment) this.scene.environment = loaded.environment;
     const anisotropy = this.renderer.capabilities?.getMaxAnisotropy?.() ?? 1;
     applyHallPbrTextures(this.materials, loaded.textures, anisotropy);
+    const iesTexture = loaded.textures.get('display-ies');
+    if (iesTexture) this.museumCases.setIesTexture(iesTexture);
   }
 
   private createLighting() {
@@ -311,7 +323,16 @@ export class ExhibitionRenderer {
     const sun = new THREE.DirectionalLight('#fff4d6', 2.4);
     sun.position.set(4, 7, 5);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(1024, 1024);
+    sun.shadow.mapSize.set(
+      QUALITY_PROFILES[this.qualityController.getLevel()].shadowMapSize,
+      QUALITY_PROFILES[this.qualityController.getLevel()].shadowMapSize
+    );
+    sun.shadow.camera.left = -8;
+    sun.shadow.camera.right = 8;
+    sun.shadow.camera.top = 10;
+    sun.shadow.camera.bottom = -10;
+    sun.shadow.camera.near = 0.5;
+    sun.shadow.camera.far = 24;
     lighting.add(sun);
 
     return lighting;
@@ -321,54 +342,10 @@ export class ExhibitionRenderer {
     const exhibits = new THREE.Group();
     exhibits.name = 'exhibits';
 
-    const mapLayout = findExhibitLayout('west-lake-map');
-    const craftLayout = findExhibitLayout('silk-and-tea');
-    const mapTable = this.createDisplayTable(
-      mapLayout.id,
-      mapLayout.position.x,
-      mapLayout.position.z,
-      mapLayout.size.width,
-      mapLayout.size.depth
-    );
-    const craftTable = this.createDisplayTable(
-      craftLayout.id,
-      craftLayout.position.x,
-      craftLayout.position.z,
-      craftLayout.size.width,
-      craftLayout.size.depth
-    );
     const bicycle = this.createBicycle();
     const car = this.createCar();
-    exhibits.add(mapTable, craftTable, bicycle, car);
+    exhibits.add(bicycle, car);
     return exhibits;
-  }
-
-  private createDisplayTable(
-    exhibitId: string,
-    x: number,
-    z: number,
-    width: number,
-    depth: number
-  ) {
-    const table = new THREE.Group();
-    table.position.set(x, 0, z);
-    const base = createBox(width, 0.72, depth, COLORS.darkGreen);
-    base.position.y = 0.36;
-    const glass = new THREE.Mesh(
-      new THREE.BoxGeometry(width * 0.88, 0.14, depth * 0.84),
-      new THREE.MeshPhysicalMaterial({
-        color: COLORS.mint,
-        transparent: true,
-        opacity: 0.62,
-        roughness: 0.15,
-        transmission: 0.2
-      })
-    );
-    glass.position.y = 0.82;
-    table.add(base, glass);
-    markExhibit(table, exhibitId);
-    this.exhibitRoots.push(table);
-    return table;
   }
 
   private createBicycle() {
@@ -437,9 +414,24 @@ export class ExhibitionRenderer {
     if (this.disposed) return;
     const deltaSeconds = clampFrameDelta(this.clock.getDelta());
     this.updateMovement(deltaSeconds);
+    this.updateMuseumCases(deltaSeconds);
     this.sampleQuality();
     this.pipeline.render(deltaSeconds);
     this.scheduleFrame();
+  }
+
+  private updateMuseumCases(deltaSeconds: number) {
+    for (const label of this.museumCases.labels) {
+      const parent = label.parent;
+      const exhibitId = label.userData.exhibitId;
+      if (!parent || typeof exhibitId !== 'string') continue;
+      const dx = this.camera.position.x - parent.position.x;
+      const dz = this.camera.position.z - parent.position.z;
+      const distance = Math.sqrt(dx * dx + dz * dz);
+      const amount = THREE.MathUtils.smoothstep(3 - distance, 0, 0.6);
+      this.museumCases.setProximity(exhibitId, amount);
+    }
+    this.museumCases.update(deltaSeconds);
   }
 
   private sampleQuality() {
