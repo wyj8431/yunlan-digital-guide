@@ -36,18 +36,27 @@ export class ExhibitionAssetLoader {
   private readonly pmremTargets: THREE.WebGLRenderTarget[] = [];
   private environment: THREE.Texture | null = null;
   private disposed = false;
+  private loadPromise: Promise<LoadedExhibitionAssets> | null = null;
 
   constructor(
     renderer: THREE.WebGLRenderer,
     private readonly assets: ExhibitionAsset[]
   ) {
-    this.ktx2 = new KTX2Loader().detectSupport(renderer);
+    this.ktx2 = new KTX2Loader().setTranscoderPath('/basis/').detectSupport(renderer);
     this.gltf = new GLTFLoader().setDRACOLoader(this.draco).setKTX2Loader(this.ktx2);
     this.pmrem = new THREE.PMREMGenerator(renderer);
     this.pmrem.compileEquirectangularShader();
   }
 
   async load(onProgress: (progress: AssetProgress) => void): Promise<LoadedExhibitionAssets> {
+    if (this.loadPromise) return this.loadPromise;
+    this.loadPromise = this.loadAll(onProgress);
+    return this.loadPromise;
+  }
+
+  private async loadAll(
+    onProgress: (progress: AssetProgress) => void
+  ): Promise<LoadedExhibitionAssets> {
     const loadedByAsset = new Map<string, number>();
     const totalByAsset = new Map<string, number>();
     let completed = 0;
@@ -65,9 +74,9 @@ export class ExhibitionAssetLoader {
     await Promise.all(
       this.assets.map(async (asset) => {
         try {
-          await this.loadOne(asset, (loaded, total) => {
-            loadedByAsset.set(asset.id, Math.max(loadedByAsset.get(asset.id) ?? 0, loaded));
-            if (total > 0) totalByAsset.set(asset.id, total);
+          await this.loadOne(asset, (key, loaded, total) => {
+            loadedByAsset.set(key, Math.max(loadedByAsset.get(key) ?? 0, loaded));
+            if (total > 0) totalByAsset.set(key, total);
             report();
           });
         } catch (error) {
@@ -123,11 +132,13 @@ export class ExhibitionAssetLoader {
     this.models.clear();
     this.textures.clear();
     this.audio.clear();
+    this.failures.clear();
+    this.loadPromise = null;
   }
 
   private loadOne(
     asset: ExhibitionAsset,
-    progress: (loaded: number, total: number) => void
+    progress: (key: string, loaded: number, total: number) => void
   ): Promise<void> {
     const url = asset.localPath;
     if (asset.kind === 'glb')
@@ -138,7 +149,7 @@ export class ExhibitionAssetLoader {
             this.models.set(asset.id, result.scene);
             resolve();
           },
-          (event) => progress(event.loaded, event.total),
+          (event) => progress(url, event.loaded, event.total),
           reject
         )
       );
@@ -153,22 +164,29 @@ export class ExhibitionAssetLoader {
             this.environment = target.texture;
             resolve();
           },
-          undefined,
+          (event) => progress(url, event.loaded, event.total),
           reject
         )
       );
     if (asset.kind === 'ktx2')
-      return new Promise((resolve, reject) =>
-        this.ktx2.load(
-          url,
-          (texture) => {
-            this.textures.set(asset.id, texture);
-            resolve();
-          },
-          undefined,
-          reject
+      return Promise.all(
+        asset.files.map(
+          (file) =>
+            new Promise<void>((resolve, reject) =>
+              this.ktx2.load(
+                file.localPath,
+                (texture) => {
+                  const slot = file.materialSlot;
+                  this.textures.set(slot ? `${asset.id}:${slot}` : asset.id, texture);
+                  if (slot === 'baseColor') this.textures.set(asset.id, texture);
+                  resolve();
+                },
+                (event) => progress(file.localPath, event.loaded, event.total),
+                reject
+              )
+            )
         )
-      );
+      ).then(() => undefined);
     if (asset.kind === 'ies')
       return new Promise((resolve, reject) =>
         this.ies.load(
@@ -177,18 +195,26 @@ export class ExhibitionAssetLoader {
             this.textures.set(asset.id, texture);
             resolve();
           },
-          undefined,
+          (event) => progress(url, event.loaded, event.total),
           reject
         )
       );
-    if (asset.kind === 'audio')
+    if (asset.kind === 'audio') {
+      const context = new AudioContext();
       return fetch(url)
-        .then((response) => response.arrayBuffer())
+        .then((response) => {
+          if (!response.ok) throw new Error(`Audio request failed with HTTP ${response.status}`);
+          const total = Number(response.headers.get('content-length')) || 0;
+          return response.arrayBuffer().then((buffer) => {
+            progress(url, buffer.byteLength, total || buffer.byteLength);
+            return buffer;
+          });
+        })
         .then(async (buffer) => {
-          const context = new AudioContext();
           this.audio.set(asset.id, await context.decodeAudioData(buffer));
-          await context.close();
-        });
+        })
+        .finally(() => context.close());
+    }
     return Promise.resolve();
   }
 }

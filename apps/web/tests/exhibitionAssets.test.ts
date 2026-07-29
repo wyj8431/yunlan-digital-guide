@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { createHash } from 'node:crypto';
+import { readFileSync, statSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
   EXHIBITION_ASSETS,
   type ExhibitionAsset,
@@ -36,7 +39,7 @@ describe('exhibition asset registry', () => {
     );
     expect(
       EXHIBITION_ASSETS.every((asset) =>
-        ['CC0-1.0', 'CC-BY-4.0', 'project-owned'].includes(asset.license)
+        ['CC0-1.0', 'CC-BY-4.0', 'MIT', 'project-owned'].includes(asset.license)
       )
     ).toBe(true);
     expect(validateAssetRegistry(EXHIBITION_ASSETS)).toEqual([]);
@@ -56,5 +59,48 @@ describe('exhibition asset registry', () => {
     } as unknown as ExhibitionAsset;
 
     expect(validateAssetRegistry([invalid])).toEqual(['source:invalid', 'path:invalid']);
+  });
+
+  it('reports a primary path that is absent from the physical files', () => {
+    const invalid = {
+      ...EXHIBITION_ASSETS[0],
+      id: 'mismatch',
+      localPath: '/exhibition/models/mismatch.glb'
+    } as ExhibitionAsset;
+    expect(validateAssetRegistry([invalid])).toContain('primary:mismatch');
+  });
+
+  it('reports incomplete PBR material slots', () => {
+    const stone = EXHIBITION_ASSETS.find((asset) => asset.id === 'stone-pbr')!;
+    expect(validateAssetRegistry([{ ...stone, files: stone.files.slice(0, 3) }])).toContain(
+      'material:stone-pbr'
+    );
+  });
+
+  it('declares complete PBR map bundles for stone and walnut', () => {
+    for (const id of ['stone-pbr', 'walnut-pbr']) {
+      const entry = EXHIBITION_ASSETS.find((asset) => asset.id === id);
+      expect(entry?.files.map((file) => file.materialSlot)).toEqual([
+        'baseColor',
+        'normal',
+        'roughness',
+        'ao'
+      ]);
+    }
+  });
+
+  it('matches every registered local file size and SHA-256', () => {
+    for (const entry of EXHIBITION_ASSETS) {
+      for (const file of entry.files) {
+        const diskPath = resolve(process.cwd(), 'public', file.localPath.slice(1));
+        const bytes = readFileSync(diskPath);
+        expect(statSync(diskPath).size, file.localPath).toBe(file.byteSize);
+        expect(createHash('sha256').update(bytes).digest('hex'), file.localPath).toBe(file.sha256);
+        expect(
+          file.directUrl?.startsWith('https://') ?? entry.license === 'project-owned',
+          file.localPath
+        ).toBe(true);
+      }
+    }
   });
 });
