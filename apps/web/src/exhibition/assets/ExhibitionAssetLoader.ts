@@ -32,11 +32,13 @@ export class ExhibitionAssetLoader {
   private readonly models = new Map<string, THREE.Group>();
   private readonly textures = new Map<string, THREE.Texture>();
   private readonly audio = new Map<string, AudioBuffer>();
+  private readonly pendingAudio = new Map<string, Promise<void>>();
   private readonly failures = new Map<string, Error>();
   private readonly pmremTargets: THREE.WebGLRenderTarget[] = [];
   private environment: THREE.Texture | null = null;
   private disposed = false;
   private loadPromise: Promise<LoadedExhibitionAssets> | null = null;
+  private audioLoadPromise: Promise<Map<string, AudioBuffer>> | null = null;
 
   constructor(
     renderer: THREE.WebGLRenderer,
@@ -53,6 +55,31 @@ export class ExhibitionAssetLoader {
     if (this.loadPromise) return this.loadPromise;
     this.loadPromise = this.loadAll(onProgress);
     return this.loadPromise;
+  }
+
+  async loadAudio(
+    onProgress: (progress: AssetProgress) => void
+  ): Promise<Map<string, AudioBuffer>> {
+    if (this.disposed) throw new Error('ExhibitionAssetLoader has been disposed');
+    if (this.audioLoadPromise) return this.audioLoadPromise;
+    const audioAssets = this.assets.filter((asset) => asset.kind === 'audio');
+    this.audioLoadPromise = Promise.all(
+      audioAssets.map(async (asset) => {
+        try {
+          await this.loadOne(asset, (_key, loaded, total) =>
+            onProgress({
+              loadedBytes: loaded,
+              totalBytes: total || loaded,
+              completed: 0,
+              total: audioAssets.length
+            })
+          );
+        } catch (error) {
+          this.failures.set(asset.id, error instanceof Error ? error : new Error(String(error)));
+        }
+      })
+    ).then(() => this.audio);
+    return this.audioLoadPromise;
   }
 
   private async loadAll(
@@ -133,8 +160,10 @@ export class ExhibitionAssetLoader {
     this.models.clear();
     this.textures.clear();
     this.audio.clear();
+    this.pendingAudio.clear();
     this.failures.clear();
     this.loadPromise = null;
+    this.audioLoadPromise = null;
   }
 
   private loadOne(
@@ -201,8 +230,11 @@ export class ExhibitionAssetLoader {
         )
       );
     if (asset.kind === 'audio') {
+      if (this.audio.has(asset.id)) return Promise.resolve();
+      const pending = this.pendingAudio.get(asset.id);
+      if (pending) return pending;
       const context = new AudioContext();
-      return fetch(url)
+      const load = fetch(url)
         .then((response) => {
           if (!response.ok) throw new Error(`Audio request failed with HTTP ${response.status}`);
           const total = Number(response.headers.get('content-length')) || 0;
@@ -214,7 +246,12 @@ export class ExhibitionAssetLoader {
         .then(async (buffer) => {
           this.audio.set(asset.id, await context.decodeAudioData(buffer));
         })
-        .finally(() => context.close());
+        .finally(async () => {
+          this.pendingAudio.delete(asset.id);
+          await context.close();
+        });
+      this.pendingAudio.set(asset.id, load);
+      return load;
     }
     return Promise.resolve();
   }

@@ -16,11 +16,20 @@ import {
   createHallMaterials,
   type HallMaterials
 } from './exhibitionMaterials';
-import { ExhibitionAssetLoader } from './assets/ExhibitionAssetLoader';
+import { ExhibitionAssetLoader, type AssetProgress } from './assets/ExhibitionAssetLoader';
 import { EXHIBITION_ASSETS } from './assets/exhibitionAssets';
-import { ExhibitionAudio } from './audio/ExhibitionAudio';
+import { ExhibitionAudio, createExhibitionAudio } from './audio/ExhibitionAudio';
+import {
+  FALLBACK_ASSET_SOURCES,
+  publishExhibitionTelemetry,
+  type ExhibitionAssetSources
+} from './exhibitionTelemetry';
 import { PostProcessingPipeline } from './quality/PostProcessingPipeline';
-import { QUALITY_PROFILES, QualityDowngradeController } from './quality/qualityProfile';
+import {
+  QUALITY_PROFILES,
+  QualityDowngradeController,
+  type QualityLevel
+} from './quality/qualityProfile';
 import { JIANGNAN_HALL_COLLIDERS, createJiangnanHall } from './scene/createJiangnanHall';
 import { createMuseumCases } from './scene/createMuseumCases';
 import { createRealisticExhibits } from './scene/createRealisticExhibits';
@@ -28,6 +37,12 @@ import { createRealisticExhibits } from './scene/createRealisticExhibits';
 export type ExhibitionRendererOptions = {
   host: HTMLElement;
   onExhibitSelect: (exhibitId: string) => void;
+  onProgress?: (progress: AssetProgress) => void;
+  onReady?: () => void;
+  onQualityChange?: (quality: QualityLevel) => void;
+  onRecoverableFailure?: (assetId: string) => void;
+  onFatalError?: (error: Error) => void;
+  audio?: ExhibitionAudio;
 };
 
 export type ExhibitionCameraPose = {
@@ -70,8 +85,8 @@ export class ExhibitionRenderer {
   private readonly camera = new THREE.PerspectiveCamera(68, 1, 0.08, 80);
   private readonly renderer: THREE.WebGLRenderer;
   private readonly assetLoader: ExhibitionAssetLoader;
-  private readonly audioListener: THREE.AudioListener;
   private readonly audio: ExhibitionAudio;
+  private readonly ownsAudio: boolean;
   private readonly pipeline: PostProcessingPipeline;
   private readonly raycaster = new THREE.Raycaster();
   private readonly pointer = new THREE.Vector2();
@@ -103,6 +118,10 @@ export class ExhibitionRenderer {
   );
   private qualitySampleStartedAt = performance.now();
   private qualitySampleFrames = 0;
+  private quality: QualityLevel = 'high';
+  private manualQuality: QualityLevel | null = null;
+  private fatalErrorReported = false;
+  private assetSources: ExhibitionAssetSources = { ...FALLBACK_ASSET_SOURCES };
 
   private readonly handleKeyDown = (event: KeyboardEvent) => {
     if (!this.interactionEnabled) return;
@@ -208,8 +227,8 @@ export class ExhibitionRenderer {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.options.host.appendChild(this.renderer.domElement);
     RectAreaLightUniformsLib.init();
-    this.audioListener = new THREE.AudioListener();
-    this.audio = new ExhibitionAudio(this.audioListener, new Map());
+    this.audio = this.options.audio ?? createExhibitionAudio();
+    this.ownsAudio = !this.options.audio;
     this.audio.setScene('hall');
 
     const hallAssets = EXHIBITION_ASSETS.filter((asset) =>
@@ -253,6 +272,7 @@ export class ExhibitionRenderer {
     this.resizeObserver.observe(this.options.host);
     this.resize();
     this.scheduleFrame();
+    this.options.onQualityChange?.(this.quality);
   }
 
   resize() {
@@ -293,9 +313,28 @@ export class ExhibitionRenderer {
 
   async unlockAudio() {
     await this.audio.unlock();
-    if (!this.disposed && this.audio.isUnlocked() && this.audioListener.parent !== this.camera) {
-      this.camera.add(this.audioListener);
+    if (!this.disposed) this.audio.attachTo(this.camera);
+    this.publishTelemetry();
+  }
+
+  setQuality(quality: QualityLevel) {
+    this.manualQuality = quality;
+    this.applyQuality(quality);
+  }
+
+  setFocus(exhibitId: string | null) {
+    if (!exhibitId) {
+      this.pipeline.setFocus(null);
+      return;
     }
+    const layout = EXHIBITION_LAYOUT.find((item) => item.id === exhibitId);
+    this.pipeline.setFocus(
+      layout ? new THREE.Vector3(layout.position.x, layout.position.y, layout.position.z) : null
+    );
+  }
+
+  setTransitionProgress(progress: number) {
+    this.pipeline.setTransitionProgress(progress);
   }
 
   playNarration(exhibitId: string) {
@@ -323,7 +362,8 @@ export class ExhibitionRenderer {
     this.renderer.domElement.removeEventListener('click', this.handleClick);
     // 同时释放几何体、材质、WebGL 上下文和画布，防止重复进出页面耗尽显存。
     disposeObject3D(this.scene);
-    this.audio.dispose();
+    this.audio.detachFrom(this.camera);
+    if (this.ownsAudio) this.audio.dispose();
     this.assetLoader.dispose();
     this.pipeline.dispose();
     this.renderer.dispose();
@@ -354,25 +394,39 @@ export class ExhibitionRenderer {
   }
 
   private async loadHallEnvironment() {
-    const loaded = await this.assetLoader.load(() => undefined);
-    if (this.disposed) return;
-    if (loaded.environment) this.scene.environment = loaded.environment;
-    const anisotropy = this.renderer.capabilities?.getMaxAnisotropy?.() ?? 1;
-    applyHallPbrTextures(this.materials, loaded.textures, anisotropy);
-    const iesTexture = loaded.textures.get('display-ies');
-    if (iesTexture) this.museumCases.setIesTexture(iesTexture);
-    const realistic = createRealisticExhibits(loaded, EXHIBITION_LAYOUT);
-    for (const child of [...this.exhibitRoots]) child.visible = false;
-    this.exhibitRoots.length = 0;
-    for (const root of realistic.roots.values()) {
-      this.exhibitGroup.add(root);
-      this.exhibitRoots.push(root);
+    try {
+      const loaded = await this.assetLoader.load(this.options.onProgress ?? (() => undefined));
+      if (this.disposed) return;
+      if (loaded.environment) this.scene.environment = loaded.environment;
+      const anisotropy = this.renderer.capabilities?.getMaxAnisotropy?.() ?? 1;
+      applyHallPbrTextures(this.materials, loaded.textures, anisotropy);
+      const iesTexture = loaded.textures.get('display-ies');
+      if (iesTexture) this.museumCases.setIesTexture(iesTexture);
+      const realistic = createRealisticExhibits(loaded, EXHIBITION_LAYOUT);
+      for (const child of [...this.exhibitRoots]) child.visible = false;
+      this.exhibitRoots.length = 0;
+      for (const root of realistic.roots.values()) {
+        this.exhibitGroup.add(root);
+        this.exhibitRoots.push(root);
+        const source = root.userData.assetSource === 'glb' ? 'glb' : 'fallback';
+        if (root.userData.exhibitId === 'west-lake-bicycle') this.assetSources.bicycle = source;
+        if (root.userData.exhibitId === 'green-mobility-car') this.assetSources.shuttle = source;
+        if (root.userData.exhibitId === 'silk-and-tea') this.assetSources.teaSet = source;
+        if (root.userData.exhibitId === 'silk-garment') this.assetSources.silkGarment = source;
+      }
+      for (const assetId of loaded.failures.keys()) {
+        this.options.onRecoverableFailure?.(assetId);
+      }
+      this.publishTelemetry();
+      this.options.onReady?.();
+    } catch (error) {
+      this.reportFatalError(error);
     }
   }
 
   private async loadHallAudio() {
-    const loaded = await this.assetLoader.load(() => undefined);
-    if (!this.disposed) this.audio.setBuffers(loaded.audio);
+    const audio = await this.assetLoader.loadAudio(() => undefined);
+    if (!this.disposed) this.audio.setBuffers(audio);
   }
 
   private createLighting() {
@@ -477,7 +531,13 @@ export class ExhibitionRenderer {
     this.updateMovement(deltaSeconds);
     this.updateMuseumCases(deltaSeconds);
     this.sampleQuality();
-    this.pipeline.render(deltaSeconds);
+    try {
+      this.pipeline.render(deltaSeconds);
+    } catch (error) {
+      this.reportFatalError(error);
+      return;
+    }
+    this.publishTelemetry();
     this.scheduleFrame();
   }
 
@@ -501,9 +561,11 @@ export class ExhibitionRenderer {
     const elapsed = now - this.qualitySampleStartedAt;
     if (elapsed < 1_000) return;
     const fps = (this.qualitySampleFrames * 1_000) / elapsed;
-    this.pipeline.setQuality(this.qualityController.sample(fps, now));
+    const sampled = this.manualQuality ?? this.qualityController.sample(fps, now);
+    this.applyQuality(sampled);
     this.qualitySampleStartedAt = now;
     this.qualitySampleFrames = 0;
+    this.publishTelemetry(fps);
   }
 
   private updateMovement(deltaSeconds: number) {
@@ -535,5 +597,41 @@ export class ExhibitionRenderer {
     this.camera.position.x = next.x;
     this.camera.position.z = next.z;
     this.audio.updateTravelledDistance(travelled);
+  }
+
+  private applyQuality(quality: QualityLevel) {
+    this.pipeline.setQuality(quality);
+    this.renderer.setPixelRatio(
+      Math.min(window.devicePixelRatio || 1, QUALITY_PROFILES[quality].pixelRatio)
+    );
+    if (quality !== this.quality) {
+      this.quality = quality;
+      this.options.onQualityChange?.(quality);
+    }
+    this.publishTelemetry();
+  }
+
+  private publishTelemetry(rollingFps = 0) {
+    publishExhibitionTelemetry({
+      scene: 'hall',
+      cameraPose: this.getCameraPose(),
+      qualityLevel: this.quality,
+      rollingFps,
+      drawCalls: this.renderer.info?.render?.calls ?? 0,
+      triangles: this.renderer.info?.render?.triangles ?? 0,
+      textures: this.renderer.info?.memory?.textures ?? 0,
+      activePasses: this.pipeline.getActivePassNames?.() ?? [],
+      assetSources: { ...this.assetSources },
+      visibleZones: ['hall'],
+      audioUnlocked: this.audio.isUnlocked(),
+      activeCanvasCount: document.querySelectorAll('.exhibition-canvas-host canvas').length
+    });
+  }
+
+  private reportFatalError(error: unknown) {
+    if (this.fatalErrorReported || this.disposed) return;
+    this.fatalErrorReported = true;
+    this.setInteractionEnabled(false);
+    this.options.onFatalError?.(error instanceof Error ? error : new Error(String(error)));
   }
 }

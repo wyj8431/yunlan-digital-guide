@@ -3,6 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({
   sceneChildren: [] as Array<{ name: string }>,
   render: vi.fn(),
+  pipelineSetQuality: vi.fn(),
+  pipelineSetFocus: vi.fn(),
+  pipelineSetTransitionProgress: vi.fn(),
   rendererDispose: vi.fn(),
   forceContextLoss: vi.fn(),
   geometryDispose: vi.fn(),
@@ -15,10 +18,21 @@ const state = vi.hoisted(() => ({
   animationFrames: new Map<number, FrameRequestCallback>(),
   nextFrameId: 1,
   assetLoad: vi.fn(),
+  assetLoadAudio: vi.fn(),
   assetDispose: vi.fn(),
   assetIds: [] as string[],
   museumUpdate: vi.fn(),
-  museumSetIesTexture: vi.fn()
+  museumSetIesTexture: vi.fn(),
+  audioUnlock: vi.fn().mockResolvedValue(undefined),
+  audioSetScene: vi.fn(),
+  audioSetBuffers: vi.fn(),
+  audioPlayNarration: vi.fn(),
+  audioStopNarration: vi.fn(),
+  audioUpdateTravelledDistance: vi.fn(),
+  audioSetMuted: vi.fn(),
+  audioAttachTo: vi.fn(),
+  audioDetachFrom: vi.fn(),
+  audioDispose: vi.fn()
 }));
 
 class MockResizeObserver {
@@ -34,7 +48,9 @@ vi.mock('../src/exhibition/quality/PostProcessingPipeline', () => ({
   PostProcessingPipeline: class {
     render = state.render;
     resize = vi.fn();
-    setQuality = vi.fn();
+    setQuality = state.pipelineSetQuality;
+    setFocus = state.pipelineSetFocus;
+    setTransitionProgress = state.pipelineSetTransitionProgress;
     dispose = vi.fn();
   }
 }));
@@ -83,12 +99,35 @@ vi.mock('../src/exhibition/assets/ExhibitionAssetLoader', () => ({
       models: new Map(),
       textures: new Map([['display-ies', { isTexture: true }]]),
       environment: null,
-      audio: new Map(),
+      audio: new Map([['hall-ambience', { duration: 10 }]]),
       failures: new Map()
     });
+    loadAudio = state.assetLoadAudio.mockResolvedValue(
+      new Map([['hall-ambience', { duration: 10 }]])
+    );
     dispose = state.assetDispose;
   }
 }));
+
+vi.mock('../src/exhibition/audio/ExhibitionAudio', () => {
+  class MockExhibitionAudio {
+    unlock = state.audioUnlock;
+    setScene = state.audioSetScene;
+    setBuffers = state.audioSetBuffers;
+    playNarration = state.audioPlayNarration;
+    stopNarration = state.audioStopNarration;
+    updateTravelledDistance = state.audioUpdateTravelledDistance;
+    setMuted = state.audioSetMuted;
+    attachTo = state.audioAttachTo;
+    detachFrom = state.audioDetachFrom;
+    dispose = state.audioDispose;
+    isUnlocked = () => true;
+  }
+  return {
+    ExhibitionAudio: MockExhibitionAudio,
+    createExhibitionAudio: () => new MockExhibitionAudio()
+  };
+});
 
 vi.mock('three', () => {
   class MockNode {
@@ -141,6 +180,8 @@ vi.mock('three', () => {
     updateProjectionMatrix = vi.fn();
   }
 
+  class MockAudioListener extends MockNode {}
+
   class MockMesh extends MockNode {
     castShadow = false;
     receiveShadow = false;
@@ -170,6 +211,7 @@ vi.mock('three', () => {
   return {
     Scene: MockScene,
     PerspectiveCamera: MockCamera,
+    AudioListener: MockAudioListener,
     WebGLRenderer: class {
       domElement = document.createElement('canvas');
       shadowMap = { enabled: false, type: 0 };
@@ -333,7 +375,14 @@ describe('ExhibitionRenderer', () => {
       expect.arrayContaining(['jiangnan-museum-hall', 'museum-cases', 'hall-lighting', 'exhibits'])
     );
     expect(state.assetIds).toContain('display-ies');
+    expect(state.assetIds).toEqual(
+      expect.arrayContaining(['hall-ambience', 'footstep-stone', 'narration-bicycle'])
+    );
     expect(state.museumSetIesTexture).toHaveBeenCalledWith({ isTexture: true });
+    expect(state.audioSetScene).toHaveBeenCalledWith('hall');
+    expect(state.audioSetBuffers).toHaveBeenCalledWith(
+      new Map([['hall-ambience', { duration: 10 }]])
+    );
     expect(state.sceneChildren.map((child) => child.name)).not.toContain('greenery');
 
     renderer.dispose();
@@ -377,6 +426,11 @@ describe('ExhibitionRenderer', () => {
     expect(state.museumUpdate).toHaveBeenCalledWith(0.1);
     expect(renderer.getCameraPose().yaw).not.toBe(0);
     expect(renderer.getCameraPose().pitch).not.toBe(0);
+    expect(state.audioUnlock).toHaveBeenCalledTimes(1);
+    expect(state.audioUpdateTravelledDistance).toHaveBeenCalledWith(expect.any(Number));
+    expect(state.audioUpdateTravelledDistance.mock.calls.some(([distance]) => distance > 0)).toBe(
+      true
+    );
 
     renderer.dispose();
   });
@@ -402,6 +456,94 @@ describe('ExhibitionRenderer', () => {
     canvas.dispatchEvent(new MouseEvent('click', { clientX: 200, clientY: 120 }));
 
     expect(onExhibitSelect).toHaveBeenCalledWith('west-lake-bicycle');
+    expect(state.audioPlayNarration).toHaveBeenCalledWith('west-lake-bicycle');
+    renderer.dispose();
+  });
+
+  it('exposes mute and narration cleanup for the page detail lifecycle', () => {
+    const renderer = new ExhibitionRenderer({ host, onExhibitSelect: vi.fn() });
+
+    renderer.setMuted(true);
+    renderer.playNarration('silk-and-tea');
+    renderer.setInteractionEnabled(false);
+    renderer.setInteractionEnabled(true);
+
+    expect(state.audioSetMuted).toHaveBeenCalledWith(true);
+    expect(state.audioPlayNarration).toHaveBeenCalledWith('silk-and-tea');
+    expect(state.audioStopNarration).toHaveBeenCalledTimes(1);
+    renderer.dispose();
+  });
+
+  it('reports real loading state and exposes page orchestration controls', async () => {
+    const onProgress = vi.fn();
+    const onReady = vi.fn();
+    const onQualityChange = vi.fn();
+    const onRecoverableFailure = vi.fn();
+    state.assetLoad.mockImplementationOnce(async (reportProgress: (value: unknown) => void) => {
+      reportProgress({ loadedBytes: 40, totalBytes: 100, completed: 2, total: 5 });
+      return {
+        models: new Map(),
+        textures: new Map(),
+        environment: null,
+        audio: new Map(),
+        failures: new Map([['bicycle', new Error('model unavailable')]])
+      };
+    });
+    const renderer = new ExhibitionRenderer({
+      host,
+      onExhibitSelect: vi.fn(),
+      onProgress,
+      onReady,
+      onQualityChange,
+      onRecoverableFailure
+    });
+
+    await vi.waitFor(() => expect(onReady).toHaveBeenCalledTimes(1));
+    expect(onProgress).toHaveBeenCalledWith({
+      loadedBytes: 40,
+      totalBytes: 100,
+      completed: 2,
+      total: 5
+    });
+    expect(onRecoverableFailure).toHaveBeenCalledWith('bicycle');
+
+    await renderer.unlockAudio();
+    renderer.setQuality('medium');
+    renderer.setFocus('west-lake-bicycle');
+    renderer.setTransitionProgress(0.75);
+
+    expect(state.audioUnlock).toHaveBeenCalled();
+    expect(state.pipelineSetQuality).toHaveBeenCalledWith('medium');
+    expect(state.pipelineSetFocus).toHaveBeenCalledWith(expect.anything());
+    expect(state.pipelineSetTransitionProgress).toHaveBeenCalledWith(0.75);
+    expect(onQualityChange).toHaveBeenCalledWith('medium');
+    renderer.dispose();
+  });
+
+  it('reports the hall ready only after its visual assets finish processing', async () => {
+    let finishLoading: (() => void) | undefined;
+    state.assetLoad.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishLoading = () =>
+            resolve({
+              models: new Map(),
+              textures: new Map(),
+              environment: null,
+              audio: new Map(),
+              failures: new Map()
+            });
+        })
+    );
+    const onReady = vi.fn();
+
+    const renderer = new ExhibitionRenderer({ host, onExhibitSelect: vi.fn(), onReady });
+
+    expect(onReady).not.toHaveBeenCalled();
+    await Promise.resolve();
+    expect(onReady).not.toHaveBeenCalled();
+    finishLoading?.();
+    await vi.waitFor(() => expect(onReady).toHaveBeenCalledTimes(1));
     renderer.dispose();
   });
 
@@ -476,6 +618,8 @@ describe('ExhibitionRenderer', () => {
     expect(state.rendererDispose).toHaveBeenCalledTimes(1);
     expect(state.forceContextLoss).toHaveBeenCalledTimes(1);
     expect(state.assetDispose).toHaveBeenCalledTimes(1);
+    expect(state.audioDispose).toHaveBeenCalledTimes(1);
+    expect(state.audioDetachFrom).toHaveBeenCalledTimes(1);
     expect(host.querySelector('canvas')).toBeNull();
   });
 });

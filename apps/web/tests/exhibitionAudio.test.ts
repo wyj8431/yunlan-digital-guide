@@ -73,6 +73,20 @@ class FakeAudioContext {
   }
 }
 
+class FakeCamera {
+  children: unknown[] = [];
+
+  add(child: { parent?: unknown }) {
+    child.parent = this;
+    this.children.push(child);
+  }
+
+  remove(child: { parent?: unknown }) {
+    child.parent = null;
+    this.children = this.children.filter((candidate) => candidate !== child);
+  }
+}
+
 function buffer(id: string) {
   return { id } as unknown as AudioBuffer;
 }
@@ -81,7 +95,8 @@ function createHarness(missing: string[] = []) {
   const context = new FakeAudioContext();
   const listener = {
     context,
-    gain: new FakeGainNode()
+    gain: new FakeGainNode(),
+    parent: null
   };
   const buffers = new Map<string, AudioBuffer>();
   for (const id of [
@@ -130,6 +145,52 @@ describe('ExhibitionAudio', () => {
     expect(audio.getMix()).toMatchObject({ master: 1, narration: 1, ambience: 0.35 });
     context.sources.at(-1)?.finish();
     expect(audio.getMix().ambience).toBe(1);
+  });
+
+  it('queues the first narration while the user gesture is still resuming audio', async () => {
+    const { audio, context } = createHarness();
+    let finishResume: (() => void) | undefined;
+    context.resume.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishResume = () => {
+            context.state = 'running';
+            resolve();
+          };
+        })
+    );
+    audio.setScene('hall');
+
+    const unlocking = audio.unlock();
+    expect(audio.playNarration('west-lake-bicycle')).toBe(false);
+    finishResume?.();
+    await unlocking;
+
+    expect(context.sources.at(-1)?.buffer).toEqual(buffer('narration-bicycle'));
+    expect(audio.getMix().ambience).toBe(0.35);
+  });
+
+  it('keeps one unlocked muted runtime while moving between scene cameras', async () => {
+    const { audio, context, listener } = createHarness();
+    const hallCamera = new FakeCamera();
+    const lakeCamera = new FakeCamera();
+    audio.setScene('hall');
+    await audio.unlock();
+    audio.setMuted(true);
+
+    audio.attachTo(hallCamera as never);
+    audio.detachFrom(hallCamera as never);
+    audio.setScene('lake');
+    audio.attachTo(lakeCamera as never);
+    await audio.unlock();
+
+    expect(context.resume).toHaveBeenCalledTimes(1);
+    expect(audio.getMix().master).toBe(0);
+    expect(listener.parent).toBe(lakeCamera);
+    expect(hallCamera.children).not.toContain(listener);
+
+    audio.dispose();
+    expect(listener.parent).toBeNull();
   });
 
   it('switches ambience and places lake water in the positional field', async () => {

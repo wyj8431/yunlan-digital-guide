@@ -1,4 +1,4 @@
-import type * as THREE from 'three';
+import * as THREE from 'three';
 
 export type ExhibitionSceneAudio = 'hall' | 'lake';
 
@@ -31,6 +31,8 @@ export class ExhibitionAudio {
   private ambienceSource: AudioBufferSourceNode | null = null;
   private waterSource: AudioBufferSourceNode | null = null;
   private narrationSource: AudioBufferSourceNode | null = null;
+  private unlockPromise: Promise<void> | null = null;
+  private pendingNarrationId: string | null = null;
   private scene: ExhibitionSceneAudio | null = null;
   private unlocked = false;
   private muted = false;
@@ -76,16 +78,20 @@ export class ExhibitionAudio {
 
   async unlock(): Promise<void> {
     if (this.disposed || this.unlocked) return;
-    if (this.context.state !== 'running') await this.context.resume();
-    if (this.disposed) return;
-    this.unlocked = true;
-    this.startSceneAudio();
+    if (this.unlockPromise) return this.unlockPromise;
+    this.unlockPromise = this.resumeAudio();
+    try {
+      await this.unlockPromise;
+    } finally {
+      this.unlockPromise = null;
+    }
   }
 
   setBuffers(buffers: Map<string, AudioBuffer>): void {
     if (this.disposed) return;
-    this.buffers = buffers;
+    for (const [assetId, buffer] of buffers) this.buffers.set(assetId, buffer);
     if (this.unlocked && this.scene && !this.ambienceSource) this.startSceneAudio();
+    if (this.unlocked && this.pendingNarrationId) this.playNarration(this.pendingNarrationId);
   }
 
   setScene(scene: ExhibitionSceneAudio): void {
@@ -113,13 +119,31 @@ export class ExhibitionAudio {
     this.setParam(this.waterPanner.positionZ, z);
   }
 
+  attachTo(camera: THREE.Object3D): void {
+    if (this.disposed || !this.unlocked || this.listener.parent === camera) return;
+    this.listener.parent?.remove(this.listener);
+    camera.add(this.listener);
+  }
+
+  detachFrom(camera: THREE.Object3D): void {
+    if (this.listener.parent === camera) camera.remove(this.listener);
+  }
+
   playNarration(exhibitId: string): boolean {
-    if (!this.unlocked || this.disposed) return false;
     const assetId = NARRATION_ASSETS[exhibitId];
+    if (!assetId || this.disposed) return false;
+    if (!this.unlocked) {
+      this.pendingNarrationId = exhibitId;
+      return false;
+    }
     const buffer = assetId ? this.buffers.get(assetId) : undefined;
-    if (!buffer) return false;
+    if (!buffer) {
+      this.pendingNarrationId = exhibitId;
+      return false;
+    }
 
     this.stopNarration();
+    this.pendingNarrationId = null;
     this.mix = { ...this.mix, ambience: 0.35 };
     this.ramp(this.ambienceGain.gain, this.mix.ambience, 0.2);
     const source = this.createSource(buffer, this.narrationGain, false, () => {
@@ -132,6 +156,7 @@ export class ExhibitionAudio {
   }
 
   stopNarration(): void {
+    this.pendingNarrationId = null;
     if (this.narrationSource) {
       this.stopSource(this.narrationSource);
       this.narrationSource = null;
@@ -154,6 +179,8 @@ export class ExhibitionAudio {
     if (this.disposed) return;
     this.disposed = true;
     this.unlocked = false;
+    this.pendingNarrationId = null;
+    this.listener.parent?.remove(this.listener);
     for (const source of [...this.sources]) this.stopSource(source);
     this.ambienceSource = null;
     this.waterSource = null;
@@ -165,6 +192,14 @@ export class ExhibitionAudio {
     this.waterGain.disconnect();
     this.masterGain.disconnect();
     this.listener.gain.disconnect();
+  }
+
+  private async resumeAudio(): Promise<void> {
+    if (this.context.state !== 'running') await this.context.resume();
+    if (this.disposed) return;
+    this.unlocked = true;
+    this.startSceneAudio();
+    if (this.pendingNarrationId) this.playNarration(this.pendingNarrationId);
   }
 
   private startSceneAudio(): void {
@@ -237,4 +272,8 @@ export class ExhibitionAudio {
   private setParam(param: AudioParam, value: number): void {
     param.setValueAtTime(value, this.context.currentTime);
   }
+}
+
+export function createExhibitionAudio(): ExhibitionAudio {
+  return new ExhibitionAudio(new THREE.AudioListener(), new Map());
 }

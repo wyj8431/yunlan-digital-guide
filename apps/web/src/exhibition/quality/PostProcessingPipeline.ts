@@ -202,6 +202,10 @@ export class PostProcessingPipeline {
     this.transitionPass.uniforms.progress.value = THREE.MathUtils.clamp(value, 0, 1);
   }
 
+  getActivePassNames(): string[] {
+    return getPostProcessingPassNames(this.quality, this.options.reducedMotion ?? false);
+  }
+
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;

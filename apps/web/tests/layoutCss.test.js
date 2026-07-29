@@ -3,7 +3,9 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const css = readFileSync(resolve(process.cwd(), 'src/styles.css'), 'utf8');
-const dedicatedTourismCss = css.slice(css.indexOf('/* Dedicated URL pages'));
+const videoCenterStart = css.indexOf('.video-center-page');
+const dedicatedTourismStart = css.indexOf('.tourism-page {', videoCenterStart);
+const dedicatedTourismCss = css.slice(dedicatedTourismStart);
 
 describe('desktop split layout', () => {
   it('keeps the viewport fixed while the guide column scrolls independently', () => {
@@ -25,6 +27,8 @@ describe('desktop split layout', () => {
   });
 
   it('defines responsive full-page tourism routes', () => {
+    expect(videoCenterStart).toBeGreaterThanOrEqual(0);
+    expect(dedicatedTourismStart).toBeGreaterThan(videoCenterStart);
     expect(css).toMatch(/\.tourism-page\s*{/);
     expect(css).toMatch(/\.tourism-page-content\s*{/);
     expect(css).toMatch(/\.tourism-page-back\s*{/);
@@ -62,5 +66,20 @@ describe('desktop split layout', () => {
 
   it('opens the answer export menu above its trigger inside the scrollable chat', () => {
     expect(css).toMatch(/\.message-export-menu\s*{[^}]*top:\s*auto;[^}]*bottom:\s*34px;/s);
+  });
+
+  it('keeps exhibition controls in responsive safe areas during scene transitions', () => {
+    expect(css).toMatch(
+      /\.exhibition-toolbar\s*{[^}]*position:\s*absolute;[^}]*top:\s*76px;[^}]*right:\s*22px;/s
+    );
+    expect(css).toMatch(
+      /\.exhibition-transition\s*{[^}]*position:\s*absolute;[^}]*inset:\s*0;[^}]*pointer-events:\s*none;/s
+    );
+    expect(css).toMatch(
+      /@media \(max-width: 640px\)[\s\S]*?\.exhibition-toolbar\s*{[^}]*top:\s*64px;[^}]*right:\s*12px;/s
+    );
+    expect(css).toMatch(
+      /@media \(max-width: 640px\)[\s\S]*?\.exhibit-dialog\s*{[^}]*max-height:\s*calc\(100dvh - 152px\);[^}]*overflow-y:\s*auto;/s
+    );
   });
 });

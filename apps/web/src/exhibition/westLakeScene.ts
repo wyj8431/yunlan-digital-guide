@@ -1,8 +1,12 @@
 import * as THREE from 'three';
 import { disposeObject3D } from '../lib/three/disposeObject3D';
-import { ExhibitionAssetLoader, type LoadedExhibitionAssets } from './assets/ExhibitionAssetLoader';
+import {
+  ExhibitionAssetLoader,
+  type AssetProgress,
+  type LoadedExhibitionAssets
+} from './assets/ExhibitionAssetLoader';
 import { EXHIBITION_ASSETS } from './assets/exhibitionAssets';
-import { ExhibitionAudio } from './audio/ExhibitionAudio';
+import { ExhibitionAudio, createExhibitionAudio } from './audio/ExhibitionAudio';
 import {
   PLAYER_RADIUS,
   clampFrameDelta,
@@ -12,10 +16,22 @@ import {
   type Point2
 } from './collision';
 import { PostProcessingPipeline } from './quality/PostProcessingPipeline';
-import { QUALITY_PROFILES, QualityDowngradeController } from './quality/qualityProfile';
+import {
+  QUALITY_PROFILES,
+  QualityDowngradeController,
+  type QualityLevel
+} from './quality/qualityProfile';
 import { WEST_LAKE_COLLIDERS, createWestLakeEnvironment } from './scene/createWestLakeEnvironment';
 
-type WestLakeSceneOptions = { host: HTMLElement };
+export type WestLakeSceneOptions = {
+  host: HTMLElement;
+  onProgress?: (progress: AssetProgress) => void;
+  onReady?: () => void;
+  onQualityChange?: (quality: QualityLevel) => void;
+  onRecoverableFailure?: (assetId: string) => void;
+  onFatalError?: (error: Error) => void;
+  audio?: ExhibitionAudio;
+};
 
 const EYE_HEIGHT = 1.65;
 const MOVE_SPEED = 3.2;
@@ -41,8 +57,8 @@ export class WestLakeScene {
   private readonly camera = new THREE.PerspectiveCamera(68, 1, 0.08, 100);
   private readonly renderer: THREE.WebGLRenderer;
   private readonly assetLoader: ExhibitionAssetLoader;
-  private readonly audioListener: THREE.AudioListener;
   private readonly audio: ExhibitionAudio;
+  private readonly ownsAudio: boolean;
   private readonly environment = createWestLakeEnvironment(EMPTY_ASSETS, QUALITY_PROFILES.high);
   private readonly pipeline: PostProcessingPipeline;
   private readonly observer: ResizeObserver;
@@ -55,6 +71,7 @@ export class WestLakeScene {
   private yaw = 0;
   private pitch = 0;
   private reducedMotion = this.motionQuery.matches;
+  private interactionEnabled = true;
   private readonly qualityController = new QualityDowngradeController(
     'high',
     45,
@@ -64,8 +81,12 @@ export class WestLakeScene {
   );
   private qualitySampleStartedAt = performance.now();
   private qualitySampleFrames = 0;
+  private quality: QualityLevel = 'high';
+  private manualQuality: QualityLevel | null = null;
+  private fatalErrorReported = false;
 
   private readonly handleKeyDown = (event: KeyboardEvent) => {
+    if (!this.interactionEnabled) return;
     if (event.code.startsWith('Key') || event.code.startsWith('Arrow'))
       this.pressedKeys.add(event.code);
   };
@@ -75,11 +96,13 @@ export class WestLakeScene {
     this.looking = false;
   };
   private readonly handlePointerDown = () => {
+    if (!this.interactionEnabled) return;
     void this.unlockAudio();
     this.looking = true;
     this.renderer.domElement.requestPointerLock?.();
   };
   private readonly handlePointerMove = (event: PointerEvent) => {
+    if (!this.interactionEnabled) return;
     if (!this.looking && document.pointerLockElement !== this.renderer.domElement) return;
     this.yaw -= event.movementX * LOOK_SENSITIVITY;
     this.pitch = THREE.MathUtils.clamp(
@@ -109,8 +132,8 @@ export class WestLakeScene {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 0.9;
     this.options.host.appendChild(this.renderer.domElement);
-    this.audioListener = new THREE.AudioListener();
-    this.audio = new ExhibitionAudio(this.audioListener, new Map());
+    this.audio = this.options.audio ?? createExhibitionAudio();
+    this.ownsAudio = !this.options.audio;
     this.audio.setScene('lake');
     this.audio.setWaterPosition(0, 0, 0);
     this.assetLoader = new ExhibitionAssetLoader(
@@ -136,6 +159,10 @@ export class WestLakeScene {
     this.observer.observe(options.host);
     this.resize();
     this.render();
+    this.options.onQualityChange?.(this.quality);
+    queueMicrotask(() => {
+      if (!this.disposed) this.options.onReady?.();
+    });
   }
 
   getCameraPose() {
@@ -152,9 +179,24 @@ export class WestLakeScene {
 
   async unlockAudio() {
     await this.audio.unlock();
-    if (!this.disposed && this.audio.isUnlocked() && this.audioListener.parent !== this.camera) {
-      this.camera.add(this.audioListener);
+    if (!this.disposed) this.audio.attachTo(this.camera);
+  }
+
+  setInteractionEnabled(enabled: boolean) {
+    this.interactionEnabled = enabled;
+    if (!enabled) {
+      this.handleBlur();
+      document.exitPointerLock?.();
     }
+  }
+
+  setQuality(quality: QualityLevel) {
+    this.manualQuality = quality;
+    this.applyQuality(quality);
+  }
+
+  setTransitionProgress(progress: number) {
+    this.pipeline.setTransitionProgress(progress);
   }
 
   dispose() {
@@ -171,7 +213,8 @@ export class WestLakeScene {
     this.environment.dispose();
     this.scene.remove(this.environment.root);
     disposeObject3D(this.scene);
-    this.audio.dispose();
+    this.audio.detachFrom(this.camera);
+    if (this.ownsAudio) this.audio.dispose();
     this.assetLoader.dispose();
     this.pipeline.dispose();
     this.renderer.dispose();
@@ -223,11 +266,17 @@ export class WestLakeScene {
   private render = () => {
     if (this.disposed) return;
     const deltaSeconds = clampFrameDelta(this.clock.getDelta());
+    this.audio.setWaterPosition(0, 0, 0);
     this.updateMovement(deltaSeconds);
     this.updateZoneVisibility();
     this.environment.update(deltaSeconds);
     this.sampleQuality();
-    this.pipeline.render(deltaSeconds);
+    try {
+      this.pipeline.render(deltaSeconds);
+    } catch (error) {
+      this.reportFatalError(error);
+      return;
+    }
     this.frameId = requestAnimationFrame(this.render);
   };
 
@@ -237,7 +286,8 @@ export class WestLakeScene {
     const elapsed = now - this.qualitySampleStartedAt;
     if (elapsed < 1_000) return;
     const fps = (this.qualitySampleFrames * 1_000) / elapsed;
-    this.pipeline.setQuality(this.qualityController.sample(fps, now));
+    const sampled = this.manualQuality ?? this.qualityController.sample(fps, now);
+    this.applyQuality(sampled);
     this.qualitySampleStartedAt = now;
     this.qualitySampleFrames = 0;
   }
@@ -252,7 +302,33 @@ export class WestLakeScene {
   }
 
   private async loadAudioBuffers() {
-    const loaded = await this.assetLoader.load(() => undefined);
-    if (!this.disposed) this.audio.setBuffers(loaded.audio);
+    try {
+      const loaded = await this.assetLoader.load(this.options.onProgress ?? (() => undefined));
+      if (this.disposed) return;
+      this.audio.setBuffers(loaded.audio);
+      for (const assetId of loaded.failures.keys()) {
+        this.options.onRecoverableFailure?.(assetId);
+      }
+    } catch (error) {
+      this.reportFatalError(error);
+    }
+  }
+
+  private applyQuality(quality: QualityLevel) {
+    this.pipeline.setQuality(quality);
+    this.renderer.setPixelRatio(
+      Math.min(window.devicePixelRatio || 1, QUALITY_PROFILES[quality].pixelRatio)
+    );
+    if (quality !== this.quality) {
+      this.quality = quality;
+      this.options.onQualityChange?.(quality);
+    }
+  }
+
+  private reportFatalError(error: unknown) {
+    if (this.fatalErrorReported || this.disposed) return;
+    this.fatalErrorReported = true;
+    this.setInteractionEnabled(false);
+    this.options.onFatalError?.(error instanceof Error ? error : new Error(String(error)));
   }
 }
