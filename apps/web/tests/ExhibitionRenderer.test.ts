@@ -29,6 +29,7 @@ vi.mock('../src/exhibition/quality/PostProcessingPipeline', () => ({
   PostProcessingPipeline: class {
     render = state.render;
     resize = vi.fn();
+    setQuality = vi.fn();
     dispose = vi.fn();
   }
 }));

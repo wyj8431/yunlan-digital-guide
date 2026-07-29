@@ -9,6 +9,7 @@ import {
   type Point2
 } from './collision';
 import { PostProcessingPipeline } from './quality/PostProcessingPipeline';
+import { QualityDowngradeController } from './quality/qualityProfile';
 
 type WestLakeSceneOptions = { host: HTMLElement };
 
@@ -143,6 +144,15 @@ export class WestLakeScene {
   private yaw = 0;
   private pitch = 0;
   private reducedMotion = this.motionQuery.matches;
+  private readonly qualityController = new QualityDowngradeController(
+    'high',
+    45,
+    20_000,
+    5_000,
+    performance.now()
+  );
+  private qualitySampleStartedAt = performance.now();
+  private qualitySampleFrames = 0;
 
   private readonly handleKeyDown = (event: KeyboardEvent) => {
     if (event.code.startsWith('Key') || event.code.startsWith('Arrow'))
@@ -271,6 +281,7 @@ export class WestLakeScene {
     if (this.disposed) return;
     const deltaSeconds = clampFrameDelta(this.clock.getDelta());
     this.updateMovement(deltaSeconds);
+    this.sampleQuality();
     if (!this.reducedMotion) {
       const water = this.scene.getObjectByName('lake-water');
       if (water) water.position.y = Math.sin(performance.now() * 0.0008) * 0.015;
@@ -278,4 +289,15 @@ export class WestLakeScene {
     this.pipeline.render(deltaSeconds);
     this.frameId = requestAnimationFrame(this.render);
   };
+
+  private sampleQuality() {
+    this.qualitySampleFrames += 1;
+    const now = performance.now();
+    const elapsed = now - this.qualitySampleStartedAt;
+    if (elapsed < 1_000) return;
+    const fps = (this.qualitySampleFrames * 1_000) / elapsed;
+    this.pipeline.setQuality(this.qualityController.sample(fps, now));
+    this.qualitySampleStartedAt = now;
+    this.qualitySampleFrames = 0;
+  }
 }

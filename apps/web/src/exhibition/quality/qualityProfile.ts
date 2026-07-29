@@ -67,7 +67,6 @@ export function nextLowerQuality(level: QualityLevel): QualityLevel {
 }
 
 export class QualityDowngradeController {
-  private readonly startedAt = 0;
   private slowWindows = 0;
   private lastDowngradeAt = Number.NEGATIVE_INFINITY;
 
@@ -75,7 +74,8 @@ export class QualityDowngradeController {
     private level: QualityLevel,
     private readonly targetFps: number,
     private readonly cooldownMs: number,
-    private readonly warmupMs = 5_000
+    private readonly warmupMs = 5_000,
+    private readonly startedAt = 0
   ) {}
 
   sample(fps: number, nowMs: number): QualityLevel {

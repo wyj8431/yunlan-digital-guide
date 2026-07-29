@@ -15,6 +15,7 @@ import {
   type HallMaterials
 } from './exhibitionMaterials';
 import { PostProcessingPipeline } from './quality/PostProcessingPipeline';
+import { QualityDowngradeController } from './quality/qualityProfile';
 
 export type ExhibitionRendererOptions = {
   host: HTMLElement;
@@ -77,6 +78,15 @@ export class ExhibitionRenderer {
   private interactionEnabled = true;
   private yaw = 0;
   private pitch = 0;
+  private readonly qualityController = new QualityDowngradeController(
+    'high',
+    50,
+    20_000,
+    5_000,
+    performance.now()
+  );
+  private qualitySampleStartedAt = performance.now();
+  private qualitySampleFrames = 0;
 
   private readonly handleKeyDown = (event: KeyboardEvent) => {
     if (!this.interactionEnabled) return;
@@ -507,8 +517,20 @@ export class ExhibitionRenderer {
     if (this.disposed) return;
     const deltaSeconds = clampFrameDelta(this.clock.getDelta());
     this.updateMovement(deltaSeconds);
+    this.sampleQuality();
     this.pipeline.render(deltaSeconds);
     this.scheduleFrame();
+  }
+
+  private sampleQuality() {
+    this.qualitySampleFrames += 1;
+    const now = performance.now();
+    const elapsed = now - this.qualitySampleStartedAt;
+    if (elapsed < 1_000) return;
+    const fps = (this.qualitySampleFrames * 1_000) / elapsed;
+    this.pipeline.setQuality(this.qualityController.sample(fps, now));
+    this.qualitySampleStartedAt = now;
+    this.qualitySampleFrames = 0;
   }
 
   private updateMovement(deltaSeconds: number) {
