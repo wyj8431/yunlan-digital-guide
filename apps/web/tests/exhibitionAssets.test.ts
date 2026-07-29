@@ -112,17 +112,22 @@ describe('exhibition asset registry', () => {
     const exhibitionRoot = resolve(process.cwd(), 'public', 'exhibition');
     const physicalPaths = readdirSync(exhibitionRoot, { recursive: true, withFileTypes: true })
       .filter((entry) => entry.isFile())
-      .map((entry) =>
-        `/exhibition/${resolve(entry.parentPath, entry.name)
-          .slice(exhibitionRoot.length + 1)
-          .replaceAll('\\', '/')}`
+      .map(
+        (entry) =>
+          `/exhibition/${resolve(entry.parentPath, entry.name)
+            .slice(exhibitionRoot.length + 1)
+            .replaceAll('\\', '/')}`
       )
       .sort();
     const registeredPaths = EXHIBITION_ASSETS.flatMap((entry) =>
       entry.files.map((file) => file.localPath)
     ).sort();
     expect(physicalPaths).toEqual(registeredPaths);
-    expect(statSync(resolve(process.cwd(), 'public/basis/basis_transcoder.js')).size).toBeGreaterThan(0);
-    expect(statSync(resolve(process.cwd(), 'public/basis/basis_transcoder.wasm')).size).toBeGreaterThan(0);
+    expect(
+      statSync(resolve(process.cwd(), 'public/basis/basis_transcoder.js')).size
+    ).toBeGreaterThan(0);
+    expect(
+      statSync(resolve(process.cwd(), 'public/basis/basis_transcoder.wasm')).size
+    ).toBeGreaterThan(0);
   });
 });
