@@ -291,4 +291,11 @@ describe('ExhibitionAssetLoader', () => {
     expect(loaderSpies.materialDispose).toHaveBeenCalledTimes(1);
     expect(loaderSpies.textureDispose).toHaveBeenCalledTimes(1);
   });
+
+  it('rejects loading after disposal', async () => {
+    const loader = new ExhibitionAssetLoader({} as THREE.WebGLRenderer, []);
+    loader.dispose();
+
+    await expect(loader.load(() => undefined)).rejects.toThrow('disposed');
+  });
 });

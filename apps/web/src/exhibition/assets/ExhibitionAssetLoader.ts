@@ -49,6 +49,7 @@ export class ExhibitionAssetLoader {
   }
 
   async load(onProgress: (progress: AssetProgress) => void): Promise<LoadedExhibitionAssets> {
+    if (this.disposed) throw new Error('ExhibitionAssetLoader has been disposed');
     if (this.loadPromise) return this.loadPromise;
     this.loadPromise = this.loadAll(onProgress);
     return this.loadPromise;
