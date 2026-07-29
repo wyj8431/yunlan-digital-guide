@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
-import { readFileSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   EXHIBITION_ASSETS,
@@ -58,7 +58,11 @@ describe('exhibition asset registry', () => {
       localPath: '/outside/asset.glb'
     } as unknown as ExhibitionAsset;
 
-    expect(validateAssetRegistry([invalid])).toEqual(['source:invalid', 'path:invalid']);
+    expect(validateAssetRegistry([invalid])).toEqual([
+      'source:invalid',
+      'path:invalid',
+      'primary:invalid'
+    ]);
   });
 
   it('reports a primary path that is absent from the physical files', () => {
@@ -102,5 +106,23 @@ describe('exhibition asset registry', () => {
         ).toBe(true);
       }
     }
+  });
+
+  it('registers every physical exhibition file and ships the Basis transcoder', () => {
+    const exhibitionRoot = resolve(process.cwd(), 'public', 'exhibition');
+    const physicalPaths = readdirSync(exhibitionRoot, { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .map((entry) =>
+        `/exhibition/${resolve(entry.parentPath, entry.name)
+          .slice(exhibitionRoot.length + 1)
+          .replaceAll('\\', '/')}`
+      )
+      .sort();
+    const registeredPaths = EXHIBITION_ASSETS.flatMap((entry) =>
+      entry.files.map((file) => file.localPath)
+    ).sort();
+    expect(physicalPaths).toEqual(registeredPaths);
+    expect(statSync(resolve(process.cwd(), 'public/basis/basis_transcoder.js')).size).toBeGreaterThan(0);
+    expect(statSync(resolve(process.cwd(), 'public/basis/basis_transcoder.wasm')).size).toBeGreaterThan(0);
   });
 });

@@ -328,6 +328,17 @@ export function validateAssetRegistry(assets: ExhibitionAsset[]): string[] {
     ids.add(asset.id);
     if (!asset.sourceUrl.startsWith('https://')) errors.push(`source:${asset.id}`);
     if (!asset.localPath.startsWith('/exhibition/')) errors.push(`path:${asset.id}`);
+    if (!asset.files.some((file) => file.localPath === asset.localPath)) {
+      errors.push(`primary:${asset.id}`);
+    }
+    if (asset.kind === 'ktx2') {
+      const slots = asset.files.map((file) => file.materialSlot);
+      if (
+        !(['baseColor', 'normal', 'roughness', 'ao'] as const).every((slot) => slots.includes(slot))
+      ) {
+        errors.push(`material:${asset.id}`);
+      }
+    }
     for (const file of asset.files) {
       if (paths.has(file.localPath)) errors.push(`duplicate-path:${file.localPath}`);
       paths.add(file.localPath);
