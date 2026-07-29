@@ -134,6 +134,7 @@ vi.mock('three', () => {
   class MockMaterial {
     dispose = state.materialDispose;
     map = { dispose: state.textureDispose };
+    normalScale = { set: vi.fn() };
   }
 
   return {
@@ -288,8 +289,9 @@ describe('ExhibitionRenderer', () => {
     expect(state.resizeObservers[0]?.observe).toHaveBeenCalledWith(host);
     expect(state.assetLoad).toHaveBeenCalledTimes(1);
     expect(state.sceneChildren.map((child) => child.name)).toEqual(
-      expect.arrayContaining(['jiangnan-museum-hall', 'hall-lighting', 'exhibits', 'greenery'])
+      expect.arrayContaining(['jiangnan-museum-hall', 'hall-lighting', 'exhibits'])
     );
+    expect(state.sceneChildren.map((child) => child.name)).not.toContain('greenery');
 
     renderer.dispose();
   });

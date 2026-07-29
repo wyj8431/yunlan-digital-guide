@@ -289,7 +289,6 @@ export class ExhibitionRenderer {
     this.scene.add(createJiangnanHall(this.materials));
     this.scene.add(this.createLighting());
     this.scene.add(this.createExhibits());
-    this.scene.add(this.createGreenery());
   }
 
   private async loadHallEnvironment() {
@@ -312,16 +311,6 @@ export class ExhibitionRenderer {
     sun.shadow.mapSize.set(1024, 1024);
     lighting.add(sun);
 
-    for (const x of [-5, 0, 5]) {
-      const pendant = new THREE.PointLight('#ffe4a3', 15, 8, 2);
-      pendant.position.set(x, 4.15, -1.5);
-      const shade = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.26, 0.48, 0.32, 16, 1, true),
-        new THREE.MeshStandardMaterial({ color: COLORS.gold, roughness: 0.42 })
-      );
-      shade.position.set(x, 4.18, -1.5);
-      lighting.add(pendant, shade);
-    }
     return lighting;
   }
 
@@ -347,8 +336,7 @@ export class ExhibitionRenderer {
     );
     const bicycle = this.createBicycle();
     const car = this.createCar();
-    const wallArt = this.createWallArt();
-    exhibits.add(mapTable, craftTable, bicycle, car, wallArt);
+    exhibits.add(mapTable, craftTable, bicycle, car);
     return exhibits;
   }
 
@@ -378,23 +366,6 @@ export class ExhibitionRenderer {
     markExhibit(table, exhibitId);
     this.exhibitRoots.push(table);
     return table;
-  }
-
-  private createWallArt() {
-    const art = new THREE.Group();
-    const layout = findExhibitLayout('west-lake-wall-art');
-    art.position.set(layout.position.x, layout.position.y, layout.position.z);
-    const frame = createBox(6.6, 2.5, 0.12, COLORS.gold, 0.4);
-    const canvas = createBox(6.22, 2.12, 0.08, COLORS.white, 0.92);
-    canvas.position.z = 0.09;
-    const lake = createBox(4.8, 0.32, 0.05, COLORS.lake, 0.35);
-    lake.position.set(0, -0.25, 0.16);
-    const skyline = createBox(2.7, 0.08, 0.06, COLORS.ink, 0.75);
-    skyline.position.set(-0.6, 0.48, 0.17);
-    art.add(frame, canvas, lake, skyline);
-    markExhibit(art, 'west-lake-wall-art');
-    this.exhibitRoots.push(art);
-    return art;
   }
 
   private createBicycle() {
@@ -448,26 +419,6 @@ export class ExhibitionRenderer {
     markExhibit(car, 'green-mobility-car');
     this.exhibitRoots.push(car);
     return car;
-  }
-
-  private createGreenery() {
-    const greenery = new THREE.Group();
-    greenery.name = 'greenery';
-    for (const item of EXHIBITION_LAYOUT.filter((candidate) => candidate.kind === 'plant')) {
-      const { x, z } = item.position;
-      const planter = createBox(0.9, 0.58, 0.9, COLORS.gold, 0.8);
-      planter.position.set(x, 0.29, z);
-      const stem = createBox(0.12, 1.15, 0.12, COLORS.darkGreen);
-      stem.position.set(x, 1.1, z);
-      const crown = new THREE.Mesh(
-        new THREE.SphereGeometry(0.72, 12, 8),
-        new THREE.MeshStandardMaterial({ color: COLORS.foliage, roughness: 0.9 })
-      );
-      crown.position.set(x, 1.75, z);
-      crown.castShadow = true;
-      greenery.add(planter, stem, crown);
-    }
-    return greenery;
   }
 
   private applyCameraRotation() {
