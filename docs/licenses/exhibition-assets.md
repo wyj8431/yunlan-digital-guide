@@ -44,4 +44,4 @@ All files are PCM signed 16-bit little-endian WAV at 44.1 kHz. They were generat
 
 ## Basis runtime
 
-`public/basis/basis_transcoder.js` (57,529 bytes, SHA-256 `8478b5b6d6b74e7d3082b89f6417321d8d1dc0307f2b30d4484bb11b441696a1`) and `basis_transcoder.wasm` (527,333 bytes, SHA-256 `6cf17dc889352c42e9acf8897107978d127005fe3386c36a0e3845e27967630a`) are copied from Three.js 0.178.0 `examples/jsm/libs/basis/`. Basis Universal is Apache-2.0 licensed. The loader uses `setTranscoderPath('/basis/')` before `detectSupport(renderer)`.
+`public/basis/basis_transcoder.js` (82,913 bytes, SHA-256 `5f0ae394de03a2036f653008885d39c104e64dc740767370c9f515a30f05863b`) and `basis_transcoder.wasm` (527,333 bytes, SHA-256 `6cf17dc889352c42e9acf8897107978d127005fe3386c36a0e3845e27967630a`) originate from Three.js 0.178.0 `examples/jsm/libs/basis/`. The JavaScript wrapper was formatted and given an ESLint-disable header; its behavior and paired WASM are unchanged. Basis Universal is Apache-2.0 licensed. The loader uses `setTranscoderPath('/basis/')` before `detectSupport(renderer)`.
