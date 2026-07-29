@@ -34,6 +34,81 @@ const TransitionShader = {
   `
 };
 
+const GodRaysShader = {
+  uniforms: { tDiffuse: { value: null }, lightPosition: { value: new THREE.Vector2(0.72, 0.12) } },
+  vertexShader: TransitionShader.vertexShader,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform vec2 lightPosition;
+    varying vec2 vUv;
+    void main() {
+      vec2 delta = (vUv - lightPosition) * 0.035;
+      vec2 sampleUv = vUv;
+      vec3 scatter = vec3(0.0);
+      float decay = 1.0;
+      for (int i = 0; i < 12; i++) {
+        sampleUv -= delta;
+        vec3 sampleColor = texture2D(tDiffuse, sampleUv).rgb;
+        float luminance = max(max(sampleColor.r, sampleColor.g), sampleColor.b);
+        scatter += sampleColor * smoothstep(0.72, 1.15, luminance) * decay;
+        decay *= 0.89;
+      }
+      vec4 source = texture2D(tDiffuse, vUv);
+      gl_FragColor = vec4(source.rgb + scatter * vec3(1.0, 0.84, 0.62) * 0.065, source.a);
+    }
+  `
+};
+
+const VolumetricFogShader = {
+  uniforms: { tDiffuse: { value: null }, time: { value: 0 }, density: { value: 0.055 } },
+  vertexShader: TransitionShader.vertexShader,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform float time;
+    uniform float density;
+    varying vec2 vUv;
+    float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    float noise(vec2 p) {
+      vec2 i = floor(p);
+      vec2 f = fract(p);
+      f = f * f * (3.0 - 2.0 * f);
+      return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x),
+        mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0)), f.x), f.y);
+    }
+    void main() {
+      vec4 source = texture2D(tDiffuse, vUv);
+      float drift = noise(vUv * vec2(5.0, 3.0) + vec2(time * 0.018, 0.0));
+      float heightFog = smoothstep(0.9, 0.08, vUv.y);
+      float amount = density * heightFog * mix(0.45, 1.0, drift);
+      gl_FragColor = vec4(mix(source.rgb, vec3(0.78, 0.84, 0.79), amount), source.a);
+    }
+  `
+};
+
+export function getPostProcessingFeatures(level: QualityLevel, reducedMotion: boolean) {
+  const profile = QUALITY_PROFILES[level];
+  return {
+    godRays: profile.godRays && !reducedMotion,
+    fog: profile.volumetricFog && !reducedMotion
+  };
+}
+
+export function getPostProcessingPassNames(level: QualityLevel, reducedMotion: boolean): string[] {
+  const profile = QUALITY_PROFILES[level];
+  const features = getPostProcessingFeatures(level, reducedMotion);
+  return [
+    'render',
+    ...(profile.ssao ? ['ssao'] : []),
+    ...(profile.ssr ? ['ssr'] : []),
+    ...(profile.bloom ? ['bloom'] : []),
+    ...(profile.depthOfField && !reducedMotion ? ['depthOfField'] : []),
+    ...(features.godRays ? ['godRays'] : []),
+    ...(features.fog ? ['fog'] : []),
+    'transition',
+    'output'
+  ];
+}
+
 export type PostProcessingPipelineOptions = {
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
@@ -50,6 +125,8 @@ export class PostProcessingPipeline {
   private readonly bloomPass: UnrealBloomPass;
   private readonly bokehPass: BokehPass;
   private readonly transitionPass: ShaderPass;
+  private readonly godRaysPass: ShaderPass;
+  private readonly fogPass: ShaderPass;
   private readonly outputPass: OutputPass;
   private quality: QualityLevel;
   private width = 1;
@@ -84,12 +161,16 @@ export class PostProcessingPipeline {
       maxblur: 0.004
     });
     this.transitionPass = new ShaderPass(TransitionShader);
+    this.godRaysPass = new ShaderPass(GodRaysShader);
+    this.fogPass = new ShaderPass(VolumetricFogShader);
     this.outputPass = new OutputPass();
     this.rebuildPasses();
   }
 
   render(deltaSeconds: number): void {
-    if (!this.disposed) this.composer.render(deltaSeconds);
+    if (this.disposed) return;
+    this.fogPass.uniforms.time.value += deltaSeconds;
+    this.composer.render(deltaSeconds);
   }
 
   resize(width: number, height: number, pixelRatio: number): void {
@@ -130,19 +211,27 @@ export class PostProcessingPipeline {
     this.bloomPass.dispose();
     this.bokehPass.dispose();
     this.transitionPass.dispose();
+    this.godRaysPass.dispose();
+    this.fogPass.dispose();
     this.outputPass.dispose();
   }
 
   private rebuildPasses(): void {
-    const profile = QUALITY_PROFILES[this.quality];
     const reducedMotion = this.options.reducedMotion ?? false;
     this.composer.passes.length = 0;
-    this.composer.addPass(this.renderPass);
-    if (profile.ssao) this.composer.addPass(this.ssaoPass);
-    if (profile.ssr) this.composer.addPass(this.ssrPass);
-    if (profile.bloom) this.composer.addPass(this.bloomPass);
-    if (profile.depthOfField && !reducedMotion) this.composer.addPass(this.bokehPass);
-    this.composer.addPass(this.transitionPass);
-    this.composer.addPass(this.outputPass);
+    const passByName = {
+      render: this.renderPass,
+      ssao: this.ssaoPass,
+      ssr: this.ssrPass,
+      bloom: this.bloomPass,
+      depthOfField: this.bokehPass,
+      godRays: this.godRaysPass,
+      fog: this.fogPass,
+      transition: this.transitionPass,
+      output: this.outputPass
+    };
+    for (const name of getPostProcessingPassNames(this.quality, reducedMotion)) {
+      this.composer.addPass(passByName[name as keyof typeof passByName]);
+    }
   }
 }
