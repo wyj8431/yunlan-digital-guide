@@ -65,8 +65,8 @@ export class ExhibitionAssetLoader {
     if (this.disposed) throw new Error('ExhibitionAssetLoader has been disposed');
     if (this.audioLoadPromise) return this.audioLoadPromise;
     const audioAssets = this.assets.filter((asset) => asset.kind === 'audio');
-    this.audioLoadPromise = Promise.all(
-      audioAssets.map(async (asset) => {
+    this.audioLoadPromise = (async () => {
+      for (const asset of audioAssets) {
         try {
           await this.loadOne(asset, (_key, loaded, total) =>
             onProgress({
@@ -79,14 +79,17 @@ export class ExhibitionAssetLoader {
         } catch (error) {
           this.failures.set(asset.id, error instanceof Error ? error : new Error(String(error)));
         }
-      })
-    ).then(() => this.audio);
+      }
+      return this.audio;
+    })();
     return this.audioLoadPromise;
   }
 
   private async loadAll(
     onProgress: (progress: AssetProgress) => void
   ): Promise<LoadedExhibitionAssets> {
+    const visualAssets = this.assets.filter((asset) => asset.kind !== 'audio');
+    const visualAssetIds = new Set(visualAssets.map((asset) => asset.id));
     const loadedByAsset = new Map<string, number>();
     const totalByAsset = new Map<string, number>();
     let completed = 0;
@@ -98,11 +101,11 @@ export class ExhibitionAssetLoader {
             ? [...totalByAsset.values()].reduce((sum, value) => sum + value, 0)
             : null,
         completed,
-        total: this.assets.length
+        total: visualAssets.length
       });
     report();
     await Promise.all(
-      this.assets.map(async (asset) => {
+      visualAssets.map(async (asset) => {
         try {
           await this.withTimeout(
             this.loadOne(asset, (key, loaded, total) => {
@@ -125,7 +128,7 @@ export class ExhibitionAssetLoader {
       textures: this.textures,
       environment: this.environment,
       audio: this.audio,
-      failures: this.failures
+      failures: new Map([...this.failures].filter(([assetId]) => visualAssetIds.has(assetId)))
     };
   }
 

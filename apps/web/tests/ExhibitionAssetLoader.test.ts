@@ -218,7 +218,7 @@ describe('ExhibitionAssetLoader', () => {
     expect(result.textures.has('display-ies')).toBe(true);
   });
 
-  it('loads every PBR slot and aggregates progress across all asset kinds', async () => {
+  it('loads every PBR slot without blocking visual readiness on audio decoding', async () => {
     const pbr: ExhibitionAsset = {
       ...asset('stone-pbr', '/exhibition/materials/stone-baseColor.ktx2'),
       kind: 'ktx2',
@@ -261,7 +261,18 @@ describe('ExhibitionAssetLoader', () => {
         result.textures.has(`stone-pbr:${slot}`)
       )
     ).toBe(true);
-    expect(reports.at(-1)).toMatchObject({ loadedBytes: 24, totalBytes: 28 });
+    expect(reports.at(-1)).toMatchObject({
+      loadedBytes: 19,
+      totalBytes: 23,
+      completed: 4,
+      total: 4
+    });
+    expect(successFetch).not.toHaveBeenCalled();
+    expect(close).not.toHaveBeenCalled();
+
+    await loader.loadAudio(() => undefined);
+
+    expect(successFetch).toHaveBeenCalledTimes(1);
     expect(close).toHaveBeenCalledTimes(1);
     vi.unstubAllGlobals();
   });
@@ -278,9 +289,9 @@ describe('ExhibitionAssetLoader', () => {
     );
     const loader = new ExhibitionAssetLoader({} as THREE.WebGLRenderer, [audioAsset]);
 
-    const result = await loader.load(() => undefined);
+    const result = await loader.loadAudio(() => undefined);
 
-    expect(result.failures.get('hall-ambience')?.message).toContain('404');
+    expect(result.size).toBe(0);
     expect(close).toHaveBeenCalledTimes(1);
     vi.unstubAllGlobals();
   });

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({
   assetIds: [] as string[],
   assetLoad: vi.fn(),
+  assetLoadAudio: vi.fn(),
   assetDispose: vi.fn(),
   audioUnlock: vi.fn().mockResolvedValue(undefined),
   audioSetScene: vi.fn(),
@@ -31,6 +32,9 @@ vi.mock('../src/exhibition/assets/ExhibitionAssetLoader', () => ({
       audio: new Map([['lake-ambience', { duration: 10 }]]),
       failures: new Map()
     });
+    loadAudio = state.assetLoadAudio.mockResolvedValue(
+      new Map([['lake-ambience', { duration: 10 }]])
+    );
     dispose = state.assetDispose;
   }
 }));
@@ -201,6 +205,8 @@ describe('WestLakeScene audio lifecycle', () => {
     await Promise.resolve();
 
     expect(state.assetIds).toEqual(expect.arrayContaining(['lake-ambience', 'footstep-stone']));
+    expect(state.assetLoadAudio).toHaveBeenCalledTimes(1);
+    expect(state.assetLoad).not.toHaveBeenCalled();
     expect(state.audioSetScene).toHaveBeenCalledWith('lake');
     expect(state.audioSetBuffers).toHaveBeenCalledWith(
       new Map([['lake-ambience', { duration: 10 }]])
@@ -231,7 +237,7 @@ describe('WestLakeScene audio lifecycle', () => {
   });
 
   it('reports the lake ready after construction but before optional audio finishes loading', async () => {
-    state.assetLoad.mockImplementationOnce(() => new Promise(() => undefined));
+    state.assetLoadAudio.mockImplementationOnce(() => new Promise(() => undefined));
     const onReady = vi.fn();
 
     const scene = new WestLakeScene({ host, onReady });

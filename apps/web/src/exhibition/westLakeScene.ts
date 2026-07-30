@@ -308,12 +308,11 @@ export class WestLakeScene {
 
   private async loadAudioBuffers() {
     try {
-      const loaded = await this.assetLoader.load(this.options.onProgress ?? (() => undefined));
+      const buffers = await this.assetLoader.loadAudio(
+        this.options.onProgress ?? (() => undefined)
+      );
       if (this.disposed) return;
-      this.audio.setBuffers(loaded.audio);
-      for (const assetId of loaded.failures.keys()) {
-        this.options.onRecoverableFailure?.(assetId);
-      }
+      this.audio.setBuffers(buffers);
     } catch (error) {
       this.reportFatalError(error);
     }
