@@ -7,6 +7,7 @@ import {
 } from './assets/ExhibitionAssetLoader';
 import { EXHIBITION_ASSETS } from './assets/exhibitionAssets';
 import { ExhibitionAudio, createExhibitionAudio } from './audio/ExhibitionAudio';
+import { FALLBACK_ASSET_SOURCES, publishExhibitionTelemetry } from './exhibitionTelemetry';
 import {
   PLAYER_RADIUS,
   clampFrameDelta,
@@ -70,6 +71,7 @@ export class WestLakeScene {
   private looking = false;
   private yaw = 0;
   private pitch = 0;
+  private rollingFps = 0;
   private reducedMotion = this.motionQuery.matches;
   private interactionEnabled = true;
   private readonly qualityController = new QualityDowngradeController(
@@ -277,6 +279,7 @@ export class WestLakeScene {
       this.reportFatalError(error);
       return;
     }
+    this.publishTelemetry();
     this.frameId = requestAnimationFrame(this.render);
   };
 
@@ -286,10 +289,12 @@ export class WestLakeScene {
     const elapsed = now - this.qualitySampleStartedAt;
     if (elapsed < 1_000) return;
     const fps = (this.qualitySampleFrames * 1_000) / elapsed;
+    this.rollingFps = fps;
     const sampled = this.manualQuality ?? this.qualityController.sample(fps, now);
     this.applyQuality(sampled);
     this.qualitySampleStartedAt = now;
     this.qualitySampleFrames = 0;
+    this.publishTelemetry();
   }
 
   private updateZoneVisibility() {
@@ -330,5 +335,22 @@ export class WestLakeScene {
     this.fatalErrorReported = true;
     this.setInteractionEnabled(false);
     this.options.onFatalError?.(error instanceof Error ? error : new Error(String(error)));
+  }
+
+  private publishTelemetry() {
+    publishExhibitionTelemetry({
+      scene: 'lake',
+      cameraPose: this.getCameraPose(),
+      qualityLevel: this.quality,
+      rollingFps: this.rollingFps,
+      drawCalls: this.renderer.info?.render?.calls ?? 0,
+      triangles: this.renderer.info?.render?.triangles ?? 0,
+      textures: this.renderer.info?.memory?.textures ?? 0,
+      activePasses: this.pipeline.getActivePassNames?.() ?? [],
+      assetSources: { ...FALLBACK_ASSET_SOURCES },
+      visibleZones: ['lake', 'shore', 'vegetation', 'distance'],
+      audioUnlocked: this.audio.isUnlocked(),
+      activeCanvasCount: document.querySelectorAll('.exhibition-canvas-host canvas').length
+    });
   }
 }

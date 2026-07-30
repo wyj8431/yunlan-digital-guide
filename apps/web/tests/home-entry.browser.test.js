@@ -78,7 +78,10 @@ describe('home destination entry browser acceptance', () => {
         );
 
         await links.first().hover();
-        await page.waitForTimeout(220);
+        await page.waitForFunction(
+          (element) => getComputedStyle(element).opacity === '1',
+          await links.first().elementHandle()
+        );
         const hoverStyle = await links.first().evaluate((element) => {
           const style = getComputedStyle(element);
           return { opacity: style.opacity, backgroundColor: style.backgroundColor };

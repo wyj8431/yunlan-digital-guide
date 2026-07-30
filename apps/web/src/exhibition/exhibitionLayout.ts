@@ -36,6 +36,13 @@ function groundedItem(
 
 export const EXHIBITION_LAYOUT: ExhibitLayoutItem[] = [
   groundedItem({
+    id: 'west-lake-map',
+    kind: 'sand-table',
+    position: { x: 3.1, y: 0, z: 3 },
+    size: { width: 2.8, height: 0.82, depth: 2.2 },
+    interactive: true
+  }),
+  groundedItem({
     id: 'silk-and-tea',
     kind: 'display-table',
     position: { x: -3.8, y: 0, z: -1.2 },

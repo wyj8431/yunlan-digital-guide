@@ -22,6 +22,8 @@ export type LoadedExhibitionAssets = {
   failures: Map<string, Error>;
 };
 
+const ASSET_TIMEOUT_MS = 20_000;
+
 export class ExhibitionAssetLoader {
   private readonly draco = new DRACOLoader().setDecoderPath('/draco/');
   private readonly ktx2: KTX2Loader;
@@ -102,11 +104,14 @@ export class ExhibitionAssetLoader {
     await Promise.all(
       this.assets.map(async (asset) => {
         try {
-          await this.loadOne(asset, (key, loaded, total) => {
-            loadedByAsset.set(key, Math.max(loadedByAsset.get(key) ?? 0, loaded));
-            if (total > 0) totalByAsset.set(key, total);
-            report();
-          });
+          await this.withTimeout(
+            this.loadOne(asset, (key, loaded, total) => {
+              loadedByAsset.set(key, Math.max(loadedByAsset.get(key) ?? 0, loaded));
+              if (total > 0) totalByAsset.set(key, total);
+              report();
+            }),
+            asset.id
+          );
         } catch (error) {
           this.failures.set(asset.id, error instanceof Error ? error : new Error(String(error)));
         } finally {
@@ -176,8 +181,12 @@ export class ExhibitionAssetLoader {
         this.gltf.load(
           url,
           (result) => {
-            this.models.set(asset.id, result.scene);
-            resolve();
+            try {
+              this.models.set(asset.id, result.scene);
+              resolve();
+            } catch (error) {
+              reject(error);
+            }
           },
           (event) => progress(url, event.loaded, event.total),
           reject
@@ -188,11 +197,16 @@ export class ExhibitionAssetLoader {
         this.rgbe.load(
           url,
           (texture) => {
-            const target = this.pmrem.fromEquirectangular(texture);
-            this.pmremTargets.push(target);
-            texture.dispose();
-            this.environment = target.texture;
-            resolve();
+            try {
+              const target = this.pmrem.fromEquirectangular(texture);
+              this.pmremTargets.push(target);
+              texture.dispose();
+              this.environment = target.texture;
+              resolve();
+            } catch (error) {
+              texture.dispose();
+              reject(error);
+            }
           },
           (event) => progress(url, event.loaded, event.total),
           reject
@@ -206,10 +220,15 @@ export class ExhibitionAssetLoader {
               this.ktx2.load(
                 file.localPath,
                 (texture) => {
-                  const slot = file.materialSlot;
-                  this.textures.set(slot ? `${asset.id}:${slot}` : asset.id, texture);
-                  if (slot === 'baseColor') this.textures.set(asset.id, texture);
-                  resolve();
+                  try {
+                    const slot = file.materialSlot;
+                    this.textures.set(slot ? `${asset.id}:${slot}` : asset.id, texture);
+                    if (slot === 'baseColor') this.textures.set(asset.id, texture);
+                    resolve();
+                  } catch (error) {
+                    texture.dispose();
+                    reject(error);
+                  }
                 },
                 (event) => progress(file.localPath, event.loaded, event.total),
                 reject
@@ -222,8 +241,13 @@ export class ExhibitionAssetLoader {
         this.ies.load(
           url,
           (texture) => {
-            this.textures.set(asset.id, texture);
-            resolve();
+            try {
+              this.textures.set(asset.id, texture);
+              resolve();
+            } catch (error) {
+              texture.dispose();
+              reject(error);
+            }
           },
           (event) => progress(url, event.loaded, event.total),
           reject
@@ -254,5 +278,24 @@ export class ExhibitionAssetLoader {
       return load;
     }
     return Promise.resolve();
+  }
+
+  private withTimeout<T>(promise: Promise<T>, assetId: string): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const timer = window.setTimeout(
+        () => reject(new Error(`Asset load timed out: ${assetId}`)),
+        ASSET_TIMEOUT_MS
+      );
+      promise.then(
+        (value) => {
+          window.clearTimeout(timer);
+          resolve(value);
+        },
+        (error) => {
+          window.clearTimeout(timer);
+          reject(error);
+        }
+      );
+    });
   }
 }

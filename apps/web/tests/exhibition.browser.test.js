@@ -120,6 +120,9 @@ describe('exhibition browser acceptance', () => {
           });
           await page.goto(URL, { waitUntil: 'networkidle' });
           await page.locator('canvas').waitFor({ state: 'visible' });
+          await page
+            .locator('[data-exhibition-ready="true"]')
+            .waitFor({ state: 'visible', timeout: 60_000 });
           await page.waitForTimeout(500);
           assert.equal(await page.locator('canvas').count(), 1);
           await assertCanvasPainted(page);
@@ -137,14 +140,76 @@ describe('exhibition browser acceptance', () => {
           );
           assert.equal(boxes.length, 2);
           assert.ok(boxes[0].right <= boxes[1].left, 'top controls overlap');
-          const hint = await page.locator('.exhibition-hint').boundingBox();
-          const topbar = await page.locator('.exhibition-topbar').boundingBox();
-          assert.ok(
-            hint && topbar && topbar.y + topbar.height < hint.y,
-            'topbar overlaps movement hint'
+          const controlBoxes = await page
+            .locator('.exhibition-topbar button, .exhibition-toolbar button')
+            .evaluateAll((buttons) =>
+              buttons.map((button) => {
+                const box = button.getBoundingClientRect();
+                return { left: box.left, right: box.right, top: box.top, bottom: box.bottom };
+              })
+            );
+          for (let first = 0; first < controlBoxes.length; first += 1) {
+            for (let second = first + 1; second < controlBoxes.length; second += 1) {
+              const a = controlBoxes[first];
+              const b = controlBoxes[second];
+              const overlaps =
+                a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+              assert.equal(overlaps, false, `museum controls ${first} and ${second} overlap`);
+            }
+          }
+          assert.equal(await page.locator('.exhibition-notice').count(), 0);
+          await page.waitForFunction(
+            () =>
+              window.__EXHIBITION_TELEMETRY__?.assetSources?.bicycle === 'glb' &&
+              window.__EXHIBITION_TELEMETRY__?.assetSources?.shuttle === 'glb' &&
+              window.__EXHIBITION_TELEMETRY__?.assetSources?.teaSet === 'glb' &&
+              window.__EXHIBITION_TELEMETRY__?.assetSources?.silkGarment === 'glb',
+            undefined,
+            { timeout: 30_000 }
           );
-          assert.equal(await page.locator('.exhibition-render-error').count(), 0);
+          const telemetry = await page.evaluate(() => window.__EXHIBITION_TELEMETRY__);
+          assert.equal(telemetry.scene, 'hall');
+          assert.match(telemetry.qualityLevel, /high|medium|low/);
+          assert.equal(telemetry.activeCanvasCount, 1);
+          assert.equal(telemetry.audioUnlocked, false);
+          assert.ok(Number.isFinite(telemetry.drawCalls));
+          assert.ok(Number.isFinite(telemetry.triangles));
+          assert.ok(Array.isArray(telemetry.activePasses));
           assert.deepEqual(consoleErrors, []);
+
+          if (viewport.width === 1440) {
+            await page.locator('canvas').click({
+              position: {
+                x: Math.round(viewport.width * 0.83),
+                y: Math.round(viewport.height * 0.72)
+              }
+            });
+            await page.getByRole('heading', { name: '西湖数字沙盘' }).waitFor();
+            await page.getByRole('button', { name: '进入西湖沙盘' }).click();
+            await page.waitForFunction(
+              () =>
+                window.__EXHIBITION_TELEMETRY__?.scene === 'lake' &&
+                document.querySelector('.exhibition-page')?.getAttribute('data-page-state') ===
+                  'lake',
+              undefined,
+              { timeout: 60_000 }
+            );
+            assert.equal(await page.locator('canvas').count(), 1);
+            await assertCanvasPainted(page);
+
+            await page.getByRole('button', { name: '返回展馆' }).click();
+            await page.waitForFunction(
+              () =>
+                window.__EXHIBITION_TELEMETRY__?.scene === 'hall' &&
+                document.querySelector('.exhibition-page')?.getAttribute('data-page-state') ===
+                  'hall',
+              undefined,
+              { timeout: 60_000 }
+            );
+            assert.equal(await page.locator('canvas').count(), 1);
+            await assertCanvasPainted(page);
+            assert.deepEqual(consoleErrors, []);
+          }
           await page.close();
         }
       } finally {

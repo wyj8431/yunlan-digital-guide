@@ -4,13 +4,15 @@ const loaderSpies = vi.hoisted(() => ({
   dracoDispose: vi.fn(),
   ktxDispose: vi.fn(),
   pmremDispose: vi.fn(),
+  pmremFromEquirectangular: vi.fn(),
   renderTargetDispose: vi.fn(),
   setTranscoderPath: vi.fn(),
   gltfLoad: vi.fn(),
   textureDispose: vi.fn(),
   geometryDispose: vi.fn(),
   materialDispose: vi.fn(),
-  ktxLoad: vi.fn()
+  ktxLoad: vi.fn(),
+  asyncHdrCallback: false
 }));
 
 vi.mock('three', async (importOriginal) => {
@@ -20,6 +22,10 @@ vi.mock('three', async (importOriginal) => {
     PMREMGenerator: class {
       compileEquirectangularShader() {}
       fromEquirectangular() {
+        loaderSpies.pmremFromEquirectangular();
+        if (loaderSpies.pmremFromEquirectangular.mock.results.at(-1)?.value instanceof Error) {
+          throw loaderSpies.pmremFromEquirectangular.mock.results.at(-1)?.value;
+        }
         return {
           texture: new actual.Texture(),
           dispose: loaderSpies.renderTargetDispose
@@ -110,7 +116,9 @@ vi.mock('three/examples/jsm/loaders/RGBELoader.js', async () => {
         onProgress: (event: { loaded: number; total: number }) => void
       ) {
         onProgress({ loaded: 3, total: 3 });
-        onLoad(new THREE.Texture());
+        const finish = () => onLoad(new THREE.Texture());
+        if (loaderSpies.asyncHdrCallback) queueMicrotask(finish);
+        else finish();
       }
     }
   };
@@ -162,7 +170,11 @@ const audioAsset: ExhibitionAsset = {
 };
 
 describe('ExhibitionAssetLoader', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    loaderSpies.asyncHdrCallback = false;
+    loaderSpies.pmremFromEquirectangular.mockReturnValue(undefined);
+  });
 
   it('loads models, caches their sources, and returns independent clones', async () => {
     const loader = new ExhibitionAssetLoader({} as THREE.WebGLRenderer, [
@@ -271,6 +283,16 @@ describe('ExhibitionAssetLoader', () => {
     expect(result.failures.get('hall-ambience')?.message).toContain('404');
     expect(close).toHaveBeenCalledTimes(1);
     vi.unstubAllGlobals();
+  });
+
+  it('turns exceptions thrown inside loader callbacks into recoverable failures', async () => {
+    loaderSpies.asyncHdrCallback = true;
+    loaderSpies.pmremFromEquirectangular.mockReturnValueOnce(new Error('PMREM unavailable'));
+    const loader = new ExhibitionAssetLoader({} as THREE.WebGLRenderer, [hdrAsset]);
+
+    const result = await loader.load(() => undefined);
+
+    expect(result.failures.get('hall-hdri')?.message).toBe('PMREM unavailable');
   });
 
   it('disposes shared loaders and cached resources exactly once', async () => {

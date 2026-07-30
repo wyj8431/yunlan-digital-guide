@@ -547,6 +547,23 @@ describe('ExhibitionRenderer', () => {
     renderer.dispose();
   });
 
+  it('keeps the procedural West Lake sand table after realistic assets replace other exhibits', async () => {
+    const renderer = new ExhibitionRenderer({ host, onExhibitSelect: vi.fn() });
+
+    await vi.waitFor(() => expect(state.assetLoad).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => {
+      const exhibits = state.sceneChildren.find((child) => child.name === 'exhibits') as
+        { children?: Array<{ name: string; visible?: boolean }> } | undefined;
+      const sandTable = exhibits?.children?.find(
+        (child) => child.name === 'west-lake-map-sand-table'
+      );
+      expect(sandTable).toBeDefined();
+      expect(sandTable?.visible).not.toBe(false);
+    });
+
+    renderer.dispose();
+  });
+
   it('stops movement while interaction is disabled and clears input on blur', () => {
     const renderer = new ExhibitionRenderer({ host, onExhibitSelect: vi.fn() });
     const runFrame = () => {

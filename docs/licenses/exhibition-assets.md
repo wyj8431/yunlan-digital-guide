@@ -44,4 +44,14 @@ All files are PCM signed 16-bit little-endian WAV at 44.1 kHz. They were generat
 
 ## Basis runtime
 
-`public/basis/basis_transcoder.js` (82,913 bytes, SHA-256 `5f0ae394de03a2036f653008885d39c104e64dc740767370c9f515a30f05863b`) and `basis_transcoder.wasm` (527,333 bytes, SHA-256 `6cf17dc889352c42e9acf8897107978d127005fe3386c36a0e3845e27967630a`) originate from Three.js 0.178.0 `examples/jsm/libs/basis/`. The JavaScript wrapper was formatted and given an ESLint-disable header; its behavior and paired WASM are unchanged. Basis Universal is Apache-2.0 licensed. The loader uses `setTranscoderPath('/basis/')` before `detectSupport(renderer)`.
+`public/basis/basis_transcoder.js` (57,529 bytes, SHA-256 `8478b5b6d6b74e7d3082b89f6417321d8d1dc0307f2b30d4484bb11b441696a1`) and `basis_transcoder.wasm` (527,333 bytes, SHA-256 `6cf17dc889352c42e9acf8897107978d127005fe3386c36a0e3845e27967630a`) originate from Three.js 0.178.0 `examples/jsm/libs/basis/` and are copied without source changes. Basis Universal is Apache-2.0 licensed. The loader uses `setTranscoderPath('/basis/')` before `detectSupport(renderer)`.
+
+## Draco runtime
+
+The following files originate from Three.js 0.178.0 `examples/jsm/libs/draco/gltf/` and are copied without source changes. Google Draco is Apache-2.0 licensed. The loader uses `setDecoderPath('/draco/')` and selects the WASM decoder when supported.
+
+| Local file                           |   Bytes | SHA-256                                                            |
+| ------------------------------------ | ------: | ------------------------------------------------------------------ |
+| `public/draco/draco_decoder.js`      | 512,465 | `8625489da79a805f4f2a7d511c3e52d8b4085608a9d2a4d5f4f9de5db0aea04f` |
+| `public/draco/draco_decoder.wasm`    | 192,420 | `a680d927bed9cb864ddbd63521868891af2bfbe755092761b4837487618df8ac` |
+| `public/draco/draco_wasm_wrapper.js` |  58,456 | `8bb2952d2ba7d67e1414f8df819410cb0434a666be53f671fff75f68843d76f6` |

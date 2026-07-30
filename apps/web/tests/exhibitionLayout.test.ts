@@ -15,11 +15,22 @@ describe('exhibition layout metadata', () => {
       expect.arrayContaining([
         'silk-and-tea',
         'silk-garment',
+        'west-lake-map',
         'west-lake-bicycle',
         'green-mobility-car',
         'west-lake-wall-art'
       ])
     );
+  });
+
+  it('keeps the West Lake sand table interactive, collidable, and outside the central aisle', () => {
+    const sandTable = EXHIBITION_LAYOUT.find((item) => item.id === 'west-lake-map');
+    expect(sandTable).toMatchObject({
+      kind: 'sand-table',
+      interactive: true,
+      blocksMovement: true
+    });
+    expect(sandTable?.collider?.minX).toBeGreaterThanOrEqual(1.2);
   });
 
   it('gives every grounded obstacle a collider', () => {

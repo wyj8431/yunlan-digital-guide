@@ -1,4 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('three', async (importOriginal) => {
+  const THREE = await importOriginal<typeof import('three')>();
+  return {
+    ...THREE,
+    AudioListener: class extends THREE.Object3D {}
+  };
+});
 import { PLAYER_RADIUS } from '../src/exhibition/collision';
 import { LAKE_BOUNDS, resolveLakeMovement } from '../src/exhibition/westLakeScene';
 

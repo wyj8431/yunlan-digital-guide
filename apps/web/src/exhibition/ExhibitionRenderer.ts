@@ -109,6 +109,7 @@ export class ExhibitionRenderer {
   private interactionEnabled = true;
   private yaw = 0;
   private pitch = 0;
+  private rollingFps = 0;
   private readonly qualityController = new QualityDowngradeController(
     'high',
     50,
@@ -403,8 +404,13 @@ export class ExhibitionRenderer {
       const iesTexture = loaded.textures.get('display-ies');
       if (iesTexture) this.museumCases.setIesTexture(iesTexture);
       const realistic = createRealisticExhibits(loaded, EXHIBITION_LAYOUT);
-      for (const child of [...this.exhibitRoots]) child.visible = false;
+      const retainedRoots = this.exhibitRoots.filter((root) => {
+        const replaced = realistic.roots.has(root.userData.exhibitId as string);
+        if (replaced) root.visible = false;
+        return !replaced;
+      });
       this.exhibitRoots.length = 0;
+      this.exhibitRoots.push(...retainedRoots);
       for (const root of realistic.roots.values()) {
         this.exhibitGroup.add(root);
         this.exhibitRoots.push(root);
@@ -459,8 +465,50 @@ export class ExhibitionRenderer {
 
     const bicycle = this.createBicycle();
     const car = this.createCar();
-    exhibits.add(bicycle, car);
+    const sandTable = this.createSandTable();
+    exhibits.add(bicycle, car, sandTable);
     return exhibits;
+  }
+
+  private createSandTable() {
+    const root = new THREE.Group();
+    const layout = findExhibitLayout('west-lake-map');
+    root.name = 'west-lake-map-sand-table';
+    root.position.set(layout.position.x, layout.position.y, layout.position.z);
+
+    const plinth = createBox(layout.size.width, 0.62, layout.size.depth, '#213d36', 0.42);
+    plinth.position.y = 0.31;
+    const lake = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.86, 0.96, 0.08, 48),
+      new THREE.MeshPhysicalMaterial({
+        color: '#4b9b8f',
+        roughness: 0.2,
+        metalness: 0.05,
+        transmission: 0.12
+      })
+    );
+    lake.scale.set(1.15, 1, 0.72);
+    lake.position.y = 0.7;
+    const islandMaterial = new THREE.MeshStandardMaterial({
+      color: '#8daa74',
+      roughness: 0.82
+    });
+    for (const [x, z, scale] of [
+      [-0.42, -0.16, 0.34],
+      [0.28, 0.12, 0.28],
+      [0.05, -0.38, 0.2]
+    ] as const) {
+      const island = new THREE.Mesh(
+        new THREE.CylinderGeometry(scale, scale * 1.1, 0.12, 20),
+        islandMaterial
+      );
+      island.position.set(x, 0.78, z);
+      root.add(island);
+    }
+    root.add(plinth, lake);
+    markExhibit(root, 'west-lake-map');
+    this.exhibitRoots.push(root);
+    return root;
   }
 
   private createBicycle() {
@@ -561,11 +609,12 @@ export class ExhibitionRenderer {
     const elapsed = now - this.qualitySampleStartedAt;
     if (elapsed < 1_000) return;
     const fps = (this.qualitySampleFrames * 1_000) / elapsed;
+    this.rollingFps = fps;
     const sampled = this.manualQuality ?? this.qualityController.sample(fps, now);
     this.applyQuality(sampled);
     this.qualitySampleStartedAt = now;
     this.qualitySampleFrames = 0;
-    this.publishTelemetry(fps);
+    this.publishTelemetry();
   }
 
   private updateMovement(deltaSeconds: number) {
@@ -611,12 +660,12 @@ export class ExhibitionRenderer {
     this.publishTelemetry();
   }
 
-  private publishTelemetry(rollingFps = 0) {
+  private publishTelemetry() {
     publishExhibitionTelemetry({
       scene: 'hall',
       cameraPose: this.getCameraPose(),
       qualityLevel: this.quality,
-      rollingFps,
+      rollingFps: this.rollingFps,
       drawCalls: this.renderer.info?.render?.calls ?? 0,
       triangles: this.renderer.info?.render?.triangles ?? 0,
       textures: this.renderer.info?.memory?.textures ?? 0,

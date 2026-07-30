@@ -10,6 +10,8 @@ export default tseslint.config(
       '**/coverage/**',
       '**/node_modules/**',
       'apps/web/public/libs/**',
+      'apps/web/public/basis/**',
+      'apps/web/public/draco/**',
       '.codex-run/**',
       '.superpowers/**',
       '.worktrees/**'
