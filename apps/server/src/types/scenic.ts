@@ -60,4 +60,14 @@ export type ScenicAreaSummary = {
   routes: Pick<ScenicRoute, 'id' | 'name' | 'duration' | 'description'>[];
   services: ScenicService[];
   quickQuestions: string[];
+  officialInfo?: ScenicOfficialInfo;
+};
+
+export type ScenicOfficialInfo = {
+  status: 'live' | 'stale' | 'fallback' | 'unconfigured';
+  sourceName?: string;
+  sourceUrl?: string;
+  updatedAt?: string;
+  checkedAt?: string;
+  notices: string[];
 };

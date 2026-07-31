@@ -64,6 +64,11 @@ function readFirstConfiguredSecret(...keys: string[]): string {
   return '';
 }
 
+function readPositiveNumberEnv(key: string, fallback: number): number {
+  const parsed = Number(process.env[key]);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 function hasArkLlmConfig(): boolean {
   return (
     isArkProvider() ||
@@ -179,6 +184,8 @@ export type ServerEnv = {
   xfyunTtsApiSecret: string;
   xfyunTtsUrl: string;
   xfyunTtsVoice: string;
+  scenicLiveFeedUrl: string;
+  scenicLiveTtlMs: number;
 };
 
 export function readEnv(): ServerEnv {
@@ -237,6 +244,8 @@ export function readEnv(): ServerEnv {
       'XFYUN_VIRTUAL_HUMAN_APP_SECRET'
     ),
     xfyunTtsUrl: readOptionalEnv('XFYUN_TTS_URL') || DEFAULT_XFYUN_TTS_URL,
-    xfyunTtsVoice: readFirstNonEmptyEnv('XFYUN_TTS_VOICE') || 'xiaoyan'
+    xfyunTtsVoice: readFirstNonEmptyEnv('XFYUN_TTS_VOICE') || 'xiaoyan',
+    scenicLiveFeedUrl: readOptionalEnv('SCENIC_OFFICIAL_FEED_URL'),
+    scenicLiveTtlMs: readPositiveNumberEnv('SCENIC_OFFICIAL_FEED_TTL_MS', 300_000)
   };
 }

@@ -465,7 +465,20 @@ export function createOpenApiDocument(serverUrl: string) {
             spots: { type: 'array', items: { $ref: '#/components/schemas/Spot' } },
             routes: { type: 'array', items: { $ref: '#/components/schemas/Route' } },
             services: { type: 'array', items: { $ref: '#/components/schemas/Service' } },
-            quickQuestions: { type: 'array', items: { type: 'string' } }
+            quickQuestions: { type: 'array', items: { type: 'string' } },
+            officialInfo: { $ref: '#/components/schemas/ScenicOfficialInfo' }
+          }
+        },
+        ScenicOfficialInfo: {
+          type: 'object',
+          required: ['status', 'notices'],
+          properties: {
+            status: { type: 'string', enum: ['live', 'stale', 'fallback', 'unconfigured'] },
+            sourceName: { type: 'string' },
+            sourceUrl: { type: 'string', format: 'uri' },
+            updatedAt: { type: 'string', format: 'date-time' },
+            checkedAt: { type: 'string', format: 'date-time' },
+            notices: { type: 'array', items: { type: 'string' } }
           }
         },
         ScenicAreaInfo: {

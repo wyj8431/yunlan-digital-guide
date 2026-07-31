@@ -8,7 +8,6 @@ import {
   BusFront,
   Camera,
   Check,
-  CircleAlert,
   Clock3,
   Compass,
   Footprints,
@@ -29,6 +28,7 @@ import {
 import type { TourismView } from '../routing/appRoute';
 import type { RouteCard, ScenicAreaSummary } from '../types/guide';
 import type { VoiceGuideState } from '../voice/useVoiceGuideSession';
+import { OfficialInfoNotice } from './OfficialInfoNotice';
 import { TourismNav } from './TourismNav';
 
 type PageView = Exclude<TourismView, 'explore' | 'history'>;
@@ -194,6 +194,7 @@ export function TourismPage({
 
   const narration = latestAnswer || scenicArea.scenicArea.description;
   const voiceStatus = VOICE_STATUS[voice.status];
+  const officialInfo = scenicArea.officialInfo;
 
   return (
     <main
@@ -507,13 +508,7 @@ export function TourismPage({
                   ))}
                 </div>
               </section>
-              <section className="tourism-passport-warning">
-                <CircleAlert size={20} aria-hidden="true" />
-                <div>
-                  <h3>官方信息核验</h3>
-                  <p>票价、开放时间、预约规则和交通班次可能变化，请以景区官方当天公告为准。</p>
-                </div>
-              </section>
+              <OfficialInfoNotice info={officialInfo} />
             </div>
           </section>
         ) : null}

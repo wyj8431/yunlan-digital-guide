@@ -6,7 +6,10 @@ import { attachGuideWebSocketServer } from './modules/guide/guide.websocket.js';
 import { attachVoiceWebSocketServer } from './modules/voice/voice-websocket.js';
 
 const env = readEnv();
-const app = createApp();
+const app = createApp({
+  scenicLiveFeedUrl: env.scenicLiveFeedUrl,
+  scenicLiveTtlMs: env.scenicLiveTtlMs
+});
 const server = createServer(app.callback());
 
 server.once('close', () => app.close());

@@ -39,6 +39,12 @@ describe('server env', () => {
     expect(readEnv().xfyunTtsVoice).toBe('xiaoyan');
   });
 
+  it('falls back to a five-minute scenic feed ttl when configured ttl is invalid', () => {
+    vi.stubEnv('SCENIC_OFFICIAL_FEED_TTL_MS', 'not-a-number');
+
+    expect(readEnv().scenicLiveTtlMs).toBe(300_000);
+  });
+
   it('uses Volcengine Ark aliases for OpenAI-compatible LLM settings', () => {
     vi.stubEnv('LLM_BASE_URL', '');
     vi.stubEnv('LLM_API_KEY', '');

@@ -172,6 +172,6 @@ describe('TourismPage', () => {
 
     expect(screen.getByRole('heading', { name: '本次乌镇旅程' })).toBeInTheDocument();
     expect(screen.getByText('出发准备')).toBeInTheDocument();
-    expect(screen.getByText('官方信息核验')).toBeInTheDocument();
+    expect(screen.getByText('官方信息')).toBeInTheDocument();
   });
 });

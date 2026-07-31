@@ -17,6 +17,16 @@ export type ScenicAreaSummary = {
   routes: Array<{ id: string; name: string; duration: string; description: string }>;
   services: Array<{ id: string; name: string; type: string; description: string }>;
   quickQuestions: string[];
+  officialInfo?: ScenicOfficialInfo;
+};
+
+export type ScenicOfficialInfo = {
+  status: 'live' | 'stale' | 'fallback' | 'unconfigured';
+  sourceName?: string;
+  sourceUrl?: string;
+  updatedAt?: string;
+  checkedAt?: string;
+  notices: string[];
 };
 
 export type ChatMessage = {

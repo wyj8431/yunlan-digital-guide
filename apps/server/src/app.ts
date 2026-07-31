@@ -9,6 +9,8 @@ import bodyParser from 'koa-bodyparser';
 import { createDocsRouter } from './modules/docs/docs.routes.js';
 import { createGuideRouter } from './modules/guide/guide.routes.js';
 import { createScenicRouter } from './modules/scenic/scenic.routes.js';
+import { getScenicAreaSummary } from './modules/scenic/scenic-data.js';
+import { ScenicLiveService } from './modules/scenic/scenic-live.service.js';
 import { createSpeechRouter } from './modules/speech/speech.routes.js';
 import { VideoRepository } from './modules/video/video.repository.js';
 import { createVideoRouter } from './modules/video/video.routes.js';
@@ -21,6 +23,9 @@ const DEFAULT_VIDEO_DATABASE_PATH = path.resolve(currentDirectory, '../data/vide
 export type CreateAppOptions = {
   videoDatabasePath?: string;
   videoService?: VideoService;
+  scenicLiveService?: ScenicLiveService;
+  scenicLiveFeedUrl?: string;
+  scenicLiveTtlMs?: number;
 };
 
 export type ServerApp = Koa & {
@@ -61,7 +66,14 @@ export function createApp(options: CreateAppOptions = {}): ServerApp {
   const router = new Router();
   const docsRouter = createDocsRouter();
   const guideRouter = createGuideRouter();
-  const scenicRouter = createScenicRouter();
+  const scenicLiveService =
+    options.scenicLiveService ??
+    new ScenicLiveService({
+      feedUrl: options.scenicLiveFeedUrl ?? '',
+      ttlMs: options.scenicLiveTtlMs,
+      fallback: getScenicAreaSummary
+    });
+  const scenicRouter = createScenicRouter(scenicLiveService);
   const speechRouter = createSpeechRouter();
   const videoRouter = createVideoRouter(videoService);
   const virtualHumanRouter = createVirtualHumanRouter();

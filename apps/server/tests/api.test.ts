@@ -28,6 +28,7 @@ describe('server api', () => {
         expect(body.scenicArea.name).toBe('乌镇景区');
         expect(body.spots).toHaveLength(5);
         expect(body.quickQuestions).toContain('帮我规划一条乌镇半日游路线');
+        expect(body.officialInfo).toMatchObject({ status: 'unconfigured', notices: [] });
       });
   });
 
