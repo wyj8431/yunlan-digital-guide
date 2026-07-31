@@ -1,4 +1,6 @@
 import Database from 'better-sqlite3';
+import { DENSE_DANMAKU_SEEDS } from './video.danmaku-seed.js';
+import { EXTRA_SENSITIVE_KEYWORD_SEEDS } from './video.sensitive-seed.js';
 import { SENSITIVE_KEYWORD_SEEDS, SUBTITLE_CUE_SEEDS, VIDEO_SEEDS } from './video.seed.js';
 import type {
   Danmaku,
@@ -85,6 +87,7 @@ export class VideoRepository {
     this.database = new Database(databasePath);
 
     try {
+      // 初始化任一步骤失败都立即关闭句柄，避免测试或重启时残留数据库锁。
       this.database.pragma('foreign_keys = ON');
       this.initializeSchema();
       this.seedDatabase();
@@ -239,6 +242,7 @@ export class VideoRepository {
 
   private seedDatabase(): void {
     this.database.transaction(() => {
+      // 先把已有记录移到临时排序区间，避免重新编号时触发 sort_order 唯一约束。
       const temporaryRange = this.database
         .prepare('SELECT COALESCE(MAX(sort_order), -1) + 1 AS start FROM videos')
         .get() as { start: number };
@@ -278,6 +282,7 @@ export class VideoRepository {
          VALUES (?, ?, ?, ?)
          ON CONFLICT(video_id, start_ms, end_ms, content) DO NOTHING`
       );
+      // 种子数据允许在每次启动时重复执行，冲突时保留已有记录。
       for (const cue of SUBTITLE_CUE_SEEDS) {
         insertSubtitleCue.run(cue.videoId, cue.startMs, cue.endMs, cue.content);
       }
@@ -286,8 +291,41 @@ export class VideoRepository {
         `INSERT INTO sensitive_keywords (keyword) VALUES (?)
          ON CONFLICT(keyword) DO NOTHING`
       );
-      for (const keyword of SENSITIVE_KEYWORD_SEEDS) {
+      const sensitiveKeywords = [...SENSITIVE_KEYWORD_SEEDS, ...EXTRA_SENSITIVE_KEYWORD_SEEDS];
+      for (const keyword of sensitiveKeywords) {
         insertKeyword.run(keyword);
+      }
+
+      const sanitizeStoredDanmaku = this.database.prepare(
+        `UPDATE danmaku SET content = replace(content, ?, '**********') WHERE instr(content, ?) > 0`
+      );
+      for (const keyword of sensitiveKeywords) {
+        sanitizeStoredDanmaku.run(keyword, keyword);
+      }
+
+      if (process.env.NODE_ENV !== 'test') {
+        const insertDanmaku = this.database.prepare(
+          `INSERT INTO danmaku (video_id, content, timestamp_ms, position, color, nickname, created_at)
+           SELECT ?, ?, ?, ?, ?, ?, ?
+           WHERE NOT EXISTS (
+             SELECT 1 FROM danmaku WHERE video_id = ? AND timestamp_ms = ? AND content = ?
+           )`
+        );
+        // 弹幕没有天然唯一键，通过视频、时间和内容组合防止重复播种。
+        for (const item of DENSE_DANMAKU_SEEDS) {
+          insertDanmaku.run(
+            item.videoId,
+            item.content,
+            item.timestampMs,
+            item.position,
+            item.color,
+            item.nickname,
+            new Date().toISOString(),
+            item.videoId,
+            item.timestampMs,
+            item.content
+          );
+        }
       }
     })();
   }

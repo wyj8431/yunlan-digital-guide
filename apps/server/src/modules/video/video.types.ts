@@ -1,3 +1,4 @@
+// 服务端视频领域类型同时作为输入白名单，避免接口和数据库取值漂移。
 export const DANMAKU_POSITIONS = ['scroll', 'top', 'bottom'] as const;
 export const DANMAKU_COLORS = ['#ffffff', '#f5d76e', '#aee7ff', '#ffc0cb'] as const;
 

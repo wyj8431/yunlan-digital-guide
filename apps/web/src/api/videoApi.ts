@@ -1,3 +1,4 @@
+// 视频 API 客户端负责响应校验，并把服务端错误转换为统一异常。
 import type {
   CreateDanmakuInput,
   DanmakuListResponse,

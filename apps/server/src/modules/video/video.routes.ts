@@ -1,3 +1,4 @@
+// 视频路由提供列表、详情、字幕以及按时间窗口查询和发布弹幕的接口。
 import Router from '@koa/router';
 import { VideoService, VideoServiceError } from './video.service.js';
 

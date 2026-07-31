@@ -1,3 +1,4 @@
+// 视频中心页面协调视频选择、播放器、弹幕设置和各类加载状态。
 import { AlertTriangle, ArrowLeft, Film, RefreshCw, SlidersHorizontal } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';

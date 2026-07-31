@@ -1,3 +1,4 @@
+// 弹幕可见性和位移均由视频时钟计算，确保暂停和跳转后仍然同步。
 import type { Danmaku } from '../types/video';
 
 export const DANMAKU_LIFETIME_MS = 7_000;

@@ -54,7 +54,7 @@ describe('video routes', () => {
 
     expect(created.body.danmaku).toMatchObject({
       videoId: 'wuzhen-water-town',
-      content: '****别****',
+      content: '**********别**********',
       timestampMs: 12000
     });
 

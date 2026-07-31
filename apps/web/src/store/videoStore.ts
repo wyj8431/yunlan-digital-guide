@@ -1,3 +1,4 @@
+// 视频 Redux 仓库按视频 ID 隔离详情、弹幕、加载状态和错误信息。
 import {
   configureStore,
   createAsyncThunk,

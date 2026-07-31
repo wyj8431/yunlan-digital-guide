@@ -9,6 +9,7 @@ import {
   SUBTITLE_CUE_SEEDS,
   VIDEO_SEEDS
 } from '../src/modules/video/video.seed';
+import { EXTRA_SENSITIVE_KEYWORD_SEEDS } from '../src/modules/video/video.sensitive-seed';
 import { VideoService, VideoServiceError } from '../src/modules/video/video.service';
 import type { CreateDanmakuInput } from '../src/modules/video/video.types';
 
@@ -56,8 +57,8 @@ describe('video service', () => {
         id: expect.any(String),
         title: expect.any(String),
         description: expect.any(String),
-        coverUrl: expect.stringMatching(/^\/media\/videos\//),
-        videoUrl: expect.stringMatching(/^\/media\/videos\//),
+        coverUrl: expect.stringMatching(/^https:\/\/i\.ytimg\.com\/vi\/[\w-]{11}\/hqdefault\.jpg$/),
+        videoUrl: expect.stringMatching(/^https:\/\/www\.youtube\.com\/watch\?v=[\w-]{11}$/),
         durationMs: expect.any(Number)
       });
       expect(video.durationMs).toBeGreaterThan(0);
@@ -88,7 +89,7 @@ describe('video service', () => {
     });
 
     expect(saved).toMatchObject({
-      content: '这个****在发****，别****',
+      content: '这个**********在发**********，别**********',
       nickname: '游客 0001',
       timestampMs: 1_500,
       position: 'scroll',
@@ -106,7 +107,19 @@ describe('video service', () => {
       color: '#ffffff'
     });
 
-    expect(saved.content).toBe('****'.repeat(40));
+    expect(saved.content).toBe('**********'.repeat(40));
+  });
+
+  it('filters common abusive language inside a longer sentence', () => {
+    const video = service.listVideos()[0];
+    const saved = service.createDanmaku(video.id, {
+      content: '你这个大傻逼',
+      timestampMs: 2_500,
+      position: 'scroll',
+      color: '#ffffff'
+    });
+
+    expect(saved.content).toBe('你这个大**********');
   });
 
   it('queries danmaku inside an inclusive playback window in timestamp order', () => {
@@ -236,7 +249,9 @@ describe('video service', () => {
     service = new VideoService(repository);
 
     expect(service.listVideos()).toHaveLength(VIDEO_SEEDS.length);
-    expect(repository.listSensitiveKeywords()).toHaveLength(SENSITIVE_KEYWORD_SEEDS.length);
+    expect(repository.listSensitiveKeywords()).toHaveLength(
+      SENSITIVE_KEYWORD_SEEDS.length + EXTRA_SENSITIVE_KEYWORD_SEEDS.length
+    );
     expect(countSubtitleCues(service)).toBe(SUBTITLE_CUE_SEEDS.length);
 
     repository.close();
@@ -268,7 +283,9 @@ describe('video service', () => {
     service = new VideoService(repository);
 
     expect(service.listVideos()).toHaveLength(VIDEO_SEEDS.length);
-    expect(new Set(repository.listSensitiveKeywords())).toEqual(new Set(SENSITIVE_KEYWORD_SEEDS));
+    expect(new Set(repository.listSensitiveKeywords())).toEqual(
+      new Set([...SENSITIVE_KEYWORD_SEEDS, ...EXTRA_SENSITIVE_KEYWORD_SEEDS])
+    );
     expect(countSubtitleCues(service)).toBe(SUBTITLE_CUE_SEEDS.length);
   });
 

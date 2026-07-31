@@ -5,13 +5,13 @@ export type DanmakuPreferences = {
   density: number;
 };
 
-export const DANMAKU_PREFERENCES_KEY = 'yunlan-video-danmaku-preferences-v1';
+export const DANMAKU_PREFERENCES_KEY = 'yunlan-video-danmaku-preferences-v2';
 
 export const defaultDanmakuPreferences: DanmakuPreferences = {
   speed: 1,
   fontSize: 18,
   opacity: 0.9,
-  density: 3
+  density: 6
 };
 
 function isPreference(value: unknown): value is DanmakuPreferences {

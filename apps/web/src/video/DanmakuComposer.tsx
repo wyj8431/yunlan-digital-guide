@@ -1,3 +1,4 @@
+// 弹幕编辑器管理内容、位置、颜色以及提交中的禁用状态。
 import { Send } from 'lucide-react';
 import { useState, type CSSProperties, type FormEvent } from 'react';
 import type { CreateDanmakuInput, DanmakuColor, DanmakuPosition } from '../types/video';

@@ -131,6 +131,7 @@ export class VideoService {
 
       return this.repository.createDanmaku({
         videoId: parsedVideoId,
+        // 敏感词在持久化前处理，确保后续所有读取入口拿到的都是过滤结果。
         content: this.filterSensitiveKeywords(parsedInput.content),
         timestampMs: parsedInput.timestampMs,
         position: parsedInput.position,
@@ -166,13 +167,14 @@ export class VideoService {
   private filterSensitiveKeywords(content: string): string {
     return this.repository
       .listSensitiveKeywords()
-      .reduce((filtered, keyword) => filtered.split(keyword).join('****'), content);
+      .reduce((filtered, keyword) => filtered.split(keyword).join('**********'), content);
   }
 
   private execute<Result>(operation: () => Result): Result {
     try {
       return operation();
     } catch (caught) {
+      // 保留可预期的领域错误；数据库等未知异常统一转换为稳定的接口错误。
       if (caught instanceof VideoServiceError) {
         throw caught;
       }

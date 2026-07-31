@@ -1,3 +1,4 @@
+// 视频中心接口模型，字段命名与服务端 JSON 响应保持一致。
 export type VideoSummary = {
   id: string;
   title: string;
