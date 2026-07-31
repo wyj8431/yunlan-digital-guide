@@ -1,3 +1,4 @@
+// 把语音会话客户端包装成 React 状态和可复用的开始、停止操作。
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { VoiceSessionClient } from './VoiceSessionClient';
 import type { GuideChatResponse } from '../types/guide';

@@ -1,3 +1,4 @@
+// 性能面板展示帧率、帧耗时、画质等级和嘴型输入快照。
 import { useLipSyncLabStore } from '../store/useLipSyncLabStore';
 
 export function PerformancePanel() {

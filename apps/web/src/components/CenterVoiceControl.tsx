@@ -1,3 +1,4 @@
+// 中央语音按钮根据会话状态切换开始、停止和错误提示。
 import { Mic, Square } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 

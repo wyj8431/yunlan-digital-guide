@@ -1,3 +1,4 @@
+// 华北与东北地区省级景点、路线和旅行建议的静态知识记录。
 import {
   createProvinceTourismRecord,
   type ProvinceTourismRecord

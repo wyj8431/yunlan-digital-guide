@@ -1,3 +1,4 @@
+// 聚合全国目的地知识并提供按名称、别名和关键词查询的统一入口。
 import {
   destinationGuidePlanRecords,
   destinationPlanAliases,

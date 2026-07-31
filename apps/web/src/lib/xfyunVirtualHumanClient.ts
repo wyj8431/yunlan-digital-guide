@@ -1,5 +1,7 @@
 import type { VirtualHumanConfig } from '../types/virtualHuman';
 
+// 讯飞客户端兼容当前模块版 SDK 和旧版全局脚本，并统一语音完成事件。
+
 type EnabledVirtualHumanConfig = Extract<VirtualHumanConfig, { provider: 'xfyun-vms' }>;
 
 type AvatarPlatformApi = {
@@ -83,6 +85,7 @@ function isCurrentSdkModule(sdk: LoadedSdk): sdk is CurrentSdkModule {
 }
 
 async function loadLegacyScript(url: string): Promise<void> {
+  // 相同 SDK 地址只加载一次，后续调用复用页面上的脚本节点。
   await new Promise<void>((resolve, reject) => {
     const existing = document.querySelector<HTMLScriptElement>(
       `script[data-xfyun-vms-sdk="${url}"]`
@@ -181,6 +184,7 @@ function findDurationValue(payload: unknown): number | null {
 }
 
 function normalizeDurationMs(payload: unknown): number | null {
+  // SDK 不同版本可能返回秒、毫秒或嵌套字段，这里统一换算为毫秒。
   const duration = findDurationValue(payload);
 
   if (duration === null || duration <= 0) {

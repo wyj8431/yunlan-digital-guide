@@ -1,3 +1,4 @@
+// 服务端景区数据的结构化契约，与静态 JSON 字段保持一致。
 export type ScenicAreaInfo = {
   id: string;
   name: string;

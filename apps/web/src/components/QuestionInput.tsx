@@ -3,6 +3,8 @@ import { FormEvent, useEffect, useRef, useState } from 'react';
 import type { MutableRefObject } from 'react';
 import { transcribeSpeechAudio } from '../api/speechApi';
 import type { GuideAttachment, GuideAttachmentKind } from '../types/guide';
+
+// 提问组件统一管理文本、附件、浏览器语音识别和录音上传四种输入路径。
 import type { VoiceGuideState } from '../voice/useVoiceGuideSession';
 
 type QuestionInputProps = {
@@ -111,6 +113,7 @@ function getAttachmentType(file: File) {
 }
 
 async function readGuideAttachment(file: File): Promise<GuideAttachment> {
+  // 前端只读取并编码附件，真实内容解析和安全校验仍由服务端执行。
   const attachmentType = getAttachmentType(file);
   if (!attachmentType) {
     throw new Error(HINT_ATTACHMENT_UNSUPPORTED);
@@ -141,6 +144,7 @@ async function readGuideAttachment(file: File): Promise<GuideAttachment> {
 }
 
 function chooseRecorderMimeType(): string {
+  // 按浏览器支持顺序选择录音格式，保证 Safari 和 Chromium 都能工作。
   if (typeof MediaRecorder === 'undefined') {
     return '';
   }
@@ -155,6 +159,7 @@ function chooseRecorderMimeType(): string {
 }
 
 export function QuestionInput({ disabled, onAsk, voice }: QuestionInputProps) {
+  // 多个 ref 保存异步回调需要读取的最新状态，避免闭包使用过期值。
   const [question, setQuestion] = useState('');
   const [attachment, setAttachment] = useState<GuideAttachment | null>(null);
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');

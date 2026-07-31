@@ -1,3 +1,4 @@
+// 轻量路由解析器集中维护 URL 与页面视图之间的双向映射。
 export type TourismView =
   | 'home'
   | 'guide'

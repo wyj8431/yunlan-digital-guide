@@ -1,3 +1,4 @@
+// 景区信息面板展示开放时间、位置、图片和基础介绍。
 import { Clock, Image as ImageIcon, MapPin } from 'lucide-react';
 import { useState } from 'react';
 import type { RouteCard, ScenicAreaSummary } from '../types/guide';

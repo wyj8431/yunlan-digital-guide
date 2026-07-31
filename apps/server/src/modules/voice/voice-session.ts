@@ -1,3 +1,4 @@
+// 单个语音会话的状态机，串联实时听写、导游回答和中断控制。
 import type { GuideChatResponse } from '../guide/guide.service.js';
 import type {
   VoiceAsrCallbacks,

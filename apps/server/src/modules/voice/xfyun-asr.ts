@@ -1,3 +1,4 @@
+// 封装讯飞流式听写协议，把 PCM 音频帧转换为连续识别文本。
 import WebSocket from 'ws';
 import type { ServerEnv } from '../../config/env.js';
 import { createXfyunSignedUrl } from './xfyun-auth.js';

@@ -1,3 +1,4 @@
+// 根据回答文本生成轻量嘴型时间轴，供本地数字人无音素数据时使用。
 export type GuideViseme = 'sil' | 'aa' | 'ee' | 'oo' | 'ih' | 'oh' | 'mouth-open' | 'mouth-closed';
 
 export type GuideVisemeCue = {

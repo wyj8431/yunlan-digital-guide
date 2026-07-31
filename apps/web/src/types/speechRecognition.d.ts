@@ -1,3 +1,4 @@
+// 补充浏览器厂商前缀语音识别 API 的最小类型声明。
 export {};
 
 declare global {

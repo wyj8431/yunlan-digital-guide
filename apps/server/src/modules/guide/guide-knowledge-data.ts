@@ -1,3 +1,4 @@
+// 全国目的地知识库的结构定义与静态推荐记录。
 export type DestinationGuidePlanRecord = {
   destination: string;
   sections: string[];

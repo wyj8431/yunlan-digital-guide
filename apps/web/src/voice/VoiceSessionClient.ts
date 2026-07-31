@@ -1,3 +1,4 @@
+// 浏览器语音会话客户端，负责采集 PCM、传输事件和断线清理。
 import { PcmCapture } from './audio/PcmCapture';
 import { createBackendWebSocketUrl } from '../api/backendSocketUrl';
 import type { GuideChatResponse } from '../types/guide';

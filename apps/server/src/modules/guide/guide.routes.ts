@@ -1,3 +1,4 @@
+// 导游 HTTP 路由负责参数校验，并把领域错误映射为稳定响应。
 import Router from '@koa/router';
 import { readEnv } from '../../config/env.js';
 import { loadScenicData } from '../scenic/scenic-data.js';

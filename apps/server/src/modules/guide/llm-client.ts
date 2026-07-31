@@ -1,3 +1,4 @@
+// 模型客户端封装普通与流式聊天调用，并统一超时和供应商错误。
 import type { ServerEnv } from '../../config/env.js';
 import { chatWithCoze, chatWithCozeStream } from './coze-client.js';
 

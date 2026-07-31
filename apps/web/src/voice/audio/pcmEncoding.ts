@@ -1,3 +1,4 @@
+// 将浏览器音频采样率降到语音识别所需频率，同时保持连续采样。
 export function downsampleFloat32(
   input: Float32Array,
   inputSampleRate: number,

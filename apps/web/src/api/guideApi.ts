@@ -1,3 +1,4 @@
+// 导游 API 客户端统一处理 HTTP、WebSocket 流式事件和文件导出。
 import type {
   GuideChatResponse,
   GuideAttachment,

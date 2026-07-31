@@ -1,3 +1,4 @@
+// 将导游回答附带的结构化路线渲染为可快速浏览的卡片列表。
 import type { RouteCard } from '../types/guide';
 
 type RouteCardsProps = {

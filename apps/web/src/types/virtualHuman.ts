@@ -1,3 +1,4 @@
+// 使用可辨识联合类型约束不同数字人供应商所需的配置字段。
 export type VirtualHumanConfig =
   | {
       enabled: false;

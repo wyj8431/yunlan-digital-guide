@@ -1,3 +1,4 @@
+// 从麦克风读取浮点采样并转换为服务端听写协议需要的 PCM 数据块。
 import { downsampleFloat32, floatToPcm16 } from './pcmEncoding';
 
 type AudioContextWithWorklet = AudioContext & {

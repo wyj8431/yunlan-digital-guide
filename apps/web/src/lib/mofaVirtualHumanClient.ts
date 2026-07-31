@@ -1,5 +1,7 @@
 import type { VirtualHumanConfig } from '../types/virtualHuman';
 
+// 魔珐适配器把厂商事件和方法转换为项目内部统一的数字人客户端协议。
+
 type MofaVirtualHumanConfig = Extract<VirtualHumanConfig, { provider: 'mofa-xingyun' }>;
 
 type MofaVoiceState = 'voice_start' | 'voice_end' | 'start' | 'end' | string;
@@ -88,6 +90,7 @@ function stringifySdkPayload(payload: unknown): string {
 }
 
 function resolveFatalSdkError(payload: unknown): string | null {
+  // 仅把明确的失败状态视为致命错误，普通状态通知不会中断会话。
   const message = stringifySdkPayload(payload);
   const normalizedMessage = message.toLowerCase();
 
@@ -103,6 +106,7 @@ function resolveFatalSdkError(payload: unknown): string | null {
 }
 
 export async function loadMofaSdk(url: string): Promise<MofaAvatarConstructor> {
+  // SDK 脚本采用单例加载，避免重复注册全局构造函数和事件。
   const browserWindow = window as MofaWindow;
 
   if (browserWindow.XmovAvatar) {

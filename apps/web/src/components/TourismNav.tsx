@@ -1,3 +1,4 @@
+// 文旅页面的主导航，在桌面侧栏和移动底栏之间复用同一组选项。
 import { CalendarDays, Compass, Home, MessageCircle, UserRound } from 'lucide-react';
 import type { TourismView } from '../routing/appRoute';
 

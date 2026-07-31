@@ -1,3 +1,4 @@
+// 嘴型参数控制区把表单值转换为状态仓库需要的数值配置。
 import type { ChangeEvent } from 'react';
 import { useLipSyncLabStore } from '../store/useLipSyncLabStore';
 import type { MouthSignalConfig, RenderQualityTier } from '../types';

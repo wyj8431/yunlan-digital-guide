@@ -1,3 +1,4 @@
+// 嘴型实验室跨渲染器、状态仓库和控制面板共享的数据结构。
 export type MouthSignalConfig = {
   threshold: number;
   sensitivity: number;

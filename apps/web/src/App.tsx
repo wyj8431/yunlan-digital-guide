@@ -1,3 +1,4 @@
+// 数字人客服主页，组合导游对话、数字人舞台和景区内容面板。
 import { useEffect, useState } from 'react';
 import { fetchScenicArea } from './api/guideApi';
 import { DigitalHumanStage } from './components/DigitalHumanStage';

@@ -1,3 +1,4 @@
+// 读取当前可用的在线数字人配置，失败时由上层切换到本地模型。
 import type { VirtualHumanConfig } from '../types/virtualHuman';
 
 async function readJson<T>(response: Response): Promise<T> {

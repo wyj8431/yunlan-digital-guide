@@ -1,3 +1,4 @@
+// 生成讯飞 WebSocket 接口要求的 HMAC 鉴权地址。
 import { createHmac } from 'node:crypto';
 
 export type XfyunSignedUrlOptions = {

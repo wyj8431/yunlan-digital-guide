@@ -1,3 +1,4 @@
+// 浏览器与服务端语音 WebSocket 之间交换的事件协议。
 import type { GuideChatResponse, RouteCard } from './guide';
 
 export type VoiceOutputMode = 'xfyun-avatar' | 'local-avatar';

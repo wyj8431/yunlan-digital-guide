@@ -1,3 +1,4 @@
+// 将归一化嘴部信号映射到模型可用的 morph target 权重。
 import * as THREE from 'three';
 
 type MorphBinding = {

@@ -1,3 +1,4 @@
+// 根级路由组件，根据当前地址切换主页、展馆、视频中心和实验室。
 import { useCallback, useEffect, useState } from 'react';
 import { App } from './App';
 import { ExhibitionPage } from './components/ExhibitionPage';

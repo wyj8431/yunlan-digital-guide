@@ -1,3 +1,4 @@
+// 向前端提供脱敏后的数字人供应商配置，不暴露服务端私密凭据。
 import Router from '@koa/router';
 import { readEnv, type ServerEnv } from '../../config/env.js';
 

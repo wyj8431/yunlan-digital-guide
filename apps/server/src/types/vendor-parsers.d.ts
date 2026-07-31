@@ -1,3 +1,4 @@
+// 为缺少完整 TypeScript 声明的文档解析依赖提供最小安全接口。
 declare module 'word-extractor' {
   type ExtractedWordDocument = {
     getBody(): string;

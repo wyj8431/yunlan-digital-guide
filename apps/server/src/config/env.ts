@@ -1,3 +1,4 @@
+// 集中读取和校验环境变量，避免业务模块直接依赖未验证的字符串。
 import dotenv from 'dotenv';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

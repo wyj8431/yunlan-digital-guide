@@ -13,6 +13,8 @@ import { GUIDE_SPEECH_PLAYBACK_EVENT, isGuideSpeechPlaybackEvent } from '../lib/
 import type { GuideSpeechTimeline } from '../types/guide';
 import type { SpeechDriver } from '../types/virtualHuman';
 
+// 数字人舞台在在线视频流与本地 Three.js 模型之间提供无缝降级。
+
 const DIGITAL_HUMAN_MODEL_URL = '/models/Thanh.glb';
 const XFYUN_STREAM_DOM_ID = 'xfyun-virtual-human-stream';
 const GUIDE_BASE_ROTATION_Y = 0.16;
@@ -43,6 +45,7 @@ type DigitalHumanStageProps = {
 };
 
 function fitModelToStage(model: THREE.Object3D) {
+  // 根据包围盒统一模型高度和落脚点，避免不同 GLB 尺寸导致穿地或溢出。
   const bounds = new THREE.Box3().setFromObject(model);
   const center = new THREE.Vector3();
   const size = new THREE.Vector3();

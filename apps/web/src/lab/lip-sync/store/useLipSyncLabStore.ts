@@ -1,3 +1,4 @@
+// 实验室状态仓库集中维护音频源、嘴型参数、画质和性能快照。
 import { create } from 'zustand';
 import {
   DEFAULT_MOUTH_SIGNAL_CONFIG,

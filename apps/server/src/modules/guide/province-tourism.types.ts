@@ -1,3 +1,4 @@
+// 省级文旅知识的共享结构，约束亮点、路线、季节和实用建议。
 export type ProvinceTourismHighlight = {
   name: string;
   city: string;

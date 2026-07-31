@@ -1,3 +1,4 @@
+/* 嘴型实验室主布局和独立配色变量。 */
 .lip-sync-lab {
   display: grid;
   grid-template-columns: 235px minmax(420px, 1fr) 220px;

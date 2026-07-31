@@ -1,3 +1,4 @@
+// 根据设备能力和实时帧率选择渲染质量，并通过滞后区间防止频繁抖动。
 import type { RenderQualityTier } from '../types';
 
 export const QUALITY_PROFILES = {

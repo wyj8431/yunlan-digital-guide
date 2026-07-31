@@ -1,3 +1,4 @@
+// 服务启动入口：创建 HTTP 服务并挂载普通接口与 WebSocket 会话。
 import { createServer } from 'node:http';
 import { createApp } from './app.js';
 import { readEnv } from './config/env.js';

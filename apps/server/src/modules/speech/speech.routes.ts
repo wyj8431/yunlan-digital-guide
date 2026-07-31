@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import Router from '@koa/router';
 import WebSocket from 'ws';
+
+// 语音路由封装音频转码、讯飞鉴权、分帧上传以及识别和合成结果聚合。
 import { readEnv } from '../../config/env.js';
 
 const IAT_HOST = 'iat-api.xfyun.cn';
@@ -38,6 +40,7 @@ type TtsCredentials = AsrCredentials & {
 };
 
 function createSignedIatUrl(apiKey: string, apiSecret: string): string {
+  // 签名内容必须与请求头完全一致，时间使用 GMT 以符合讯飞鉴权协议。
   const date = new Date().toUTCString();
   const requestLine = `GET ${IAT_PATH} HTTP/1.1`;
   const signString = `host: ${IAT_HOST}\ndate: ${date}\n${requestLine}`;
@@ -89,6 +92,7 @@ function readTtsCredentials(): TtsCredentials | null {
 }
 
 function runFfmpeg(args: string[]): Promise<void> {
+  // 使用参数数组启动 ffmpeg，避免文件路径和用户输入参与命令拼接。
   return new Promise((resolve, reject) => {
     const child = spawn('ffmpeg', args, { windowsHide: true });
     let stderr = '';
@@ -109,6 +113,7 @@ function runFfmpeg(args: string[]): Promise<void> {
 }
 
 async function convertAudioToPcm(audio: Buffer, mimeType = 'audio/webm'): Promise<Buffer> {
+  // 浏览器录音格式先统一为 16kHz 单声道 PCM，再交给实时听写接口。
   const tempDir = await mkdtemp(path.join(tmpdir(), 'yunlan-asr-'));
   const inputExt = mimeType.includes('wav') ? 'wav' : mimeType.includes('ogg') ? 'ogg' : 'webm';
   const inputPath = path.join(tempDir, `input-${randomUUID()}.${inputExt}`);
@@ -133,6 +138,7 @@ function readTextFromIatResult(result: unknown): string {
 }
 
 async function transcribePcmWithXfyun(pcm: Buffer, credentials: AsrCredentials): Promise<string> {
+  // 首帧携带业务参数，中间帧传音频，尾帧显式通知服务端结束识别。
   return new Promise((resolve, reject) => {
     const socket = new WebSocket(createSignedIatUrl(credentials.apiKey, credentials.apiSecret));
     const textParts: string[] = [];
@@ -239,6 +245,7 @@ async function transcribePcmWithXfyun(pcm: Buffer, credentials: AsrCredentials):
 }
 
 async function synthesizeTextWithXfyun(text: string, credentials: TtsCredentials): Promise<Buffer> {
+  // 合成服务按帧返回 Base64 音频，此处按序收集后再一次性响应客户端。
   return new Promise((resolve, reject) => {
     const socket = new WebSocket(createSignedTtsUrl(credentials.apiKey, credentials.apiSecret));
     const chunks: Buffer[] = [];

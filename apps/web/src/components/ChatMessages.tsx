@@ -1,3 +1,4 @@
+// 消息列表渲染 Markdown、流式状态、附件预览和多格式导出操作。
 import { useEffect, useRef, useState } from 'react';
 import { Download, FileCode2, FileSpreadsheet, FileText, FileType2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';

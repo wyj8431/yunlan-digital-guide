@@ -1,3 +1,4 @@
+// 嘴型实验室组合音频输入、渲染舞台、参数控制和性能监控。
 import { useCallback, useEffect, useRef } from 'react';
 import type { AudioAnalysisFrame, AudioAnalysisSession } from './audio/audioSource';
 import { AudioSourceToolbar } from './components/AudioSourceToolbar';

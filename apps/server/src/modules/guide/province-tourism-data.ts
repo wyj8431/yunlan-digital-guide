@@ -1,3 +1,4 @@
+// 汇总各地区省级文旅记录，供导游服务统一检索。
 import { centralSouthProvinceTourismRecords } from './province-tourism-central-south.js';
 import { eastProvinceTourismRecords } from './province-tourism-east.js';
 import { northEastProvinceTourismRecords } from './province-tourism-north-east.js';

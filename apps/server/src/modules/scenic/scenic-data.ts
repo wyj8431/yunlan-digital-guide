@@ -1,3 +1,4 @@
+// 加载并导出经过类型约束的本地景区静态数据。
 import scenicData from '../../data/yunlan-town.json' with { type: 'json' };
 import type { ScenicAreaSummary, ScenicData } from '../../types/scenic.js';
 

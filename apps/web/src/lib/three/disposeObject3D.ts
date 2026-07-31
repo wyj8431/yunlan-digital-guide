@@ -1,3 +1,4 @@
+// 递归释放 Three.js 对象树中的几何体、材质和纹理资源。
 import * as THREE from 'three';
 
 function disposeMaterialTextures(material: THREE.Material, disposedTextures: Set<THREE.Texture>) {

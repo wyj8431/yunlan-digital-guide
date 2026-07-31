@@ -1,3 +1,4 @@
+// 通过页面级事件解耦聊天打字机与不同数字人供应商的语音进度。
 export const GUIDE_SPEECH_DURATION_EVENT = 'yunlan:guide-speech-duration';
 export const GUIDE_SPEECH_PLAYBACK_EVENT = 'yunlan:guide-speech-playback';
 

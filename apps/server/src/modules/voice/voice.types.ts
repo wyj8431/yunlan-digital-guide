@@ -1,3 +1,4 @@
+// 服务端语音会话的客户端消息和服务端事件联合类型。
 import type { RouteCard } from '../guide/guide.service.js';
 
 export type VoiceOutputMode = 'xfyun-avatar' | 'local-avatar';

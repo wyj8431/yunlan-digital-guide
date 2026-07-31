@@ -7,6 +7,8 @@ import sharp from 'sharp';
 import Tesseract from 'tesseract.js';
 import WordExtractor from 'word-extractor';
 
+// 附件模块统一完成格式校验、文本提取、OCR 和供模型使用的内容裁剪。
+
 export type GuideAttachmentKind =
   'image' | 'document' | 'spreadsheet' | 'presentation' | 'markdown';
 
@@ -70,6 +72,7 @@ function extensionOf(name: string): string {
 }
 
 function decodeDataUrl(dataUrl: string): { buffer: Buffer; declaredMimeType: string } {
+  // 严格解析 data URL，避免把任意字符串当作二进制附件处理。
   const match = DATA_URL_PATTERN.exec(dataUrl);
   if (!match) {
     throw new GuideAttachmentError('INVALID_ATTACHMENT', '附件内容无效，请重新选择文件。');
@@ -110,6 +113,7 @@ function normalizeText(value: string, preserveFormatting = false): string {
 }
 
 function decodeTextBuffer(buffer: Buffer): string {
+  // 兼容带 BOM 的 UTF 文本，并在常见编码之间选择可读结果。
   if (buffer.length >= 2 && buffer[0] === 0xff && buffer[1] === 0xfe) {
     return buffer.subarray(2).toString('utf16le');
   }
@@ -131,6 +135,7 @@ function decodeTextBuffer(buffer: Buffer): string {
 }
 
 export function isReliableOcrText(value: string, confidence: number): boolean {
+  // OCR 结果同时满足置信度和有效字符比例后才用于回答。
   const text = normalizeText(value);
   if (!text || !Number.isFinite(confidence) || confidence < 55) {
     return false;
@@ -149,6 +154,7 @@ function canonicalMimeType(rule: AttachmentRule, providedMimeType: string): stri
 }
 
 export function normalizeGuideAttachment(input: unknown): GuideAttachment | null {
+  // 此处只做结构与大小校验，耗时的解析工作留给异步准备阶段。
   if (!input || typeof input !== 'object') {
     return null;
   }
@@ -272,6 +278,7 @@ function markdownTableCell(value: string): string {
 }
 
 function spreadsheetRowsToMarkdown(rows: unknown[][]): string {
+  // 转成 Markdown 表格可同时保留行列关系并方便模型阅读。
   if (rows.length === 0) {
     return '_空工作表_';
   }

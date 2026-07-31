@@ -25,6 +25,8 @@ import type {
   RouteCard
 } from '../types/guide';
 
+// 该 Hook 是聊天状态机：负责请求、流式增量、打字机、语音同步和历史持久化。
+
 const TYPEWRITER_FRAME_MS = 48;
 const PREVIEW_CHARACTER_MS = 145;
 const PREVIEW_CHARACTER_LIMIT = 10;
@@ -49,6 +51,7 @@ type ActiveTypewriter = {
 };
 
 function getSpeechVisibleLimit(typewriter: ActiveTypewriter): number {
+  // 长回答限制文字领先语音的距离，让嘴型、播报和屏幕内容保持接近。
   if (typewriter.characters.length < LONG_ANSWER_SYNC_THRESHOLD) {
     return typewriter.characters.length;
   }
@@ -67,6 +70,7 @@ function estimateSpeechDurationMs(text: string): number {
 }
 
 export function buildConversationHistory(messages: ChatMessage[]): GuideConversationMessage[] {
+  // 发送给服务端的历史只包含有内容的最近消息，控制上下文长度。
   return messages
     .filter((message) => message.content.trim())
     .slice(-6)
@@ -80,6 +84,7 @@ function buildSessionTitle(messages: ChatMessage[]) {
 }
 
 export function useGuideChat() {
+  // 请求与动画会并行更新状态，关键值通过 ref 在异步回调间保持最新。
   const typingTimerRef = useRef<number | null>(null);
   const speechStartFallbackTimerRef = useRef<number | null>(null);
   const activeTypewriterRef = useRef<ActiveTypewriter | null>(null);

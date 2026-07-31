@@ -1,3 +1,4 @@
+// 将导游回答导出为文本、Markdown、Word 或 Excel 文件。
 import nodeXlsx from 'node-xlsx';
 import { OfficeParser } from 'officeparser';
 

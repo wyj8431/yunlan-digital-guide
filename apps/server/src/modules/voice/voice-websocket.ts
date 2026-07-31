@@ -1,3 +1,4 @@
+// 管理浏览器语音导游 WebSocket 的连接、消息校验和会话清理。
 import type { IncomingMessage, Server as HttpServer } from 'node:http';
 import type { Duplex } from 'node:stream';
 import { WebSocket, WebSocketServer } from 'ws';

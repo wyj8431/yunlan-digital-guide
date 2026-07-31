@@ -1,3 +1,4 @@
+// OpenAPI 文档定义集中维护接口契约、请求示例和错误响应。
 type JsonSchema = Record<string, unknown>;
 
 function errorSchema(...codes: string[]): JsonSchema {

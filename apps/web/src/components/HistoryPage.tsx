@@ -1,3 +1,4 @@
+// 历史页面负责会话检索、查看、继续对话和本地删除操作。
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Clock3, History, MessageCircle, Play, Trash2 } from 'lucide-react';
 import type { TourismView } from '../routing/appRoute';

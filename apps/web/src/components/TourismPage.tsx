@@ -1,3 +1,4 @@
+// 文旅专题页展示地图、章节、行程信息和会话内旅行护照。
 import { useState, type CSSProperties } from 'react';
 import {
   ArrowLeft,

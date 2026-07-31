@@ -11,6 +11,8 @@ import {
 } from '../lib/xfyunVirtualHumanClient';
 import type { SpeechDriver, VirtualHumanConfig } from '../types/virtualHuman';
 
+// 统一接入讯飞和魔珐数字人，并向页面暴露一致的加载、说话和降级状态。
+
 type VirtualHumanStatus = 'fallback' | 'loading' | 'ready' | 'speaking' | 'error';
 type OnlineVirtualHumanClient = XfyunVirtualHumanClient | MofaVirtualHumanClient;
 type EnabledVirtualHumanConfig = Extract<VirtualHumanConfig, { enabled: true }>;
@@ -100,6 +102,7 @@ function createOnlineClient(
 }
 
 export function describeOnlineFailure(config: EnabledVirtualHumanConfig, caught: unknown): string {
+  // 将 SDK 的技术错误转换成用户可理解且不泄露凭据的提示。
   const rawMessage =
     caught instanceof Error
       ? `${caught.name}: ${caught.message}`

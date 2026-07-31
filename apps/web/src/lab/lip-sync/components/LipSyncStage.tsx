@@ -1,3 +1,4 @@
+// 嘴型舞台负责创建渲染器、响应容器尺寸并展示加载或错误状态。
 import { useEffect, useRef, useState } from 'react';
 import type { AudioAnalysisFrame } from '../audio/audioSource';
 import { LipSyncRenderer, type LipSyncDebugFrame } from '../three/LipSyncRenderer';

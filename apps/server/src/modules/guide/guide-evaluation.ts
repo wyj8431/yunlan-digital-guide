@@ -1,3 +1,4 @@
+// 导游黄金用例及规则评分器，用于发现回答质量回归。
 export type GuideGoldenCase = {
   name: string;
   message: string;

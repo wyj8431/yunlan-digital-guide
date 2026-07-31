@@ -1,3 +1,4 @@
+// 导游侧栏组合消息列表、快捷问题和多模态提问输入。
 import type { ChatMessage, GuideAttachment, ScenicAreaSummary } from '../types/guide';
 import type { VoiceGuideState } from '../voice/useVoiceGuideSession';
 import { ChatMessages } from './ChatMessages';

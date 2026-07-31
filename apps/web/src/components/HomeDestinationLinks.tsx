@@ -1,3 +1,4 @@
+// 主页右上角入口分别导航到独立的 3D 展馆和视频中心页面。
 import { Landmark, PlaySquare } from 'lucide-react';
 
 export function HomeDestinationLinks() {

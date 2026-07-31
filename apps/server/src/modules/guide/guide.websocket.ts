@@ -1,3 +1,4 @@
+// 导游流式 WebSocket 入口，负责增量事件发送、取消和异常收口。
 import type { IncomingMessage, Server as HttpServer } from 'node:http';
 import type { Duplex } from 'node:stream';
 import { WebSocket, WebSocketServer } from 'ws';

@@ -1,3 +1,4 @@
+// Koa 应用装配入口：初始化共享依赖、注册中间件和各业务路由。
 import cors from '@koa/cors';
 import Router from '@koa/router';
 import { mkdirSync } from 'node:fs';

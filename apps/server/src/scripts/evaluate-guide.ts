@@ -1,3 +1,4 @@
+// 命令行评测入口，使用黄金用例检查导游回答的基本质量。
 import { readEnv } from '../config/env.js';
 import { createGuideResponse } from '../modules/guide/guide.service.js';
 import {

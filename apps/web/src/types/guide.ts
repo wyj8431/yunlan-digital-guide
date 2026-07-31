@@ -1,3 +1,4 @@
+// 导游前端共享类型，覆盖景区、消息、附件、路线和语音时间轴。
 export type ScenicAreaInfo = {
   id: string;
   name: string;

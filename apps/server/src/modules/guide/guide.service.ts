@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 import type { ServerEnv } from '../../config/env.js';
 import type { ScenicData } from '../../types/scenic.js';
+
+// 导游服务负责意图判断、附件分析、模型调用、降级回答和流式输出的统一编排。
 import { loadScenicData } from '../scenic/scenic-data.js';
 import {
   findDestinationGuidePlan,
@@ -269,6 +271,7 @@ const CHAT_READABILITY_RULE =
   '回答先用 1-2 句给出结论，再使用 2-5 个编号要点；每段不超过 3 句，段落之间空一行。路线、建议和注意事项必须分点，不要输出一整段连续长文本。';
 
 function pickRoute(message: string, scenicData: ScenicData) {
+  // 优先按路线名称匹配；没有明确名称时回退到首条推荐路线。
   const normalized = message.toLowerCase();
 
   if (message.includes('亲子') || message.includes('孩子') || normalized.includes('family')) {
@@ -377,6 +380,7 @@ function looksLikePastedMarkdown(message: string): boolean {
 }
 
 function isTourismDocument(attachment: PreparedGuideAttachment): boolean {
+  // 强关键词可单独判定，弱关键词必须跨类别同时出现，以减少普通文档误判。
   const documentText = `${attachment.name}\n${attachment.extractedText ?? ''}`.trim().toLowerCase();
   if (!documentText) {
     return false;
@@ -575,6 +579,7 @@ function cleanDocumentHeading(value: string): string {
 }
 
 function createLongDocumentSummary(attachment: PreparedGuideAttachment): string {
+  // 长文档在本地抽取标题和代表段落，避免把超长全文直接发送给模型。
   const extractedText = attachment.extractedText?.trim() ?? '';
   const headings = extractedText
     .split('\n')
@@ -1010,6 +1015,7 @@ async function emitAnswerDeltas(
   onDelta: (delta: string) => void,
   signal?: AbortSignal
 ) {
+  // 本地回答也按小片段输出，使前端与真实模型流使用同一套渲染路径。
   const characters = Array.from(answer);
 
   for (let index = 0; index < characters.length; index += 4) {
@@ -1059,6 +1065,7 @@ const MAX_GUIDE_HISTORY_MESSAGES = 6;
 const MAX_GUIDE_HISTORY_CONTENT_LENGTH = 4_000;
 
 export function normalizeGuideHistory(input: unknown): GuideConversationMessage[] {
+  // 只保留最近且长度受限的有效消息，控制提示词体积并隔离异常输入。
   if (!Array.isArray(input)) {
     return [];
   }

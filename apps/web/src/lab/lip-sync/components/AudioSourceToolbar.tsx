@@ -1,3 +1,4 @@
+// 音频工具栏统一管理麦克风、文件、演示信号和播放状态。
 import type { MutableRefObject } from 'react';
 import { ArrowLeft, Link, Pause, Play, RotateCcw, Upload } from 'lucide-react';
 import { createAudioAnalysisSession, type AudioAnalysisSession } from '../audio/audioSource';

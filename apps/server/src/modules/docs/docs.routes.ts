@@ -1,3 +1,4 @@
+// 提供 OpenAPI JSON 和可直接浏览的接口文档页面。
 import Router from '@koa/router';
 import { createOpenApiDocument } from './openapi.js';
 

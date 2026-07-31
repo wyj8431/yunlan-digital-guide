@@ -1,3 +1,4 @@
+// 从本地景区知识中召回与用户问题最相关的结构化片段。
 import type { ScenicData } from '../../types/scenic.js';
 import { destinationGuidePlanRecords, destinationPlanAliases } from './guide-knowledge-data.js';
 import { formatProvinceTourismRecord, provinceTourismRecords } from './province-tourism-data.js';

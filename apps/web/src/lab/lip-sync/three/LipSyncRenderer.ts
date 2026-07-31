@@ -1,3 +1,4 @@
+// 嘴型实验室的 Three.js 渲染器，负责模型、动画循环和画质切换。
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { disposeObject3D } from '../../../lib/three/disposeObject3D';
