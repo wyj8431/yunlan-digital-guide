@@ -3,6 +3,8 @@ import type { IncomingMessage, Server as HttpServer } from 'node:http';
 import type { Duplex } from 'node:stream';
 import { WebSocket, WebSocketServer } from 'ws';
 import { readEnv } from '../../config/env.js';
+import { loadScenicData, mergeScenicDataWithSummary } from '../scenic/scenic-data.js';
+import { ScenicLiveService } from '../scenic/scenic-live.service.js';
 import { GuideAttachmentError, normalizeGuideAttachment } from './guide-attachment.js';
 import {
   createGuideStreamResponse,
@@ -14,6 +16,10 @@ import {
 import type { GuideSpeechTimeline } from './speech-timeline.js';
 
 const GUIDE_CHAT_STREAM_PATH = '/api/guide/chat/stream';
+
+export type GuideWebSocketDependencies = {
+  scenicLiveService?: ScenicLiveService;
+};
 
 function requestPath(req: IncomingMessage): string {
   return req.url?.split('?')[0] ?? '';
@@ -51,7 +57,10 @@ function parseRequest(raw: WebSocket.RawData): GuideStreamRequest {
   return JSON.parse(text) as GuideStreamRequest;
 }
 
-export function attachGuideWebSocketServer(server: HttpServer): WebSocketServer {
+export function attachGuideWebSocketServer(
+  server: HttpServer,
+  dependencies: GuideWebSocketDependencies = {}
+): WebSocketServer {
   const wss = new WebSocketServer({ noServer: true });
 
   server.on('upgrade', (req: IncomingMessage, socket: Duplex, head: Buffer) => {
@@ -87,6 +96,13 @@ export function attachGuideWebSocketServer(server: HttpServer): WebSocketServer 
 
         sendEvent(socket, { type: 'start' });
 
+        const scenicData = dependencies.scenicLiveService
+          ? mergeScenicDataWithSummary(
+              loadScenicData(),
+              await dependencies.scenicLiveService.getSummary()
+            )
+          : undefined;
+
         const response = await createGuideStreamResponse({
           message: request.message,
           attachment:
@@ -94,6 +110,7 @@ export function attachGuideWebSocketServer(server: HttpServer): WebSocketServer 
               ? normalizeGuideAttachment(request.attachment)
               : normalizeGuideImage(request.image),
           history: normalizeGuideHistory(request.history),
+          scenicData,
           env: readEnv(),
           onDelta: (delta) => sendEvent(socket, { type: 'delta', delta }),
           signal: controller.signal

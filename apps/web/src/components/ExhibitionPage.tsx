@@ -3,8 +3,10 @@ import {
   AudioLines,
   Bot,
   ExternalLink,
+  Expand,
   Gauge,
   Map,
+  RotateCcw,
   Volume2,
   VolumeX,
   X
@@ -16,7 +18,7 @@ import { ExhibitionRenderer } from '../exhibition/ExhibitionRenderer';
 import type { QualityLevel } from '../exhibition/quality/qualityProfile';
 import { WestLakeScene } from '../exhibition/westLakeScene';
 
-type ExhibitionPageProps = { onReturnHome: () => void };
+type ExhibitionPageProps = { onReturnHome: () => void; onOpenGuide?: () => void };
 type SceneMode = 'hall' | 'lake';
 type PageState = 'loading' | 'hall' | 'detail-open' | 'transitioning' | 'lake' | 'render-error';
 type TransitionPhase = 'fade-out' | 'switch' | 'fade-in';
@@ -37,27 +39,52 @@ const EMPTY_PROGRESS: AssetProgress = {
 
 const EXHIBITS: Record<string, { title: string; description: string; sandTable?: boolean }> = {
   'west-lake-map': {
-    title: '西湖数字沙盘',
-    description: '以三维场景呈现湖岸、苏堤和雷峰塔的空间关系。',
+    title: '乌镇路线数字沙盘',
+    description: '以三维场景呈现乌镇水巷、石桥和东栅西栅之间的游览关系。',
     sandTable: true
   },
   'silk-and-tea': {
-    title: '丝茶文化',
-    description: '杭州丝绸与西湖龙井共同记录了江南生活的手艺与滋味。'
+    title: '乌镇茶礼与水乡生活',
+    description: '从一盏茶看乌镇水乡的待客方式、日常节奏与江南手艺。'
   },
   'silk-garment': {
-    title: '杭罗丝绸服饰',
-    description: '轻薄的杭罗织物体现了江南织造的细密工艺与含蓄审美。'
+    title: '水乡丝绸服饰',
+    description: '轻薄织物与克制纹样记录了乌镇水乡延续至今的生活审美。'
   },
   'west-lake-bicycle': {
-    title: '西湖绿道自行车',
-    description: '绿色出行连接湖滨、北山街与杨公堤，适合慢速游览。'
+    title: '乌镇水乡慢游自行车',
+    description: '沿着水巷、桥埠和临水街巷慢速游览，感受乌镇的生活尺度。'
   },
   'green-mobility-car': {
-    title: '绿色接驳车',
-    description: '景区接驳系统将公交、步行和骑行节点连成低碳游线。'
-  }
+    title: '乌镇景区接驳车',
+    description: '接驳系统把入口、东栅、西栅和重点场馆连成便于换乘的游线。'
+  },
+  'entrance-hologram': {
+    title: '乌镇入口全息大屏',
+    description: '从乌镇水乡全景、东栅生活到西栅夜游，入口屏把整座展厅的游览路径串联起来。'
+  },
+  'wuzhen-streets': {
+    title: '乌镇街巷复刻空间',
+    description: '沿着水巷、石桥和临水民居，了解乌镇街巷与水路共同形成的生活尺度。'
+  },
+  'itinerary-diy': {
+    title: '乌镇路线 DIY 操作台',
+    description: '选择景点、时间和游览偏好，生成一条适合自己的乌镇路线。'
+  },
+  'culture-folk': {
+    title: '木心与水乡非遗',
+    description: '木心美术馆、蓝印花布、杭扇、定胜糕和水乡婚俗在这里并置呈现。'
+  },
 };
+
+const SHOWROOM_ZONES = [
+  { id: 'entrance', name: '乌镇入口前厅' },
+  { id: 'wuzhen', name: '乌镇全景总览' },
+  { id: 'global', name: '东栅生活街区' },
+  { id: 'interactive', name: '路线与沉浸体验' },
+  { id: 'supporting', name: '水巷餐饮与文创' },
+  { id: 'culture', name: '木心与非遗文化' }
+] as const;
 
 const QUALITY_LABELS: Record<QualityLevel, string> = {
   high: '高',
@@ -78,7 +105,7 @@ function progressPercent(progress: AssetProgress): number {
   return Math.round((progress.completed / Math.max(progress.total, 1)) * 100);
 }
 
-export function ExhibitionPage({ onReturnHome }: ExhibitionPageProps) {
+export function ExhibitionPage({ onReturnHome, onOpenGuide }: ExhibitionPageProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<ActiveRenderer | null>(null);
   const audioRuntimeRef = useRef<ExhibitionAudio | null>(null);
@@ -95,6 +122,9 @@ export function ExhibitionPage({ onReturnHome }: ExhibitionPageProps) {
   const [transition, setTransition] = useState<TransitionState | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [sceneReady, setSceneReady] = useState(false);
+  const [activeZoneId, setActiveZoneId] = useState('entrance');
+  const [zoneNavOpen, setZoneNavOpen] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const qualityRef = useRef<QualityLevel>('high');
   const qualityOverrideRef = useRef<QualityLevel | null>(null);
   const mutedRef = useRef(false);
@@ -178,7 +208,7 @@ export function ExhibitionPage({ onReturnHome }: ExhibitionPageProps) {
         clearTransitionTimer();
         transitionRef.current = null;
         setTransition(null);
-        setNotice(scene === 'lake' ? '西湖场景加载失败，已返回展馆' : '展馆加载失败，已返回西湖');
+        setNotice(scene === 'lake' ? '乌镇实景加载失败，已返回展馆' : '展馆加载失败，已返回乌镇实景');
         setScene(pending.from);
         setPageState(pending.from);
         return;
@@ -190,6 +220,7 @@ export function ExhibitionPage({ onReturnHome }: ExhibitionPageProps) {
       host,
       onProgress: setProgress,
       onReady: handleReady,
+      onZoneChange: setActiveZoneId,
       onQualityChange: (nextQuality: QualityLevel) => {
         qualityRef.current = nextQuality;
         setQuality(nextQuality);
@@ -241,6 +272,12 @@ export function ExhibitionPage({ onReturnHome }: ExhibitionPageProps) {
     window.addEventListener('keydown', closeOnEscape);
     return () => window.removeEventListener('keydown', closeOnEscape);
   }, [pageState]);
+
+  useEffect(() => {
+    const syncFullscreenState = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener('fullscreenchange', syncFullscreenState);
+    return () => document.removeEventListener('fullscreenchange', syncFullscreenState);
+  }, []);
 
   useEffect(
     () => () => {
@@ -312,6 +349,34 @@ export function ExhibitionPage({ onReturnHome }: ExhibitionPageProps) {
     setPageState('hall');
   }
 
+  function goToZone(zoneId: string) {
+    const renderer = rendererRef.current;
+    if (!(renderer instanceof ExhibitionRenderer) || scene !== 'hall') return;
+    setSelectedId(null);
+    setPageState('hall');
+    setActiveZoneId(zoneId);
+    renderer.goToZone(zoneId);
+  }
+
+  function resetView() {
+    const renderer = rendererRef.current;
+    if (!(renderer instanceof ExhibitionRenderer) || scene !== 'hall') return;
+    renderer.goToZone(activeZoneId);
+  }
+
+  async function toggleFullscreen() {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+        return;
+      }
+      const page = hostRef.current?.closest('.exhibition-page');
+      if (page?.requestFullscreen) await page.requestFullscreen();
+    } catch {
+      setNotice('当前浏览器不支持全屏显示');
+    }
+  }
+
   const percent = progressPercent(progress);
   const transitioning = pageState === 'transitioning';
 
@@ -320,7 +385,7 @@ export function ExhibitionPage({ onReturnHome }: ExhibitionPageProps) {
       <div
         ref={hostRef}
         className="exhibition-canvas-host"
-        aria-label={scene === 'hall' ? '西湖室内 3D 展馆' : '西湖 3D 实景'}
+        aria-label={scene === 'hall' ? '乌镇室内 3D 展馆' : '乌镇 3D 实景'}
         data-exhibition-ready={sceneReady ? 'true' : 'false'}
       />
 
@@ -348,7 +413,7 @@ export function ExhibitionPage({ onReturnHome }: ExhibitionPageProps) {
           className="exhibition-transition"
           data-testid="scene-transition"
           data-phase={transition.phase}
-          aria-label={transition.target === 'lake' ? '正在进入西湖' : '正在返回展馆'}
+          aria-label={transition.target === 'lake' ? '正在进入乌镇实景' : '正在返回展馆'}
           role="status"
         />
       )}
@@ -358,13 +423,13 @@ export function ExhibitionPage({ onReturnHome }: ExhibitionPageProps) {
           <ArrowLeft aria-hidden="true" />
         </button>
         <div className="exhibition-heading">
-          <span>{scene === 'hall' ? '西湖文旅数字展馆' : '西湖数字实景'}</span>
-          <h1>{scene === 'hall' ? '3D 展馆' : '湖山全景'}</h1>
+          <span>{scene === 'hall' ? '乌镇文旅数字展馆' : '乌镇数字实景'}</span>
+          <h1>{scene === 'hall' ? '3D 展馆' : '水乡全景'}</h1>
         </div>
         <button
           className="exhibition-service"
           type="button"
-          onClick={onReturnHome}
+          onClick={onOpenGuide ?? onReturnHome}
           aria-label="数字人客服"
           title="数字人客服"
         >
@@ -392,6 +457,66 @@ export function ExhibitionPage({ onReturnHome }: ExhibitionPageProps) {
         >
           <Gauge aria-hidden="true" />
           <span>{QUALITY_LABELS[quality]}</span>
+        </button>
+      </nav>
+
+      {scene === 'hall' && pageState !== 'render-error' && zoneNavOpen && (
+        <nav className="exhibition-zone-nav" aria-label="展厅分区导航">
+          <span>展厅分区</span>
+          <div>
+            {SHOWROOM_ZONES.map((zone) => (
+              <button
+                key={zone.id}
+                type="button"
+                data-active={activeZoneId === zone.id ? 'true' : 'false'}
+                onClick={() => goToZone(zone.id)}
+                disabled={transitioning || pageState === 'loading'}
+              >
+                {zone.name}
+              </button>
+            ))}
+          </div>
+        </nav>
+      )}
+
+      <nav className="exhibition-action-dock" aria-label="展厅快捷操作">
+        <button
+          type="button"
+          onClick={onOpenGuide ?? onReturnHome}
+          aria-label="打开数字人客服"
+          title="打开数字人客服"
+        >
+          <Bot aria-hidden="true" />
+        </button>
+        {scene === 'hall' && (
+          <button
+            type="button"
+            onClick={() => setZoneNavOpen((open) => !open)}
+            aria-label={zoneNavOpen ? '隐藏展厅分区' : '显示展厅分区'}
+            title={zoneNavOpen ? '隐藏展厅分区' : '显示展厅分区'}
+            aria-pressed={zoneNavOpen}
+          >
+            <Map aria-hidden="true" />
+          </button>
+        )}
+        {scene === 'hall' && (
+          <button
+            type="button"
+            onClick={resetView}
+            aria-label="复位当前视角"
+            title="复位当前视角"
+            disabled={!sceneReady || transitioning}
+          >
+            <RotateCcw aria-hidden="true" />
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => void toggleFullscreen()}
+          aria-label={isFullscreen ? '退出全屏' : '进入全屏'}
+          title={isFullscreen ? '退出全屏' : '进入全屏'}
+        >
+          <Expand aria-hidden="true" />
         </button>
       </nav>
 
@@ -445,7 +570,7 @@ export function ExhibitionPage({ onReturnHome }: ExhibitionPageProps) {
                 disabled={transitioning}
               >
                 <Map aria-hidden="true" />
-                进入西湖沙盘
+                进入乌镇沙盘
               </button>
             )}
             <a href="/videos">

@@ -1,3 +1,5 @@
+import { HALL_Z_BOUNDS } from './exhibitionLayout';
+
 export type Point2 = { x: number; z: number };
 
 export type Collider = {
@@ -8,11 +10,15 @@ export type Collider = {
 };
 
 export const ROOM_BOUNDS: Collider = {
-  minX: -8,
-  maxX: 8,
-  minZ: -10,
-  maxZ: 10
+  minX: -22,
+  maxX: 22,
+  minZ: HALL_Z_BOUNDS.min,
+  maxZ: HALL_Z_BOUNDS.max
 };
+
+// Compatibility aliases for the later outdoor scene helpers that remain in the workspace.
+export const HALL_BOUNDS = ROOM_BOUNDS;
+export const HALL_COLLIDERS: Collider[] = [];
 
 export const PLAYER_RADIUS = 0.4;
 export const MAX_FRAME_DELTA_SECONDS = 0.1;

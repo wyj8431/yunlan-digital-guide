@@ -137,7 +137,7 @@ describe('ExhibitionPage', () => {
 
     finishHallLoading();
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('西湖室内 3D 展馆')).toHaveAttribute(
+    expect(screen.getByLabelText('乌镇室内 3D 展馆')).toHaveAttribute(
       'data-exhibition-ready',
       'true'
     );
@@ -170,7 +170,7 @@ describe('ExhibitionPage', () => {
 
     act(() => rendererState.selectExhibit?.('west-lake-bicycle'));
 
-    expect(screen.getByRole('dialog', { name: '西湖绿道自行车' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: '乌镇水乡慢游自行车' })).toBeInTheDocument();
     expect(rendererState.setFocus).toHaveBeenCalledWith('west-lake-bicycle');
     expect(rendererState.setInteractionEnabled).toHaveBeenLastCalledWith(false);
 
@@ -190,7 +190,7 @@ describe('ExhibitionPage', () => {
     act(() => rendererState.selectExhibit?.('west-lake-map'));
     rendererState.setTransitionProgress.mockClear();
 
-    fireEvent.click(screen.getByRole('button', { name: '进入西湖沙盘' }));
+    fireEvent.click(screen.getByRole('button', { name: '进入乌镇沙盘' }));
     expect(screen.getByTestId('scene-transition')).toHaveAttribute('data-phase', 'fade-out');
     expect(rendererState.setInteractionEnabled).toHaveBeenLastCalledWith(false);
     expect(rendererState.setTransitionProgress).toHaveBeenCalledWith(0);
@@ -208,13 +208,13 @@ describe('ExhibitionPage', () => {
     act(() => vi.advanceTimersByTime(600));
     expect(rendererState.setTransitionProgress).toHaveBeenCalledWith(0);
     expect(screen.queryByTestId('scene-transition')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('西湖 3D 实景')).toHaveAttribute('data-exhibition-ready', 'true');
+    expect(screen.getByLabelText('乌镇 3D 实景')).toHaveAttribute('data-exhibition-ready', 'true');
 
     fireEvent.click(screen.getByRole('button', { name: '返回展馆' }));
     act(() => vi.advanceTimersByTime(600));
     act(() => rendererState.hallCallbacks?.onReady?.());
     act(() => vi.advanceTimersByTime(600));
-    expect(screen.getByLabelText('西湖室内 3D 展馆')).toBeInTheDocument();
+    expect(screen.getByLabelText('乌镇室内 3D 展馆')).toBeInTheDocument();
   });
 
   it('recovers the previous scene when the target scene fails during a transition', () => {
@@ -223,12 +223,12 @@ describe('ExhibitionPage', () => {
     finishHallLoading();
     act(() => rendererState.selectExhibit?.('west-lake-map'));
 
-    fireEvent.click(screen.getByRole('button', { name: '进入西湖沙盘' }));
+    fireEvent.click(screen.getByRole('button', { name: '进入乌镇沙盘' }));
     act(() => vi.advanceTimersByTime(600));
     act(() => rendererState.lakeCallbacks?.onFatalError?.(new Error('WebGL context lost')));
 
-    expect(screen.getByRole('alert')).toHaveTextContent('西湖场景加载失败，已返回展馆');
-    expect(screen.getByLabelText('西湖室内 3D 展馆')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('乌镇实景加载失败，已返回展馆');
+    expect(screen.getByLabelText('乌镇室内 3D 展馆')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '返回首页' })).toBeEnabled();
   });
 

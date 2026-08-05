@@ -1,0 +1,19 @@
+{
+  "routes": [
+    {
+      "id": "west-route",
+      "name": "西栅水巷线",
+      "points": ["qiaoli-bridge", "hongyuantai-dyehouse", "water-market", "old-stage", "bailian-tower", "tongji-bridge"]
+    },
+    {
+      "id": "heritage-workshops",
+      "name": "非遗展馆专线",
+      "points": ["hongyuantai-dyehouse", "old-stage", "jiangnan-bed-hall"]
+    },
+    {
+      "id": "humanities",
+      "name": "人文故居专线",
+      "points": ["mao-dun-house", "lizhi-academy", "jiangnan-bed-hall"]
+    }
+  ]
+}

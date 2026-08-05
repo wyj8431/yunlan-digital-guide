@@ -14,7 +14,8 @@ export type AppRoute =
   | { kind: 'lip-sync-lab' }
   | { kind: 'tourism'; view: TourismView }
   | { kind: 'exhibition' }
-  | { kind: 'videos' };
+  | { kind: 'videos' }
+  | { kind: 'scenic-vr'; spotId: string };
 
 const VIEW_PATHS: Record<TourismView, string> = {
   explore: '/',
@@ -40,7 +41,7 @@ function normalizePathname(pathname: string) {
   return pathname.replace(/\/+$/, '') || '/';
 }
 
-export function resolveAppRoute(pathname: string): AppRoute {
+export function resolveAppRoute(pathname: string, _search = ''): AppRoute {
   const normalizedPathname = normalizePathname(pathname);
 
   if (normalizedPathname === '/lab/lip-sync') {
@@ -55,6 +56,11 @@ export function resolveAppRoute(pathname: string): AppRoute {
     return { kind: 'videos' };
   }
 
+  const scenicVrMatch = normalizedPathname.match(/^\/vr\/([^/]+)$/);
+  if (scenicVrMatch) {
+    return { kind: 'scenic-vr', spotId: decodeURIComponent(scenicVrMatch[1]) };
+  }
+
   return {
     kind: 'tourism',
     view: PATH_VIEWS.get(normalizedPathname) ?? 'explore'
@@ -63,4 +69,8 @@ export function resolveAppRoute(pathname: string): AppRoute {
 
 export function pathForTourismView(view: TourismView) {
   return VIEW_PATHS[view];
+}
+
+export function pathForScenicVR(spotId: string) {
+  return `/vr/${encodeURIComponent(spotId)}`;
 }

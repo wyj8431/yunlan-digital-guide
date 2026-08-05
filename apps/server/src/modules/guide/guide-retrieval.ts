@@ -20,6 +20,7 @@ export type RetrievedGuideKnowledge = GuideKnowledgeDocument & {
 const GENERIC_INTENT_KEYWORDS = new Set(['景点', '拍照', '路线', '行程', '服务', '问答']);
 const NATIONAL_RECOMMENDATION_KEYWORDS = ['全国', '各省', '国内推荐'];
 const NATIONAL_REPRESENTATIVE_PROVINCES = ['北京', '山西', '上海', '湖南'];
+const LIVE_SCENIC_INTENT_KEYWORDS = ['门票', '票价', '票务', '开放时间', '几点开放', '价格'];
 
 function hasDetailedDestinationMention(message: string): boolean {
   return (
@@ -132,7 +133,11 @@ function buildLocalScenicDocuments(scenicData: ScenicData): GuideKnowledgeDocume
       id: `local:faq:${index}`,
       title: faq.question,
       source: 'local-scenic' as const,
-      content: faq.answer,
+      content: faq.question.includes('门票')
+        ? `官方实时票务信息：${scenicArea.ticketInfo}`
+        : faq.question.includes('开放')
+          ? `官方实时开放时间：${scenicArea.openingHours}`
+          : faq.answer,
       keywords: [faq.question, '乌镇', '问答']
     }))
   ];
@@ -178,6 +183,13 @@ function scoreDocument(message: string, document: GuideKnowledgeDocument): numbe
 
   if (normalizedMessage.includes(normalizedTitle)) {
     score += 80;
+  }
+
+  if (
+    document.id.startsWith('local:scenic-area') &&
+    LIVE_SCENIC_INTENT_KEYWORDS.some((keyword) => message.includes(keyword))
+  ) {
+    score += 180;
   }
 
   for (const token of normalizedMessage.split(/[，。！？、\s,.;:!?]+/).filter(Boolean)) {

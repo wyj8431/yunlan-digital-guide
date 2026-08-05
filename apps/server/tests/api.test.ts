@@ -1,6 +1,8 @@
 ﻿import request from 'supertest';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../src/app';
+import { getScenicAreaSummary } from '../src/modules/scenic/scenic-data';
+import { ScenicLiveService } from '../src/modules/scenic/scenic-live.service';
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -29,6 +31,59 @@ describe('server api', () => {
         expect(body.spots).toHaveLength(5);
         expect(body.quickQuestions).toContain('帮我规划一条乌镇半日游路线');
         expect(body.officialInfo).toMatchObject({ status: 'unconfigured', notices: [] });
+      });
+  });
+
+  it('uses the same live scenic snapshot for the panel, retrieval, and chat', async () => {
+    vi.stubEnv('LLM_PROVIDER', '');
+    vi.stubEnv('LLM_BASE_URL', '');
+    vi.stubEnv('LLM_API_KEY', '');
+    vi.stubEnv('LLM_MODEL', '');
+    vi.stubEnv('ARK_API_KEY', '');
+    vi.stubEnv('ARK_MODEL', '');
+    vi.stubEnv('ARK_ENDPOINT_ID', '');
+
+    const liveService = new ScenicLiveService({
+      feedUrl: 'https://official.example/wuzhen/live.json',
+      fetchImpl: vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          openingHours: '今日 08:30-22:00',
+          ticketInfo: '官方实时票价：成人 128 元'
+        })
+      } as Response),
+      fallback: getScenicAreaSummary
+    });
+    const app = createApp({ scenicLiveService: liveService });
+
+    const summary = await request(app.callback()).get('/api/scenic-area').expect(200);
+    expect(summary.body.scenicArea).toMatchObject({
+      openingHours: '今日 08:30-22:00',
+      ticketInfo: '官方实时票价：成人 128 元'
+    });
+
+    await request(app.callback())
+      .get('/api/guide/retrieval')
+      .query({ query: '乌镇几点开放，门票多少钱？' })
+      .expect(200)
+      .expect(({ body }) => {
+        const localScenicResult = body.results.find(
+          (result: { source: string; title: string }) =>
+            result.source === 'local-scenic' && result.title === '乌镇景区'
+        );
+        expect(localScenicResult?.content).toContain('今日 08:30-22:00');
+        expect(localScenicResult?.content).toContain('官方实时票价：成人 128 元');
+      });
+
+    await request(app.callback())
+      .post('/api/guide/chat')
+      .send({ message: '乌镇几点开放，门票多少钱？' })
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.source).toBe('local-fallback');
+        expect(body.answer).toContain('今日 08:30-22:00');
+        expect(body.answer).toContain('官方实时票价：成人 128 元');
       });
   });
 
@@ -228,6 +283,8 @@ describe('server api', () => {
     vi.stubEnv('XFYUN_VIRTUAL_HUMAN_API_SECRET', 'api-secret');
     vi.stubEnv('XFYUN_VIRTUAL_HUMAN_SERVICE_ID', 'service-id');
     vi.stubEnv('XFYUN_VIRTUAL_HUMAN_AVATAR_ID', 'avatar-id');
+    vi.stubEnv('XFYUN_VIRTUAL_HUMAN_AVATAR_NAME', '语熙-新');
+    vi.stubEnv('XFYUN_VIRTUAL_HUMAN_AVATAR_ROLE', '乌镇文化导游');
     const app = createApp();
 
     await request(app.callback())
@@ -238,6 +295,8 @@ describe('server api', () => {
           enabled: true,
           provider: 'xfyun-vms',
           serviceId: 'service-id',
+          displayName: '语熙-新',
+          role: '乌镇文化导游',
           actions: expect.arrayContaining([
             expect.objectContaining({ id: 'A_LH_introduced_O', label: '介绍' })
           ]),

@@ -34,6 +34,8 @@ type VirtualHumanConfigResponse =
       enabled: true;
       provider: 'xfyun-vms';
       serviceId: string;
+      displayName?: string;
+      role?: string;
       sdkScriptUrl: string;
       startConfig: {
         appId: string;
@@ -184,6 +186,8 @@ function createXfyunConfig(env: ServerEnv): VirtualHumanConfigResponse {
     enabled: true,
     provider: 'xfyun-vms',
     serviceId: env.xfyunVirtualHumanServiceId,
+    displayName: env.xfyunVirtualHumanAvatarName,
+    role: env.xfyunVirtualHumanAvatarRole,
     sdkScriptUrl: env.xfyunVirtualHumanSdkScriptUrl,
     signedUrl: '',
     actions: readActionOptions(env.xfyunVirtualHumanActions),

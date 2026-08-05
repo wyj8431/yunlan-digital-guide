@@ -1,0 +1,17 @@
+{
+  "images": {
+    "waterTown": "/images/wuzhen-real/waterway.jpg",
+    "aerial": "/images/wuzhen-real/aerial-2023.jpg"
+  },
+  "audio": {
+    "ambience": "/exhibition/audio/lake-ambience.wav",
+    "footsteps": "/exhibition/audio/footstep-stone.wav"
+  },
+  "video": {
+    "shadowPlay": ""
+  },
+  "models": {
+    "bedHall": "/models/jiangnan-bed-hall.glb",
+    "dyeHouse": "/models/hongyuantai-dyehouse.glb"
+  }
+}

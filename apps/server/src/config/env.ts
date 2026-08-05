@@ -163,6 +163,8 @@ export type ServerEnv = {
   xfyunVirtualHumanApiSecret: string;
   xfyunVirtualHumanServiceId: string;
   xfyunVirtualHumanAvatarId: string;
+  xfyunVirtualHumanAvatarName: string;
+  xfyunVirtualHumanAvatarRole: string;
   xfyunVirtualHumanSdkScriptUrl: string;
   xfyunVirtualHumanTtsVoice: string;
   xfyunVirtualHumanActions: string;
@@ -209,6 +211,8 @@ export function readEnv(): ServerEnv {
     ),
     xfyunVirtualHumanServiceId: process.env.XFYUN_VIRTUAL_HUMAN_SERVICE_ID ?? '',
     xfyunVirtualHumanAvatarId: process.env.XFYUN_VIRTUAL_HUMAN_AVATAR_ID ?? '',
+    xfyunVirtualHumanAvatarName: process.env.XFYUN_VIRTUAL_HUMAN_AVATAR_NAME ?? '语熙-新',
+    xfyunVirtualHumanAvatarRole: process.env.XFYUN_VIRTUAL_HUMAN_AVATAR_ROLE ?? '乌镇文化导游',
     xfyunVirtualHumanSdkScriptUrl:
       process.env.XFYUN_VIRTUAL_HUMAN_SDK_SCRIPT_URL ??
       '/libs/avatar-sdk-web_3.2.3.1002/esm/index.js',

@@ -24,6 +24,7 @@ describe('TourismPage', () => {
   it('renders the map as a dedicated page instead of an Explore overlay', () => {
     const onNavigate = vi.fn();
     const onAsk = vi.fn();
+    const onOpenScenic = vi.fn();
 
     const { container } = render(
       <TourismPage
@@ -33,6 +34,7 @@ describe('TourismPage', () => {
         latestAnswer=""
         voice={{ status: 'idle', transcript: '', error: null }}
         onNavigate={onNavigate}
+        onOpenScenic={onOpenScenic}
         onAsk={onAsk}
         onToggleVoice={vi.fn()}
       />
@@ -45,8 +47,12 @@ describe('TourismPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /西栅/ }));
 
-    expect(onAsk).toHaveBeenCalledWith('介绍一下西栅，并推荐附近游玩路线。');
-    expect(onNavigate).toHaveBeenCalledWith('explore');
+    expect(onOpenScenic).toHaveBeenCalledWith('west-gate');
+    expect(onAsk).not.toHaveBeenCalled();
+    expect(onNavigate).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: '摇橹船图层' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '步行图层' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '夜游图层' })).not.toBeInTheDocument();
   });
 
   it('turns the home page into a departure observatory with actionable trip modes', () => {
@@ -91,28 +97,6 @@ describe('TourismPage', () => {
 
     expect(onAsk).toHaveBeenCalledWith('住东栅还是西栅更方便？请比较住宿体验和交通。');
     expect(onNavigate).toHaveBeenCalledWith('explore');
-  });
-
-  it('switches map travel layers without leaving the map page', () => {
-    const onNavigate = vi.fn();
-
-    render(
-      <TourismPage
-        view="map"
-        scenicArea={scenicArea}
-        routeCards={[]}
-        latestAnswer=""
-        voice={{ status: 'idle', transcript: '', error: null }}
-        onNavigate={onNavigate}
-        onAsk={vi.fn()}
-        onToggleVoice={vi.fn()}
-      />
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: '摇橹船图层' }));
-
-    expect(screen.getByText(/优先连接码头与临水景点/)).toBeInTheDocument();
-    expect(onNavigate).not.toHaveBeenCalled();
   });
 
   it('keeps voice interaction on the voice page so recognition state remains visible', () => {

@@ -20,6 +20,13 @@ export function createHallMaterials() {
     ceiling: new THREE.MeshStandardMaterial({ color: EXHIBITION_COLORS.ceiling, roughness: 0.95 }),
     floor: new THREE.MeshStandardMaterial({ color: EXHIBITION_COLORS.floor, roughness: 0.9 }),
     wood: new THREE.MeshStandardMaterial({ color: '#4c352a', roughness: 0.76 }),
+    lightTrim: new THREE.MeshStandardMaterial({
+      color: EXHIBITION_COLORS.gold,
+      emissive: EXHIBITION_COLORS.gold,
+      emissiveIntensity: 0.18,
+      roughness: 0.42,
+      metalness: 0.22
+    }),
     metal: new THREE.MeshStandardMaterial({
       color: EXHIBITION_COLORS.darkGreen,
       roughness: 0.58,

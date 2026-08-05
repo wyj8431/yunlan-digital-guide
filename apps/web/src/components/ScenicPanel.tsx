@@ -64,8 +64,8 @@ export function ScenicPanel({ scenicArea, routeCards }: ScenicPanelProps) {
 
       <section className="scenic-section">
         <div className="section-title-row">
-          <h3>全景漫游</h3>
-          <span>360 Video</span>
+          <h3>旅行影像</h3>
+          <span>Travel Video</span>
         </div>
         <div className="video-card">
           <video
@@ -74,7 +74,7 @@ export function ScenicPanel({ scenicArea, routeCards }: ScenicPanelProps) {
             playsInline
             preload="metadata"
             poster={gallery[0].src}
-            aria-label="全景漫游视频"
+            aria-label="乌镇旅行影像视频"
           >
             <source src={TOUR_VIDEO_SRC} type="video/mp4" />
             当前浏览器不支持视频播放。

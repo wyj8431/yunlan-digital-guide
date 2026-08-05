@@ -2,7 +2,7 @@ import { Captions, MessageSquareText, Mic, MicOff } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import YouTube, { type YouTubePlayer } from 'react-youtube';
-import type { Danmaku, VideoDetail } from '../types/video';
+import type { CreateDanmakuInput, Danmaku, VideoDetail } from '../types/video';
 import { getDanmakuProgress, getVisibleDanmaku } from './danmaku';
 import type { DanmakuPreferences } from './danmakuPreferences';
 import {
@@ -22,9 +22,16 @@ type VideoPlayerProps = {
   danmaku: Danmaku[];
   preferences: DanmakuPreferences;
   onClockChange: (currentMs: number) => void;
+  danmakuPreview?: Pick<CreateDanmakuInput, 'content' | 'position' | 'color'> | null;
 };
 
-export function VideoPlayer({ video, danmaku, preferences, onClockChange }: VideoPlayerProps) {
+export function VideoPlayer({
+  video,
+  danmaku,
+  preferences,
+  onClockChange,
+  danmakuPreview
+}: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const youtubePlayerRef = useRef<YouTubePlayer | null>(null);
   const [currentMs, setCurrentMs] = useState(0);
@@ -227,6 +234,14 @@ export function VideoPlayer({ video, danmaku, preferences, onClockChange }: Vide
               </span>
             );
           })}
+          {danmakuPreview ? (
+            <span
+              className={`video-danmaku-item video-danmaku-item--${danmakuPreview.position} video-danmaku-item--preview`}
+              style={{ color: danmakuPreview.color }}
+            >
+              {danmakuPreview.content}
+            </span>
+          ) : null}
         </div>
         <div className="video-subtitle" aria-live="polite" aria-atomic="true">
           <Captions aria-hidden="true" size={15} />

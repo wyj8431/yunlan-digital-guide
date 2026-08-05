@@ -419,7 +419,7 @@ describe('guide service', () => {
   it('introduces itself when the visitor says hello', async () => {
     const chat = vi
       .fn()
-      .mockResolvedValue('你好，我是你的全球景区旅游数字导游，可以推荐景区、路线和拍照点。');
+      .mockResolvedValue('你好，我是乌镇景区旅游数字导游，可以介绍乌镇景点、路线和拍照点。');
 
     const response = await createGuideResponse({
       message: '你好',
@@ -428,9 +428,9 @@ describe('guide service', () => {
     });
 
     const messages = chat.mock.calls[0][0];
-    expect(response.answer).toContain('全球景区旅游数字导游');
+    expect(response.answer).toContain('乌镇景区旅游数字导游');
     expect(response.source).toBe('llm');
-    expect(messages[0].content).toContain('寒暄或让你介绍自己');
+    expect(messages[0].content).toContain('乌镇景区旅游数字导游');
   });
 
   it('recommends scenic destinations and routes by region without LLM configuration', async () => {

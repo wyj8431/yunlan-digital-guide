@@ -4,6 +4,8 @@ import type { Duplex } from 'node:stream';
 import { WebSocket, WebSocketServer } from 'ws';
 import { readEnv } from '../../config/env.js';
 import { createGuideResponse } from '../guide/guide.service.js';
+import { loadScenicData, mergeScenicDataWithSummary } from '../scenic/scenic-data.js';
+import { ScenicLiveService } from '../scenic/scenic-live.service.js';
 import { createXfyunAsrSession } from './xfyun-asr.js';
 import { VoiceSession } from './voice-session.js';
 import type {
@@ -25,6 +27,7 @@ function requestPath(req: IncomingMessage): string {
 export type VoiceWebSocketDependencies = {
   createAsr?: (callbacks: VoiceAsrCallbacks) => VoiceAsrSession;
   createGuideResponse?: (message: string) => ReturnType<typeof createGuideResponse>;
+  scenicLiveService?: ScenicLiveService;
 };
 
 function sendEvent(socket: WebSocket, event: VoiceServerEvent) {
@@ -146,10 +149,16 @@ export function attachVoiceWebSocketServer(
             dependencies.createAsr ?? ((callbacks) => createXfyunAsrSession(env, callbacks)),
           createGuideResponse:
             dependencies.createGuideResponse ??
-            ((message) =>
+            (async (message) =>
               createGuideResponse({
                 message,
-                env
+                env,
+                scenicData: dependencies.scenicLiveService
+                  ? mergeScenicDataWithSummary(
+                      loadScenicData(),
+                      await dependencies.scenicLiveService.getSummary()
+                    )
+                  : undefined
               })),
           emit: (serverEvent) => sendEvent(socket, serverEvent)
         });

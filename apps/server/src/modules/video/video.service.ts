@@ -10,6 +10,8 @@ import {
   type VideoSummary
 } from './video.types.js';
 
+const DANMAKU_REPLACEMENT = '****';
+
 export type VideoServiceErrorCode =
   | 'INVALID_VIDEO_ID'
   | 'INVALID_DANMAKU_INPUT'
@@ -150,7 +152,9 @@ export class VideoService {
         throw new VideoServiceError('INVALID_DANMAKU_WINDOW', 400, '弹幕查询时间窗口无效。');
       }
 
-      return this.repository.listDanmaku(parsedVideoId, window.fromMs, window.toMs);
+      return this.repository
+        .listDanmaku(parsedVideoId, window.fromMs, window.toMs)
+        .map((item) => ({ ...item, content: this.filterSensitiveKeywords(item.content) }));
     });
   }
 
@@ -167,7 +171,10 @@ export class VideoService {
   private filterSensitiveKeywords(content: string): string {
     return this.repository
       .listSensitiveKeywords()
-      .reduce((filtered, keyword) => filtered.split(keyword).join('**********'), content);
+      .reduce(
+        (filtered, keyword) => filtered.split(keyword).join(DANMAKU_REPLACEMENT),
+        content.split('**********').join(DANMAKU_REPLACEMENT)
+      );
   }
 
   private execute<Result>(operation: () => Result): Result {

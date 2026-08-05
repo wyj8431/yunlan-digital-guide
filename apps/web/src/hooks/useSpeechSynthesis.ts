@@ -455,6 +455,17 @@ export function useSpeechSynthesis() {
     [browserSpeechSupported, speakWithBrowser, speakWithServerAudio, stopServerAudio, supported]
   );
 
+  const stop = useCallback(() => {
+    playbackTokenRef.current += 1;
+    stopServerAudio('end');
+
+    if (browserSpeechSupported) {
+      window.speechSynthesis.cancel();
+    }
+
+    setSpeaking(false);
+  }, [browserSpeechSupported, stopServerAudio]);
+
   useEffect(() => {
     return () => {
       playbackTokenRef.current += 1;
@@ -466,5 +477,5 @@ export function useSpeechSynthesis() {
     };
   }, [browserSpeechSupported, stopServerAudio]);
 
-  return { supported, speaking, speak };
+  return { supported, speaking, speak, stop };
 }

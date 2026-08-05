@@ -1,0 +1,96 @@
+{
+  "west": [
+    {
+      "id": "bailian-tower",
+      "name": "白莲塔",
+      "zone": "西栅",
+      "position": [10, 0, -11],
+      "type": "landmark",
+      "description": "白莲塔临水而立，是西栅水系远景中最醒目的垂直地标。",
+      "detail": "登塔可俯瞰京杭大运河与乌镇水网，暮色时塔影和河灯一起落入水面。"
+    },
+    {
+      "id": "qiaoli-bridge",
+      "name": "桥里桥",
+      "zone": "西栅",
+      "position": [0, 0, 8],
+      "type": "bridge",
+      "description": "两桥相连的水巷节点，桥洞、石阶和临水街屋形成连续视线。",
+      "detail": "这里是观察乌镇桥梁尺度和临水生活关系的典型点位。"
+    },
+    {
+      "id": "fengyuan-bridge",
+      "name": "逢源双桥",
+      "zone": "西栅",
+      "position": [-11, 0, -4],
+      "type": "bridge",
+      "description": "两座石拱桥交汇于水巷，桥面高差与河道转弯构成标志性空间。",
+      "detail": "双桥之间的水面开阔，适合观察船只靠岸、行人过桥和沿河店铺。"
+    },
+    {
+      "id": "hongyuantai-dyehouse",
+      "name": "宏源泰染坊",
+      "zone": "西栅",
+      "position": [-10, 0, 15],
+      "type": "heritage",
+      "description": "蓝印花布从木架间垂落，染坊沿河展开，保留江南作坊的潮湿肌理。",
+      "detail": "室内入口预留异步展厅，可继续查看刻板、刮浆、染色与晾晒工具。"
+    },
+    {
+      "id": "old-stage",
+      "name": "古戏台",
+      "zone": "西栅",
+      "position": [11, 0, 14],
+      "type": "heritage",
+      "description": "临河古戏台保留木构台口和檐下灯影，是夜游路线的重要停留点。",
+      "detail": "入口可接入皮影与江南戏曲视频播放，后续可替换为正式节目地址。"
+    },
+    {
+      "id": "tongji-bridge",
+      "name": "通济桥",
+      "zone": "西栅",
+      "position": [0, 0, -18],
+      "type": "bridge",
+      "description": "青石拱桥跨过主河道，桥下留出乌篷船缓慢通过的水面尺度。",
+      "detail": "雨天桥面和石阶会呈现明显积水反光，岸边青苔覆盖更浓。"
+    },
+    {
+      "id": "water-market",
+      "name": "水上集市",
+      "zone": "西栅",
+      "position": [7, 0, -1],
+      "type": "market",
+      "description": "临水棚屋、招幌和乌篷船组成的生活型水岸节点。",
+      "detail": "可以从集市转入西栅水巷线，也可以沿河体验非遗展馆专线。"
+    }
+  ],
+  "east": [
+    {
+      "id": "mao-dun-house",
+      "name": "茅盾故居",
+      "zone": "东栅",
+      "position": [24, 0, 8],
+      "type": "heritage",
+      "description": "老式书桌、木床和书柜保留着作家故居的安静尺度。",
+      "detail": "室内热点预留老照片、文字生平和语音讲解入口。"
+    },
+    {
+      "id": "lizhi-academy",
+      "name": "立志书院",
+      "zone": "东栅",
+      "position": [24, 0, -7],
+      "type": "heritage",
+      "description": "书院沿河设置，院落、门厅与巷道保持紧凑的江南尺度。",
+      "detail": "适合接入人文故居专线，补充乌镇教育与地方文化脉络。"
+    },
+    {
+      "id": "jiangnan-bed-hall",
+      "name": "江南百床馆",
+      "zone": "东栅",
+      "position": [23, 0, -19],
+      "type": "museum",
+      "description": "明清雕花古床集中陈列，木雕、榫卯和民俗信息可独立查看。",
+      "detail": "点击门厅后按需加载室内展馆，并支持单件古床模型细节观察。"
+    }
+  ]
+}

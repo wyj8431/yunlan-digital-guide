@@ -7,7 +7,7 @@ import {
 
 describe('exhibition layout metadata', () => {
   it('defines the approved hall dimensions', () => {
-    expect(HALL_DIMENSIONS).toEqual({ width: 16, depth: 20, height: 4.8 });
+    expect(HALL_DIMENSIONS).toEqual({ width: 44, depth: 88, height: 6.4 });
   });
 
   it('contains every major interactive exhibit', () => {

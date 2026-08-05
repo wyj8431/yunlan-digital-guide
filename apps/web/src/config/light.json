@@ -1,0 +1,47 @@
+{
+  "day": {
+    "name": "白日晴天",
+    "background": "#8aa7a1",
+    "fog": "#b6c9c1",
+    "fogNear": 32,
+    "fogFar": 108,
+    "hemisphereSky": "#d6e8e2",
+    "hemisphereGround": "#3a4138",
+    "hemisphereIntensity": 1.15,
+    "sunColor": "#fff0cc",
+    "sunIntensity": 2.15,
+    "water": "#477c78",
+    "lanternIntensity": 0.5,
+    "rain": false
+  },
+  "night": {
+    "name": "水乡夜景",
+    "background": "#101d23",
+    "fog": "#1b2a2d",
+    "fogNear": 18,
+    "fogFar": 82,
+    "hemisphereSky": "#1a2c35",
+    "hemisphereGround": "#101613",
+    "hemisphereIntensity": 0.42,
+    "sunColor": "#7894aa",
+    "sunIntensity": 0.22,
+    "water": "#183d40",
+    "lanternIntensity": 2.3,
+    "rain": false
+  },
+  "rain": {
+    "name": "阴雨天",
+    "background": "#60777a",
+    "fog": "#8eaaa5",
+    "fogNear": 11,
+    "fogFar": 62,
+    "hemisphereSky": "#b4c5c1",
+    "hemisphereGround": "#263533",
+    "hemisphereIntensity": 0.7,
+    "sunColor": "#cbd8d1",
+    "sunIntensity": 0.72,
+    "water": "#315f61",
+    "lanternIntensity": 0.75,
+    "rain": true
+  }
+}

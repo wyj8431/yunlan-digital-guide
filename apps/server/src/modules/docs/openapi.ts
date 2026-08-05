@@ -32,6 +32,7 @@ export function createOpenApiDocument(serverUrl: string) {
     },
     servers: [{ url: serverUrl }],
     tags: [
+      { name: 'Exhibition', description: '3D 展厅目录与物件信息' },
       { name: 'System', description: '健康检查与接口文档' },
       { name: 'Scenic', description: '景区基础资料' },
       { name: 'Guide', description: '景区导游智能体问答与检索' },
@@ -63,6 +64,62 @@ export function createOpenApiDocument(serverUrl: string) {
           summary: 'OpenAPI JSON 文档',
           responses: {
             '200': jsonResponse('OpenAPI 3.1 文档', { type: 'object' })
+          }
+        }
+      },
+      '/api/exhibition': {
+        get: {
+          tags: ['Exhibition'],
+          summary: '获取 3D 展厅完整目录',
+          responses: {
+            '200': jsonResponse('3D 展厅目录', { $ref: '#/components/schemas/ExhibitionCatalog' })
+          }
+        }
+      },
+      '/api/exhibition/zones': {
+        get: {
+          tags: ['Exhibition'],
+          summary: '获取展厅分区',
+          responses: {
+            '200': jsonResponse('展厅分区', {
+              type: 'object',
+              required: ['zones'],
+              properties: {
+                zones: { type: 'array', items: { $ref: '#/components/schemas/ExhibitionZone' } }
+              }
+            })
+          }
+        }
+      },
+      '/api/exhibition/items': {
+        get: {
+          tags: ['Exhibition'],
+          summary: '获取展厅物件清单',
+          responses: {
+            '200': jsonResponse('展厅物件清单', {
+              type: 'object',
+              required: ['items'],
+              properties: {
+                items: { type: 'array', items: { $ref: '#/components/schemas/ExhibitionItem' } }
+              }
+            })
+          }
+        }
+      },
+      '/api/exhibition/items/{itemId}': {
+        get: {
+          tags: ['Exhibition'],
+          summary: '获取单个展厅物件',
+          parameters: [
+            { name: 'itemId', in: 'path', required: true, schema: { type: 'string' } }
+          ],
+          responses: {
+            '200': jsonResponse('展厅物件', {
+              type: 'object',
+              required: ['item'],
+              properties: { item: { $ref: '#/components/schemas/ExhibitionItem' } }
+            }),
+            '404': jsonResponse('展厅物件不存在', errorSchema('EXHIBITION_ITEM_NOT_FOUND'))
           }
         }
       },
@@ -389,6 +446,57 @@ export function createOpenApiDocument(serverUrl: string) {
     },
     components: {
       schemas: {
+        ExhibitionCatalog: {
+          type: 'object',
+          required: ['title', 'description', 'source', 'zones', 'items'],
+          properties: {
+            title: { type: 'string' },
+            description: { type: 'string' },
+            source: { type: 'string' },
+            zones: { type: 'array', items: { $ref: '#/components/schemas/ExhibitionZone' } },
+            items: { type: 'array', items: { $ref: '#/components/schemas/ExhibitionItem' } }
+          }
+        },
+        ExhibitionZone: {
+          type: 'object',
+          required: ['id', 'name', 'description', 'order'],
+          properties: {
+            id: { type: 'string' },
+            name: { type: 'string' },
+            description: { type: 'string' },
+            order: { type: 'integer', minimum: 1 }
+          }
+        },
+        ExhibitionItem: {
+          type: 'object',
+          required: [
+            'id',
+            'zoneId',
+            'name',
+            'displayForm',
+            'functionDescription',
+            'backendTables',
+            'coreFields',
+            'priority',
+            'implemented',
+            'interaction'
+          ],
+          properties: {
+            id: { type: 'string' },
+            zoneId: { type: 'string' },
+            name: { type: 'string' },
+            displayForm: { type: 'string' },
+            functionDescription: { type: 'string' },
+            backendTables: { type: 'array', items: { type: 'string' } },
+            coreFields: { type: 'array', items: { type: 'string' } },
+            priority: { type: 'string', enum: ['P0', 'P1', 'P2'] },
+            implemented: { type: 'boolean' },
+            interaction: {
+              type: 'string',
+              enum: ['detail', 'guide', 'scene', 'custom-route', 'monitor']
+            }
+          }
+        },
         VideoSummary: {
           type: 'object',
           required: ['id', 'title', 'description', 'coverUrl', 'videoUrl', 'durationMs'],

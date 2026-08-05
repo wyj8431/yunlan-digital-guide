@@ -22,13 +22,13 @@ describe('realistic Jiangnan hall', () => {
         'fire-exit'
       ])
     );
-    expect(hall.userData.dimensions).toEqual({ width: 16, depth: 20, height: 4.8 });
+    expect(hall.userData.dimensions).toEqual({ width: 44, depth: 88, height: 6.4 });
     expect(hall.userData.instancedLatticeCount).toBeGreaterThanOrEqual(24);
   });
 
   it('preserves the 2.4 metre central aisle', () => {
     expect(assertMainAisleClear(EXHIBITION_LAYOUT, 2.4)).toBe(true);
-    expect(JIANGNAN_HALL_COLLIDERS).toHaveLength(4);
+    expect(JIANGNAN_HALL_COLLIDERS).toHaveLength(10);
     expect(
       JIANGNAN_HALL_COLLIDERS.every((collider) => collider.maxX <= -1.7 || collider.minX >= 1.7)
     ).toBe(true);

@@ -13,7 +13,7 @@
 - 讯飞虚拟人 SDK 接入，支持动作切换和说话
 - 本地 Three.js 数字人兜底，支持估算口型同步
 - 右上角低透明度入口，可进入独立的室内 3D 展馆和视频中心
-- 室内 3D 展馆支持鼠标观察、WASD 漫游、碰撞、展品交互和西湖数字沙盘
+- 乌镇水乡展厅支持全域沙盘、西栅街区、宏源泰染坊和夜游河道切换，并提供天气、工序、路线和全屏交互
 - 视频中心支持 Redux 状态、SQLite 弹幕、敏感词过滤、同步字幕和实时识别降级
 - 语音输入：浏览器通过 `/api/voice` WebSocket 发送 16 kHz、单声道 PCM16，实时接收讯飞 ASR 转写并自动提交
 - 语音回复：优先后端讯飞 TTS + WebAudio 播放时钟，失败时回退浏览器朗读
@@ -70,7 +70,9 @@ XFYUN_VIRTUAL_HUMAN_API_KEY=
 XFYUN_VIRTUAL_HUMAN_API_SECRET=
 XFYUN_VIRTUAL_HUMAN_APP_SECRET=
 XFYUN_VIRTUAL_HUMAN_SERVICE_ID=
-XFYUN_VIRTUAL_HUMAN_AVATAR_ID=201165002
+XFYUN_VIRTUAL_HUMAN_AVATAR_ID=201365001
+XFYUN_VIRTUAL_HUMAN_AVATAR_NAME=语熙-新
+XFYUN_VIRTUAL_HUMAN_AVATAR_ROLE=乌镇文化导游
 XFYUN_VIRTUAL_HUMAN_TTS_VOICE=x4_lingxiaoxuan_oral
 
 XFYUN_TTS_APP_ID=
@@ -135,6 +137,29 @@ npm --workspace apps/web run test -- useGuideChat QuestionInput
 - 不在日志、localStorage 或 IndexedDB 保存原始录音和真实密钥
 
 ## 文档
+
+## 乌镇 3D 水乡展厅
+
+`/exhibition` 当前默认进入乌镇户外水乡场景。西栅与东栅点位、热点文案、天气光照、路线和资源路径均在以下 JSON 中维护：
+
+- `apps/web/src/config/spots.json`：地标坐标、名称、热点介绍。
+- `apps/web/src/config/route.json`：西栅水巷线、非遗展馆专线、人文故居专线。
+- `apps/web/src/config/light.json`：晴天、夜景、雨天的背景、雾、光照和水色。
+- `apps/web/src/config/assetsPath.json`：图片、音频、视频和室内 GLB 路径。
+
+替换真实 GLB、贴图或音频时，先把文件放到 `apps/web/public` 对应目录，再只修改 `assetsPath.json` 或展厅资源注册表。新增景点时，在 `spots.json` 增加点位，再在 `createWuzhenOutdoor.ts` 为需要独立建模的类型补充构件；热点会自动使用 JSON 文案并进入右侧详情弹窗。
+
+### 数字人讲解与 3D 展厅
+
+3D 展厅负责呈现乌镇水乡、路线、非遗和数字人展项。点击景点或展品后，可以播放分段语音讲解、查看视频中心内容，并通过路线讲解台重新规划游览顺序。地图页只负责选择景点，详细问题交给数字导游回答。
+
+本地预览：
+
+```powershell
+npm run dev
+```
+
+打开 `http://localhost:5173/exhibition`。桌面端使用 WASD、Shift、鼠标视角和滚轮；手机端使用左下角摇杆与触摸拖拽。
 
 - 在线接口文档：`http://localhost:8787/api/docs`
 - OpenAPI JSON：`http://localhost:8787/api/docs/openapi.json`

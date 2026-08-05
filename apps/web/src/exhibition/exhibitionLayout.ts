@@ -1,6 +1,11 @@
 import type { Collider } from './collision';
 
-export const HALL_DIMENSIONS = { width: 16, depth: 20, height: 4.8 } as const;
+export const HALL_Z_BOUNDS = { min: -28, max: 60 } as const;
+export const HALL_DIMENSIONS = {
+  width: 44,
+  depth: HALL_Z_BOUNDS.max - HALL_Z_BOUNDS.min,
+  height: 6.4
+} as const;
 
 export type ExhibitKind =
   'sand-table' | 'display-table' | 'silk-garment' | 'bicycle' | 'shuttle' | 'wall-art' | 'plant';

@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import Koa from 'koa';
 import bodyParser from 'koa-bodyparser';
 import { createDocsRouter } from './modules/docs/docs.routes.js';
+import { createExhibitionRouter } from './modules/exhibition/exhibition.routes.js';
 import { createGuideRouter } from './modules/guide/guide.routes.js';
 import { createScenicRouter } from './modules/scenic/scenic.routes.js';
 import { getScenicAreaSummary } from './modules/scenic/scenic-data.js';
@@ -16,6 +17,7 @@ import { VideoRepository } from './modules/video/video.repository.js';
 import { createVideoRouter } from './modules/video/video.routes.js';
 import { VideoService } from './modules/video/video.service.js';
 import { createVirtualHumanRouter } from './modules/virtual-human/virtual-human.routes.js';
+import { createPanoramaRouter } from './modules/panorama/panorama.routes.js';
 
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_VIDEO_DATABASE_PATH = path.resolve(currentDirectory, '../data/videos.sqlite');
@@ -65,7 +67,7 @@ export function createApp(options: CreateAppOptions = {}): ServerApp {
   const app = new Koa() as ServerApp;
   const router = new Router();
   const docsRouter = createDocsRouter();
-  const guideRouter = createGuideRouter();
+  const exhibitionRouter = createExhibitionRouter();
   const scenicLiveService =
     options.scenicLiveService ??
     new ScenicLiveService({
@@ -73,10 +75,12 @@ export function createApp(options: CreateAppOptions = {}): ServerApp {
       ttlMs: options.scenicLiveTtlMs,
       fallback: getScenicAreaSummary
     });
+  const guideRouter = createGuideRouter(scenicLiveService);
   const scenicRouter = createScenicRouter(scenicLiveService);
   const speechRouter = createSpeechRouter();
   const videoRouter = createVideoRouter(videoService);
   const virtualHumanRouter = createVirtualHumanRouter();
+  const panoramaRouter = createPanoramaRouter();
 
   app.close = () => videoRepository?.close();
 
@@ -103,6 +107,8 @@ export function createApp(options: CreateAppOptions = {}): ServerApp {
   app.use(router.allowedMethods());
   app.use(docsRouter.routes());
   app.use(docsRouter.allowedMethods());
+  app.use(exhibitionRouter.routes());
+  app.use(exhibitionRouter.allowedMethods());
   app.use(scenicRouter.routes());
   app.use(scenicRouter.allowedMethods());
   app.use(guideRouter.routes());
@@ -113,6 +119,8 @@ export function createApp(options: CreateAppOptions = {}): ServerApp {
   app.use(videoRouter.allowedMethods());
   app.use(virtualHumanRouter.routes());
   app.use(virtualHumanRouter.allowedMethods());
+  app.use(panoramaRouter.routes());
+  app.use(panoramaRouter.allowedMethods());
 
   return app;
 }

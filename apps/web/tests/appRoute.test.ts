@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pathForTourismView, resolveAppRoute } from '../src/routing/appRoute';
+import { pathForScenicVR, pathForTourismView, resolveAppRoute } from '../src/routing/appRoute';
 
 describe('resolveAppRoute', () => {
   it('resolves every tourism page to a dedicated route', () => {
@@ -17,6 +17,13 @@ describe('resolveAppRoute', () => {
   it('resolves the exhibition and video center routes', () => {
     expect(resolveAppRoute('/exhibition')).toEqual({ kind: 'exhibition' });
     expect(resolveAppRoute('/videos')).toEqual({ kind: 'videos' });
+  });
+
+  it('resolves scenic VR pages and encodes scenic ids in their paths', () => {
+    expect(resolveAppRoute('/vr/water-market')).toEqual({ kind: 'scenic-vr', spotId: 'water-market' });
+    expect(resolveAppRoute('/vr/west%20gate')).toEqual({ kind: 'scenic-vr', spotId: 'west gate' });
+    expect(pathForScenicVR('water-market')).toBe('/vr/water-market');
+    expect(pathForScenicVR('west gate')).toBe('/vr/west%20gate');
   });
 
   it('normalizes trailing slashes and keeps the lip sync lab route', () => {

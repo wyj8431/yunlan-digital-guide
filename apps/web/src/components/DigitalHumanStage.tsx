@@ -17,6 +17,8 @@ import type { SpeechDriver } from '../types/virtualHuman';
 
 const DIGITAL_HUMAN_MODEL_URL = '/models/Thanh.glb';
 const XFYUN_STREAM_DOM_ID = 'xfyun-virtual-human-stream';
+const FALLBACK_GUIDE_NAME = '本地 3D 数字人';
+const FALLBACK_GUIDE_ROLE = '乌镇文化导游';
 const GUIDE_BASE_ROTATION_Y = 0.16;
 const GUIDE_FOOT_Y = -0.98;
 const GUIDE_STAGE_HEIGHT = 1.82;
@@ -110,7 +112,14 @@ export function DigitalHumanStage({
   const onlineHumanName =
     virtualHuman.config?.enabled && virtualHuman.config.provider === 'mofa-xingyun'
       ? '魔珐星云数字人'
-      : '讯飞虚拟人';
+      : virtualHuman.config?.enabled && virtualHuman.config.provider === 'xfyun-vms'
+        ? virtualHuman.config.displayName ?? '讯飞虚拟人'
+        : '讯飞虚拟人';
+  const guideName = virtualHuman.config?.enabled ? onlineHumanName : FALLBACK_GUIDE_NAME;
+  const guideRole =
+    virtualHuman.config?.enabled && virtualHuman.config.provider === 'xfyun-vms'
+      ? virtualHuman.config.role ?? FALLBACK_GUIDE_ROLE
+      : FALLBACK_GUIDE_ROLE;
   const shouldShowWakeButton =
     virtualHuman.active &&
     virtualHuman.config?.enabled &&
@@ -413,11 +422,11 @@ export function DigitalHumanStage({
               ? 'is-online-human-unavailable'
               : 'has-local-human'
       }`}
-      aria-label="乌镇景区年轻数字导游舞台"
+      aria-label={`${guideName} ${guideRole}舞台`}
     >
       <div className="guide-identity">
-        <span>年轻导游</span>
-        <strong>乌镇景区</strong>
+        <span>{guideName}</span>
+        <strong>{guideRole}</strong>
       </div>
 
       <div className="model-stage">
@@ -483,7 +492,7 @@ export function DigitalHumanStage({
           onClick={() => onNavigate?.('map')}
         >
           <Map size={18} />
-          <span>全景地图</span>
+          <span>景点地图</span>
           <small>Map</small>
         </button>
         <button

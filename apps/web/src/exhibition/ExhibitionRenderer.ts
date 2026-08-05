@@ -33,6 +33,11 @@ import {
 import { JIANGNAN_HALL_COLLIDERS, createJiangnanHall } from './scene/createJiangnanHall';
 import { createMuseumCases } from './scene/createMuseumCases';
 import { createRealisticExhibits } from './scene/createRealisticExhibits';
+import {
+  SHOWROOM_ZONES,
+  createCuratedShowroom,
+  type CuratedShowroom
+} from './scene/createCuratedShowroom';
 
 export type ExhibitionRendererOptions = {
   host: HTMLElement;
@@ -42,6 +47,7 @@ export type ExhibitionRendererOptions = {
   onQualityChange?: (quality: QualityLevel) => void;
   onRecoverableFailure?: (assetId: string) => void;
   onFatalError?: (error: Error) => void;
+  onZoneChange?: (zoneId: string) => void;
   audio?: ExhibitionAudio;
 };
 
@@ -52,9 +58,20 @@ export type ExhibitionCameraPose = {
 };
 
 const EYE_HEIGHT = 1.65;
-const MOVE_SPEED = 3.2;
+const MOVE_SPEED = 5;
 const LOOK_SENSITIVITY = 0.0022;
 const MAX_PITCH = Math.PI * 0.45;
+const ZONE_CAMERA_VIEWS: Record<
+  string,
+  { position: [number, number, number]; target: [number, number, number] }
+> = {
+  entrance: { position: [0, EYE_HEIGHT, 57.2], target: [0, 2.25, 52] },
+  wuzhen: { position: [0, EYE_HEIGHT, 43.2], target: [0, 2.1, 38] },
+  global: { position: [5.2, EYE_HEIGHT, 29.2], target: [-2.2, 1.9, 24] },
+  interactive: { position: [5.1, EYE_HEIGHT, 15.2], target: [0, 1.05, 10] },
+  supporting: { position: [1.5, EYE_HEIGHT, 1.2], target: [0, 2.1, -4] },
+  culture: { position: [-5.1, EYE_HEIGHT, -12.8], target: [0, 2.1, -18] }
+};
 
 function createBox(
   width: number,
@@ -102,6 +119,7 @@ export class ExhibitionRenderer {
   private readonly exhibitGroup = new THREE.Group();
   private readonly materials: HallMaterials = createHallMaterials();
   private readonly museumCases: ReturnType<typeof createMuseumCases>;
+  private readonly showroom: CuratedShowroom;
   private readonly resizeObserver: ResizeObserver;
   private frameId = 0;
   private disposed = false;
@@ -120,6 +138,7 @@ export class ExhibitionRenderer {
   private qualitySampleStartedAt = performance.now();
   private qualitySampleFrames = 0;
   private quality: QualityLevel = 'high';
+  private activeZoneId: string = SHOWROOM_ZONES[0].id;
   private manualQuality: QualityLevel | null = null;
   private fatalErrorReported = false;
   private assetSources: ExhibitionAssetSources = { ...FALLBACK_ASSET_SOURCES };
@@ -214,8 +233,8 @@ export class ExhibitionRenderer {
   }
 
   constructor(private readonly options: ExhibitionRendererOptions) {
-    this.scene.background = new THREE.Color('#dfe6df');
-    this.camera.position.set(0, EYE_HEIGHT, 7.5);
+    this.scene.background = new THREE.Color('#2b3432');
+    this.camera.position.set(...ZONE_CAMERA_VIEWS.entrance.position);
     this.camera.rotation.order = 'YXZ';
 
     this.renderer = new THREE.WebGLRenderer({
@@ -251,6 +270,8 @@ export class ExhibitionRenderer {
       ].includes(asset.id)
     );
     this.assetLoader = new ExhibitionAssetLoader(this.renderer, hallAssets);
+    this.showroom = createCuratedShowroom(this.materials);
+    this.exhibitRoots.push(...this.showroom.exhibitRoots);
     this.museumCases = createMuseumCases(
       EXHIBITION_LAYOUT,
       this.materials,
@@ -338,6 +359,20 @@ export class ExhibitionRenderer {
     this.pipeline.setTransitionProgress(progress);
   }
 
+  goToZone(zoneId: string) {
+    const zone = SHOWROOM_ZONES.find((candidate) => candidate.id === zoneId);
+    if (!zone) return;
+    const view = ZONE_CAMERA_VIEWS[zoneId] ?? {
+      position: [0, EYE_HEIGHT, Math.min(zone.z + 3.8, 57.2)] as [number, number, number],
+      target: [0, EYE_HEIGHT, zone.z] as [number, number, number]
+    };
+    this.camera.position.set(...view.position);
+    this.camera.lookAt(...view.target);
+    this.yaw = this.camera.rotation.y;
+    this.pitch = this.camera.rotation.x;
+    this.setActiveZone(zoneId);
+  }
+
   playNarration(exhibitId: string) {
     return this.audio.playNarration(exhibitId);
   }
@@ -392,6 +427,7 @@ export class ExhibitionRenderer {
     this.scene.add(this.museumCases.root);
     this.scene.add(this.createLighting());
     this.scene.add(this.createExhibits());
+    this.scene.add(this.showroom.root);
   }
 
   private async loadHallEnvironment() {
@@ -441,8 +477,8 @@ export class ExhibitionRenderer {
     lighting.add(new THREE.HemisphereLight('#fff9e8', '#234b42', 2.1));
     lighting.add(new THREE.AmbientLight('#d8eadf', 0.85));
 
-    const sun = new THREE.DirectionalLight('#fff4d6', 2.4);
-    sun.position.set(4, 7, 5);
+    const sun = new THREE.DirectionalLight('#f1dfc4', 1.18);
+    sun.position.set(8, 8, 46);
     sun.castShadow = true;
     sun.shadow.mapSize.set(
       QUALITY_PROFILES[this.qualityController.getLevel()].shadowMapSize,
@@ -454,7 +490,17 @@ export class ExhibitionRenderer {
     sun.shadow.camera.bottom = -10;
     sun.shadow.camera.near = 0.5;
     sun.shadow.camera.far = 24;
+    sun.shadow.camera.left = -25;
+    sun.shadow.camera.right = 25;
+    sun.shadow.camera.top = 62;
+    sun.shadow.camera.bottom = -62;
+    sun.shadow.camera.far = 140;
     lighting.add(sun);
+    for (const zone of SHOWROOM_ZONES) {
+      const zoneLight = new THREE.PointLight('#d9eee7', 1.15, 17, 2);
+      zoneLight.position.set(0, 5.55, zone.z);
+      lighting.add(zoneLight);
+    }
 
     return lighting;
   }
@@ -465,50 +511,8 @@ export class ExhibitionRenderer {
 
     const bicycle = this.createBicycle();
     const car = this.createCar();
-    const sandTable = this.createSandTable();
-    exhibits.add(bicycle, car, sandTable);
+    exhibits.add(bicycle, car);
     return exhibits;
-  }
-
-  private createSandTable() {
-    const root = new THREE.Group();
-    const layout = findExhibitLayout('west-lake-map');
-    root.name = 'west-lake-map-sand-table';
-    root.position.set(layout.position.x, layout.position.y, layout.position.z);
-
-    const plinth = createBox(layout.size.width, 0.62, layout.size.depth, '#213d36', 0.42);
-    plinth.position.y = 0.31;
-    const lake = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.86, 0.96, 0.08, 48),
-      new THREE.MeshPhysicalMaterial({
-        color: '#4b9b8f',
-        roughness: 0.2,
-        metalness: 0.05,
-        transmission: 0.12
-      })
-    );
-    lake.scale.set(1.15, 1, 0.72);
-    lake.position.y = 0.7;
-    const islandMaterial = new THREE.MeshStandardMaterial({
-      color: '#8daa74',
-      roughness: 0.82
-    });
-    for (const [x, z, scale] of [
-      [-0.42, -0.16, 0.34],
-      [0.28, 0.12, 0.28],
-      [0.05, -0.38, 0.2]
-    ] as const) {
-      const island = new THREE.Mesh(
-        new THREE.CylinderGeometry(scale, scale * 1.1, 0.12, 20),
-        islandMaterial
-      );
-      island.position.set(x, 0.78, z);
-      root.add(island);
-    }
-    root.add(plinth, lake);
-    markExhibit(root, 'west-lake-map');
-    this.exhibitRoots.push(root);
-    return root;
   }
 
   private createBicycle() {
@@ -578,6 +582,7 @@ export class ExhibitionRenderer {
     const deltaSeconds = clampFrameDelta(this.clock.getDelta());
     this.updateMovement(deltaSeconds);
     this.updateMuseumCases(deltaSeconds);
+    this.showroom.update(deltaSeconds);
     this.sampleQuality();
     try {
       this.pipeline.render(deltaSeconds);
@@ -646,6 +651,22 @@ export class ExhibitionRenderer {
     this.camera.position.x = next.x;
     this.camera.position.z = next.z;
     this.audio.updateTravelledDistance(travelled);
+    if (travelled > 0) this.updateActiveZone();
+  }
+
+  private updateActiveZone() {
+    const nearestZone = SHOWROOM_ZONES.reduce((nearest, zone) =>
+      Math.abs(zone.z - this.camera.position.z) < Math.abs(nearest.z - this.camera.position.z)
+        ? zone
+        : nearest
+    );
+    this.setActiveZone(nearestZone.id);
+  }
+
+  private setActiveZone(zoneId: string) {
+    if (this.activeZoneId === zoneId) return;
+    this.activeZoneId = zoneId;
+    this.options.onZoneChange?.(zoneId);
   }
 
   private applyQuality(quality: QualityLevel) {

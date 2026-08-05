@@ -2,21 +2,25 @@
 import { useCallback, useEffect, useState } from 'react';
 import { App } from './App';
 import { ExhibitionPage } from './components/ExhibitionPage';
+import { BuildingVRPage } from './components/BuildingVRPage';
 import { VideoCenterPage } from './components/VideoCenterPage';
 import { LipSyncLab } from './lab/lip-sync/LipSyncLab';
 import {
   pathForTourismView,
+  pathForScenicVR,
   resolveAppRoute,
   type AppRoute,
   type TourismView
 } from './routing/appRoute';
 
 export function RootApp() {
-  const [route, setRoute] = useState<AppRoute>(() => resolveAppRoute(window.location.pathname));
+  const [route, setRoute] = useState<AppRoute>(() =>
+    resolveAppRoute(window.location.pathname, window.location.search)
+  );
 
   useEffect(() => {
     const handlePopState = () => {
-      setRoute(resolveAppRoute(window.location.pathname));
+      setRoute(resolveAppRoute(window.location.pathname, window.location.search));
     };
 
     window.addEventListener('popstate', handlePopState);
@@ -35,17 +39,38 @@ export function RootApp() {
     document.body.scrollTop = 0;
   }, []);
 
+  const openScenic = useCallback((spotId: string) => {
+    const pathname = pathForScenicVR(spotId);
+
+    if (window.location.pathname !== pathname) {
+      window.history.pushState({}, '', pathname);
+    }
+
+    setRoute({ kind: 'scenic-vr', spotId });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, []);
+
   if (route.kind === 'lip-sync-lab') {
     return <LipSyncLab />;
   }
 
   if (route.kind === 'exhibition') {
-    return <ExhibitionPage onReturnHome={() => navigate('explore')} />;
+    return <ExhibitionPage onReturnHome={() => navigate('explore')} onOpenGuide={() => navigate('explore')} />;
   }
 
   if (route.kind === 'videos') {
     return <VideoCenterPage onReturnHome={() => navigate('explore')} />;
   }
 
-  return <App activeView={route.view} onNavigate={navigate} />;
+  if (route.kind === 'scenic-vr') {
+    return (
+      <BuildingVRPage
+        spotId={route.spotId}
+        onReturnMap={() => navigate('map')}
+      />
+    );
+  }
+
+  return <App activeView={route.view} onNavigate={navigate} onOpenScenic={openScenic} />;
 }

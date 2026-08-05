@@ -1,0 +1,93 @@
+{
+  "title": "乌镇水乡数字展厅",
+  "assets": {
+    "aerial": "/images/wuzhen-aerial-panorama.jpg",
+    "street": "/images/wuzhen-water-town-bg.jpg"
+  },
+  "weather": {
+    "sun": {
+      "label": "晴",
+      "sky": "#9fc6d5",
+      "fog": "#b8cdd1",
+      "sunColor": "#fff1c9",
+      "sunIntensity": 2.4,
+      "ambientIntensity": 1.25,
+      "water": "#275c68",
+      "lanternIntensity": 0.35,
+      "rain": false
+    },
+    "night": {
+      "label": "夜",
+      "sky": "#07131d",
+      "fog": "#132631",
+      "sunColor": "#8db9d7",
+      "sunIntensity": 0.42,
+      "ambientIntensity": 0.46,
+      "water": "#102d3a",
+      "lanternIntensity": 3.5,
+      "rain": false
+    },
+    "rain": {
+      "label": "雨",
+      "sky": "#536b73",
+      "fog": "#81969a",
+      "sunColor": "#c1d0d1",
+      "sunIntensity": 0.85,
+      "ambientIntensity": 0.72,
+      "water": "#1e5261",
+      "lanternIntensity": 1.45,
+      "rain": true
+    }
+  },
+  "districts": [
+    {
+      "id": "overview",
+      "label": "全域沙盘",
+      "frame": "/images/wuzhen-frames/overview.png",
+      "eyebrow": "01 / MASTER PLAN",
+      "title": "乌镇全域沙盘",
+      "description": "从高空观察河网、街巷和临水建筑的关系，选择下一段游览路线。",
+      "camera": { "position": [35, 34, 44], "target": [0, 0, 0] },
+      "bounds": { "minX": -34, "maxX": 34, "minZ": -24, "maxZ": 28 },
+      "marker": [0, 4.5, 4]
+    },
+    {
+      "id": "xizha",
+      "label": "西栅街区",
+      "frame": "/images/wuzhen-frames/xizha.png",
+      "eyebrow": "02 / XIZHA WATER STREET",
+      "title": "西栅水乡主街区",
+      "description": "沿主河道穿行，查看石桥、临水民居、灯笼与乌篷船构成的水乡尺度。",
+      "camera": { "position": [0, 5.2, 17], "target": [0, 2.35, -7] },
+      "bounds": { "minX": -12, "maxX": 12, "minZ": -22, "maxZ": 24 },
+      "marker": [9, 4.8, -2]
+    },
+    {
+      "id": "dyeworks",
+      "label": "宏源泰染坊",
+      "frame": "/images/wuzhen-frames/dyeworks.png",
+      "eyebrow": "03 / HONGYUANTAI DYEWORKS",
+      "title": "宏源泰蓝印花布工艺",
+      "description": "以乌镇蓝染坊的实拍工艺场景呈现宏源泰节点的蓝印花布传统：刻板、刮浆、入染、晾晒。",
+      "process": ["刻板", "刮浆", "染色", "晾晒"],
+      "camera": { "position": [0, 4, 10], "target": [0, 3.1, -2] },
+      "bounds": { "minX": -9.5, "maxX": 9.5, "minZ": -6, "maxZ": 6 },
+      "marker": [-17, 4.8, 4]
+    },
+    {
+      "id": "night-river",
+      "label": "夜游河道",
+      "frame": "/images/wuzhen-frames/night-river.png",
+      "eyebrow": "04 / NIGHT RIVER TOUR",
+      "title": "乌镇夜游河道",
+      "description": "切换夜景，观察灯笼、窗灯与河面光影在临水街巷中的节奏。",
+      "camera": { "position": [0, 3.3, 16], "target": [0, 2.45, -8] },
+      "bounds": { "minX": -8, "maxX": 8, "minZ": -22, "maxZ": 20 },
+      "marker": [9, 4.8, -12]
+    }
+  ],
+  "tour": {
+    "intervalMs": 6200,
+    "order": ["overview", "xizha", "dyeworks", "night-river"]
+  }
+}

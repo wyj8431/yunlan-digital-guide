@@ -19,11 +19,17 @@ import './styles.css';
 type AppProps = {
   activeView?: TourismView;
   onNavigate?: (view: TourismView) => void;
+  onOpenScenic?: (spotId: string) => void;
 };
 
 const ignoreNavigation = () => {};
+const ignoreScenicNavigation = () => {};
 
-export function App({ activeView = 'explore', onNavigate = ignoreNavigation }: AppProps) {
+export function App({
+  activeView = 'explore',
+  onNavigate = ignoreNavigation,
+  onOpenScenic = ignoreScenicNavigation
+}: AppProps) {
   const [scenicArea, setScenicArea] = useState<ScenicAreaSummary | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [speechDriver, setSpeechDriver] = useState<SpeechDriver>('browser');
@@ -110,6 +116,7 @@ export function App({ activeView = 'explore', onNavigate = ignoreNavigation }: A
         latestAnswer={chat.latestAnswer}
         voice={voice}
         onNavigate={onNavigate}
+        onOpenScenic={onOpenScenic}
         onAsk={chat.ask}
         onToggleVoice={voice.toggle}
       />

@@ -1,5 +1,5 @@
 // 文旅专题页展示地图、章节、行程信息和会话内旅行护照。
-import { useState, type CSSProperties } from 'react';
+import { type CSSProperties } from 'react';
 import {
   ArrowLeft,
   AudioLines,
@@ -9,15 +9,12 @@ import {
   Camera,
   Check,
   Clock3,
-  Compass,
-  Footprints,
   Headphones,
   MapPinned,
   Mic2,
   MoonStar,
   Navigation,
   Route,
-  Sailboat,
   ShieldCheck,
   Sparkles,
   SunMedium,
@@ -32,8 +29,6 @@ import { OfficialInfoNotice } from './OfficialInfoNotice';
 import { TourismNav } from './TourismNav';
 
 type PageView = Exclude<TourismView, 'explore' | 'history'>;
-type MapLayer = 'walk' | 'boat' | 'night';
-
 type TourismPageProps = {
   view: PageView;
   scenicArea: ScenicAreaSummary;
@@ -41,6 +36,7 @@ type TourismPageProps = {
   latestAnswer: string;
   voice: Pick<VoiceGuideState, 'status' | 'transcript' | 'error'>;
   onNavigate: (view: TourismView) => void;
+  onOpenScenic?: (spotId: string) => void;
   onAsk: (question: string) => void | Promise<void>;
   onToggleVoice: () => void;
 };
@@ -60,7 +56,7 @@ const PAGE_META: Record<PageView, { title: string; summary: string }> = {
   },
   map: {
     title: '活体运河地图',
-    summary: '景点沿水脉展开，切换步行、摇橹船和夜游视角，理解它们之间的关系。'
+    summary: '建筑节点沿水脉展开，点开景点，让数字导游为你解释街巷、河道和建筑。'
   },
   itinerary: {
     title: '流动行程',
@@ -121,27 +117,6 @@ const STORY_CHAPTERS = [
   { title: '当代夜游', text: '灯光落在河面以后，古镇进入另一套缓慢节奏。' }
 ] as const;
 
-const MAP_LAYERS: Record<
-  MapLayer,
-  { label: string; description: string; icon: typeof Footprints }
-> = {
-  walk: {
-    label: '步行图层',
-    description: '沿桥、巷和文化场馆串联，适合第一次完整认识乌镇。',
-    icon: Footprints
-  },
-  boat: {
-    label: '摇橹船图层',
-    description: '优先连接码头与临水景点，减少折返，从水面观看古镇。',
-    icon: Sailboat
-  },
-  night: {
-    label: '夜游图层',
-    description: '聚焦亮灯后的西栅、桥面和河岸，适合傍晚到夜间慢游。',
-    icon: MoonStar
-  }
-};
-
 const PHASES = ['晨', '昼', '暮', '夜'] as const;
 
 const VOICE_STATUS: Record<VoiceGuideState['status'], { title: string; detail: string }> = {
@@ -173,10 +148,10 @@ export function TourismPage({
   latestAnswer,
   voice,
   onNavigate,
+  onOpenScenic,
   onAsk,
   onToggleVoice
 }: TourismPageProps) {
-  const [mapLayer, setMapLayer] = useState<MapLayer>('walk');
   const visibleRouteCards =
     routeCards.length > 0
       ? routeCards
@@ -352,27 +327,7 @@ export function TourismPage({
 
         {view === 'map' ? (
           <section className="tourism-map-experience" aria-label="景点地图">
-            <div className="tourism-map-toolbar" role="group" aria-label="地图图层">
-              {(Object.entries(MAP_LAYERS) as Array<[MapLayer, (typeof MAP_LAYERS)[MapLayer]]>).map(
-                ([key, layer]) => {
-                  const Icon = layer.icon;
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      className={mapLayer === key ? 'is-active' : ''}
-                      aria-pressed={mapLayer === key}
-                      aria-label={layer.label}
-                      onClick={() => setMapLayer(key)}
-                    >
-                      <Icon size={18} aria-hidden="true" />
-                      <span>{layer.label.replace('图层', '')}</span>
-                    </button>
-                  );
-                }
-              )}
-            </div>
-            <div className="tourism-canal-map" data-map-layer={mapLayer}>
+            <div className="tourism-canal-map" data-map-layer="walk">
               <div className="tourism-canal-flow" aria-hidden="true">
                 <span />
                 <span />
@@ -384,7 +339,8 @@ export function TourismPage({
                   type="button"
                   className="tourism-map-node"
                   style={{ '--spot-index': index } as CSSProperties}
-                  onClick={() => askThenExplore(`介绍一下${spot.name}，并推荐附近游玩路线。`)}
+                  aria-label={`请让${spot.name}的数字导游讲解`}
+                  onClick={() => onOpenScenic?.(spot.id)}
                 >
                   <span className="tourism-map-marker">
                     <MapPinned size={18} aria-hidden="true" />
@@ -395,10 +351,6 @@ export function TourismPage({
                   </span>
                 </button>
               ))}
-            </div>
-            <div className="tourism-map-layer-copy">
-              <Compass size={22} aria-hidden="true" />
-              <p>{MAP_LAYERS[mapLayer].description}</p>
             </div>
           </section>
         ) : null}

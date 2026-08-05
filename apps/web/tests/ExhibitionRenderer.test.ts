@@ -145,7 +145,12 @@ vi.mock('three', () => {
         this.position.x = x;
         this.position.y = y;
         this.position.z = z;
-      }
+      },
+      clone: () => ({
+        x: this.position.x,
+        y: this.position.y,
+        z: this.position.z
+      })
     };
     rotation = { x: 0, y: 0, z: 0, order: 'XYZ', set: vi.fn() };
     scale = { x: 1, y: 1, z: 1, set: vi.fn(), setScalar: vi.fn() };
@@ -257,6 +262,9 @@ vi.mock('three', () => {
         this.y = y;
         this.z = z;
         return this;
+      }
+      clone() {
+        return { x: this.x, y: this.y, z: this.z };
       }
     },
     Euler: class {
@@ -405,14 +413,14 @@ describe('ExhibitionRenderer', () => {
     for (let index = 0; index < 45; index += 1) runFrame();
 
     const blockedPose = renderer.getCameraPose();
-    expect(blockedPose.position.x).toBeLessThan(6);
-    expect(blockedPose.position.z).toBeCloseTo(7.5);
+    expect(blockedPose.position.x).toBeCloseTo(21.6);
+    expect(blockedPose.position.z).toBeCloseTo(57.2);
 
     window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' }));
     for (let index = 0; index < 15; index += 1) runFrame();
 
     const slidingPose = renderer.getCameraPose();
-    expect(slidingPose.position.z).toBeLessThan(6.5);
+    expect(slidingPose.position.z).toBeLessThan(blockedPose.position.z);
 
     canvas.dispatchEvent(new MouseEvent('pointerdown'));
     const lookEvent = new MouseEvent('pointermove');

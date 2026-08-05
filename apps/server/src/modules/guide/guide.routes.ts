@@ -1,7 +1,12 @@
 // 导游 HTTP 路由负责参数校验，并把领域错误映射为稳定响应。
 import Router from '@koa/router';
 import { readEnv } from '../../config/env.js';
-import { loadScenicData } from '../scenic/scenic-data.js';
+import {
+  getScenicAreaSummary,
+  loadScenicData,
+  mergeScenicDataWithSummary
+} from '../scenic/scenic-data.js';
+import { ScenicLiveService } from '../scenic/scenic-live.service.js';
 import { formatGuideKnowledgeContext, retrieveGuideKnowledge } from './guide-retrieval.js';
 import { GuideAttachmentError, normalizeGuideAttachment } from './guide-attachment.js';
 import { destinationGuidePlanRecords } from './guide-knowledge-data.js';
@@ -27,8 +32,13 @@ type ExportRequestBody = {
   title?: unknown;
 };
 
-export function createGuideRouter(): Router {
+export function createGuideRouter(
+  scenicLiveService = new ScenicLiveService({ feedUrl: '', fallback: getScenicAreaSummary })
+): Router {
   const router = new Router();
+
+  const loadGuideScenicData = async () =>
+    mergeScenicDataWithSummary(loadScenicData(), await scenicLiveService.getSummary());
 
   router.get('/api/destinations', (ctx) => {
     ctx.body = {
@@ -80,7 +90,7 @@ export function createGuideRouter(): Router {
     ctx.body = record;
   });
 
-  router.get('/api/guide/retrieval', (ctx) => {
+  router.get('/api/guide/retrieval', async (ctx) => {
     const rawQuery = ctx.query.query;
     const query = typeof rawQuery === 'string' ? rawQuery.trim() : '';
 
@@ -90,7 +100,7 @@ export function createGuideRouter(): Router {
       return;
     }
 
-    const results = retrieveGuideKnowledge(query, loadScenicData());
+    const results = retrieveGuideKnowledge(query, await loadGuideScenicData());
 
     ctx.body = {
       query,
@@ -104,6 +114,7 @@ export function createGuideRouter(): Router {
     const message = typeof body?.message === 'string' ? body.message : '';
 
     try {
+      const scenicData = await loadGuideScenicData();
       ctx.body = await createGuideResponse({
         message,
         attachment:
@@ -111,6 +122,7 @@ export function createGuideRouter(): Router {
             ? normalizeGuideAttachment(body.attachment)
             : normalizeGuideImage(body?.image),
         history: normalizeGuideHistory(body?.history),
+        scenicData,
         env: readEnv()
       });
     } catch (caught) {

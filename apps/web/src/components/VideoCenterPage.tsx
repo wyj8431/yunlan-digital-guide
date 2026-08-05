@@ -11,6 +11,7 @@ import {
   type AppDispatch,
   type RootState
 } from '../store/videoStore';
+import type { CreateDanmakuInput } from '../types/video';
 import type { DanmakuPreferences } from '../video/danmakuPreferences';
 import {
   defaultDanmakuPreferences,
@@ -46,6 +47,10 @@ export function VideoCenterPage({ onReturnHome }: VideoCenterPageProps) {
   } = useSelector((state: RootState) => state.video);
   const [preferences, setPreferences] = useState<DanmakuPreferences>(defaultDanmakuPreferences);
   const [currentMs, setCurrentMs] = useState(0);
+  const [danmakuPreview, setDanmakuPreview] = useState<Pick<
+    CreateDanmakuInput,
+    'content' | 'position' | 'color'
+  > | null>(null);
   const selectedVideo = videos.find((video) => video.id === selectedVideoId) ?? null;
   const selectedDetail = selectedVideoId ? detailsByVideoId[selectedVideoId] : undefined;
   const selectedDetailStatus = selectedVideoId
@@ -65,6 +70,7 @@ export function VideoCenterPage({ onReturnHome }: VideoCenterPageProps) {
   useEffect(() => {
     if (!selectedVideoId) return;
     setCurrentMs(0);
+    setDanmakuPreview(null);
     void dispatch(loadVideoDetail(selectedVideoId));
   }, [dispatch, selectedVideoId]);
 
@@ -169,6 +175,7 @@ export function VideoCenterPage({ onReturnHome }: VideoCenterPageProps) {
                 danmaku={danmakuByVideoId[selectedDetail.id] ?? []}
                 preferences={preferences}
                 onClockChange={setCurrentMs}
+                danmakuPreview={danmakuPreview}
               />
               <div className="video-center-controls">
                 <div className="video-center-copy">
@@ -219,7 +226,9 @@ export function VideoCenterPage({ onReturnHome }: VideoCenterPageProps) {
                 ) : null}
 
                 <DanmakuComposer
+                  key={selectedDetail.id}
                   currentMs={currentMs}
+                  onPreviewChange={setDanmakuPreview}
                   onSubmit={async (input) => {
                     await dispatch(sendDanmaku({ videoId: selectedDetail.id, input })).unwrap();
                   }}

@@ -242,6 +242,19 @@ export class VideoRepository {
 
   private seedDatabase(): void {
     this.database.transaction(() => {
+      const seedIds = VIDEO_SEEDS.map((video) => video.id);
+      if (seedIds.length > 0) {
+        const placeholders = seedIds.map(() => '?').join(', ');
+        // 视频种子是当前演示目录的权威清单，移除已经下线的旧景区条目。
+        this.database
+          .prepare(`DELETE FROM videos WHERE id NOT IN (${placeholders})`)
+          .run(...seedIds);
+        // 字幕内容随目录一起更新，避免同一视频保留旧项目的字幕。
+        this.database
+          .prepare(`DELETE FROM subtitle_cues WHERE video_id IN (${placeholders})`)
+          .run(...seedIds);
+      }
+
       // 先把已有记录移到临时排序区间，避免重新编号时触发 sort_order 唯一约束。
       const temporaryRange = this.database
         .prepare('SELECT COALESCE(MAX(sort_order), -1) + 1 AS start FROM videos')
@@ -297,8 +310,11 @@ export class VideoRepository {
       }
 
       const sanitizeStoredDanmaku = this.database.prepare(
-        `UPDATE danmaku SET content = replace(content, ?, '**********') WHERE instr(content, ?) > 0`
+        `UPDATE danmaku SET content = replace(content, ?, '****') WHERE instr(content, ?) > 0`
       );
+      this.database
+        .prepare("UPDATE danmaku SET content = replace(content, '**********', '****')")
+        .run();
       for (const keyword of sensitiveKeywords) {
         sanitizeStoredDanmaku.run(keyword, keyword);
       }

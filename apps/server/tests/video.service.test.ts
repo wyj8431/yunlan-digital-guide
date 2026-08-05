@@ -51,7 +51,8 @@ describe('video service', () => {
 
     expect(videos).toHaveLength(6);
     expect(new Set(videos.map((video) => video.id)).size).toBe(6);
-
+    expect(videos.every((video) => video.id.startsWith('wuzhen-'))).toBe(true);
+    expect(new Set(videos.map((video) => video.videoUrl)).size).toBe(6);
     for (const video of videos) {
       expect(video).toMatchObject({
         id: expect.any(String),
@@ -89,7 +90,7 @@ describe('video service', () => {
     });
 
     expect(saved).toMatchObject({
-      content: '这个**********在发**********，别**********',
+      content: '这个****在发****，别****',
       nickname: '游客 0001',
       timestampMs: 1_500,
       position: 'scroll',
@@ -98,7 +99,7 @@ describe('video service', () => {
     expect(service.listDanmaku(video.id, 0, 2_000)).toEqual([saved]);
   });
 
-  it('accepts 80-character input when filtering expands the stored content', () => {
+  it('accepts 80-character input when filtering masks the stored content', () => {
     const video = service.listVideos()[0];
     const saved = service.createDanmaku(video.id, {
       content: '广告'.repeat(40),
@@ -107,7 +108,7 @@ describe('video service', () => {
       color: '#ffffff'
     });
 
-    expect(saved.content).toBe('**********'.repeat(40));
+    expect(saved.content).toBe('****'.repeat(40));
   });
 
   it('filters common abusive language inside a longer sentence', () => {
@@ -119,7 +120,35 @@ describe('video service', () => {
       color: '#ffffff'
     });
 
-    expect(saved.content).toBe('你这个大**********');
+    expect(saved.content).toBe('你这个大****');
+  });
+
+  it('masks sensitive keywords again when playback reads an existing record', () => {
+    const video = service.listVideos()[0];
+    const database = new Database(databasePath);
+    try {
+      database
+        .prepare(
+          `INSERT INTO danmaku (
+             video_id, content, timestamp_ms, position, color, nickname, created_at
+           ) VALUES (?, ?, ?, ?, ?, ?, ?)`
+        )
+        .run(
+          video.id,
+          '历史广告和傻逼弹幕',
+          3_000,
+          'scroll',
+          '#ffffff',
+          '游客 9999',
+          new Date().toISOString()
+        );
+    } finally {
+      database.close();
+    }
+
+    const playback = service.listDanmaku(video.id, 3_000, 3_000);
+    expect(playback).toHaveLength(1);
+    expect(playback[0].content).toBe('历史****和****弹幕');
   });
 
   it('queries danmaku inside an inclusive playback window in timestamp order', () => {

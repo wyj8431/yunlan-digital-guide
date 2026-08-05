@@ -1,0 +1,25 @@
+{
+  "routes": [
+    {
+      "id": "water-street",
+      "label": "水巷经典线",
+      "description": "从入口沙盘进入西栅主街，再抵达宏源泰与夜游河道。",
+      "intervalMs": 6200,
+      "order": ["overview", "xizha", "dyeworks", "night-river"]
+    },
+    {
+      "id": "indigo-craft",
+      "label": "蓝印花布工艺线",
+      "description": "聚焦宏源泰染坊的蓝印花布制作与临水晾晒场景。",
+      "intervalMs": 6800,
+      "order": ["overview", "dyeworks", "xizha"]
+    },
+    {
+      "id": "lantern-night",
+      "label": "灯影夜游线",
+      "description": "沿临水街巷进入乌篷船视角，观察石桥与河面灯影。",
+      "intervalMs": 7400,
+      "order": ["overview", "xizha", "night-river"]
+    }
+  ]
+}

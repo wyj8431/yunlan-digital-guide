@@ -39,6 +39,18 @@ describe('HomeDestinationLinks', () => {
     expect(focusRule).toContain('opacity: 1;');
   });
 
+  it('shows destination links without requiring hover', () => {
+    const styles = readFileSync(resolve(process.cwd(), 'src/styles.css'), 'utf8');
+    const baseRule = styles.match(
+      /\.home-destination-link\s*\{(?<declarations>[^}]*)\}/
+    )?.groups?.declarations;
+
+    expect(baseRule).toContain('opacity: 1;');
+    expect(baseRule).toContain('border: 1px solid rgba(255, 240, 168, 0.88);');
+    expect(baseRule).toContain('background: #baf8dc;');
+    expect(baseRule).toContain('color: #164a3b;');
+  });
+
   it('moves into the page grid below the title on narrow screens', () => {
     const styles = readFileSync(resolve(process.cwd(), 'src/styles.css'), 'utf8');
     const narrowScreenRule = styles.match(

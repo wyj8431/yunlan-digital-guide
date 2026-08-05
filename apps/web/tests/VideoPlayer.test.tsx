@@ -5,7 +5,7 @@ import {
   canUseLiveSubtitleRecognition,
   resolveSubtitleDisplay
 } from '../src/video/subtitleFallback';
-import type { Danmaku, VideoDetail } from '../src/types/video';
+import type { CreateDanmakuInput, Danmaku, VideoDetail } from '../src/types/video';
 
 const video: VideoDetail = {
   id: 'west-lake-dawn',
@@ -80,6 +80,18 @@ function renderPlayer() {
   };
 }
 
+function renderPlayerWithPreview(position: CreateDanmakuInput['position']) {
+  return render(
+    <VideoPlayer
+      video={video}
+      danmaku={danmaku}
+      preferences={{ speed: 1, fontSize: 18, opacity: 0.9, density: 3 }}
+      onClockChange={() => undefined}
+      danmakuPreview={{ content: '新弹幕预览', position, color: '#f5d76e' }}
+    />
+  );
+}
+
 describe('VideoPlayer', () => {
   afterEach(() => {
     cleanup();
@@ -100,6 +112,23 @@ describe('VideoPlayer', () => {
     fireEvent.seeking(player);
     fireEvent.seeked(player);
     expect(Number.parseFloat(screen.getByText('好美').style.left)).toBeCloseTo((2 / 7) * 100);
+  });
+
+  it('renders the new danmaku preview at the selected position', () => {
+    const { rerender } = renderPlayerWithPreview('top');
+    const preview = screen.getByText('新弹幕预览');
+    expect(preview).toHaveClass('video-danmaku-item--top');
+
+    rerender(
+      <VideoPlayer
+        video={video}
+        danmaku={danmaku}
+        preferences={{ speed: 1, fontSize: 18, opacity: 0.9, density: 3 }}
+        onClockChange={() => undefined}
+        danmakuPreview={{ content: '新弹幕预览', position: 'bottom', color: '#f5d76e' }}
+      />
+    );
+    expect(screen.getByText('新弹幕预览')).toHaveClass('video-danmaku-item--bottom');
   });
 
   it('freezes on pause, waiting, stalled and seeking until playback resumes', () => {

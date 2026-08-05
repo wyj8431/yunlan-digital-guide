@@ -9,6 +9,8 @@ export type VirtualHumanConfig =
       enabled: true;
       provider: 'xfyun-vms';
       serviceId: string;
+      displayName?: string;
+      role?: string;
       sdkScriptUrl: string;
       signedUrl: string;
       actions: Array<{

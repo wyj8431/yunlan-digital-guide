@@ -54,7 +54,7 @@ describe('video routes', () => {
 
     expect(created.body.danmaku).toMatchObject({
       videoId: 'wuzhen-water-town',
-      content: '**********别**********',
+      content: '****别****',
       timestampMs: 12000
     });
 
@@ -64,7 +64,7 @@ describe('video routes', () => {
       .expect(({ body }) => expect(body.danmaku).toEqual([created.body.danmaku]));
 
     await request(app.callback())
-      .get('/api/videos/huangshan-cloud-sea/danmaku?from=0&to=20000')
+      .get('/api/videos/wuzhen-xizha-night/danmaku?from=0&to=20000')
       .expect(200)
       .expect(({ body }) => expect(body.danmaku).toEqual([]));
   });

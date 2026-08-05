@@ -25,10 +25,10 @@ describe('scenic data', () => {
     expect('story' in summary.spots[0]).toBe(false);
   });
 
-  it('includes onboarding and regional recommendation quick questions', () => {
+  it('includes the self-introduction quick question without the regional recommendation', () => {
     const summary = getScenicAreaSummary();
 
     expect(summary.quickQuestions).toContain('先介绍一下你自己');
-    expect(summary.quickQuestions).toContain('推荐几个国内热门地区的景区和路线');
+    expect(summary.quickQuestions).not.toContain('推荐几个国内热门地区的景区和路线');
   });
 });
