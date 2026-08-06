@@ -65,12 +65,14 @@ const ZONE_CAMERA_VIEWS: Record<
   string,
   { position: [number, number, number]; target: [number, number, number] }
 > = {
-  entrance: { position: [0, EYE_HEIGHT, 57.2], target: [0, 2.25, 52] },
-  wuzhen: { position: [0, EYE_HEIGHT, 43.2], target: [0, 2.1, 38] },
-  global: { position: [5.2, EYE_HEIGHT, 29.2], target: [-2.2, 1.9, 24] },
-  interactive: { position: [5.1, EYE_HEIGHT, 15.2], target: [0, 1.05, 10] },
-  supporting: { position: [1.5, EYE_HEIGHT, 1.2], target: [0, 2.1, -4] },
-  culture: { position: [-5.1, EYE_HEIGHT, -12.8], target: [0, 2.1, -18] }
+  entrance: { position: [6.5, EYE_HEIGHT, 57.2], target: [0, 2.25, 52] },
+  wuzhen: { position: [5.2, EYE_HEIGHT, 43.2], target: [0, 2.1, 38] },
+  global: { position: [4.8, EYE_HEIGHT, 29.2], target: [0, 1.9, 24] },
+  interactive: { position: [5.1, EYE_HEIGHT, 15.2], target: [0, 2.35, 10] },
+  // Stay in the central aisle: the boat, tea table, and rear image wall read as one composition.
+  supporting: { position: [10.8, EYE_HEIGHT, -0.8], target: [11.8, 1.8, -4.1] },
+  // Start outside the foreground reading desk to keep the gallery wall and resting area in view.
+  culture: { position: [-1.2, EYE_HEIGHT, -11.6], target: [3.2, 1.9, -18] }
 };
 
 function createBox(
@@ -245,6 +247,8 @@ export class ExhibitionRenderer {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.04;
     this.options.host.appendChild(this.renderer.domElement);
     RectAreaLightUniformsLib.init();
     this.audio = this.options.audio ?? createExhibitionAudio();
@@ -430,11 +434,23 @@ export class ExhibitionRenderer {
     this.scene.add(this.showroom.root);
   }
 
+  private updateSidePlatformVisibility() {
+    // The four hands-on displays belong to the side platforms, not the central aisle.
+    const insidePlatform = Math.abs(this.camera.position.x) >= 6.5;
+    this.exhibitGroup.visible = insidePlatform;
+    this.museumCases.root.visible = insidePlatform;
+  }
+
   private async loadHallEnvironment() {
     try {
       const loaded = await this.assetLoader.load(this.options.onProgress ?? (() => undefined));
       if (this.disposed) return;
-      if (loaded.environment) this.scene.environment = loaded.environment;
+      if (loaded.environment) {
+        this.scene.environment = loaded.environment;
+        // Keep the HDRI as a restrained reflection/fill source; the hall's authored lights
+        // should define the visible exposure and preserve wall/display detail.
+        this.scene.environmentIntensity = 0.34;
+      }
       const anisotropy = this.renderer.capabilities?.getMaxAnisotropy?.() ?? 1;
       applyHallPbrTextures(this.materials, loaded.textures, anisotropy);
       const iesTexture = loaded.textures.get('display-ies');
@@ -474,10 +490,10 @@ export class ExhibitionRenderer {
   private createLighting() {
     const lighting = new THREE.Group();
     lighting.name = 'hall-lighting';
-    lighting.add(new THREE.HemisphereLight('#fff9e8', '#234b42', 2.1));
-    lighting.add(new THREE.AmbientLight('#d8eadf', 0.85));
+    lighting.add(new THREE.HemisphereLight('#fff9e8', '#234b42', 0.82));
+    lighting.add(new THREE.AmbientLight('#d8eadf', 0.28));
 
-    const sun = new THREE.DirectionalLight('#f1dfc4', 1.18);
+    const sun = new THREE.DirectionalLight('#f1dfc4', 0.78);
     sun.position.set(8, 8, 46);
     sun.castShadow = true;
     sun.shadow.mapSize.set(
@@ -496,11 +512,22 @@ export class ExhibitionRenderer {
     sun.shadow.camera.bottom = -62;
     sun.shadow.camera.far = 140;
     lighting.add(sun);
-    for (const zone of SHOWROOM_ZONES) {
-      const zoneLight = new THREE.PointLight('#d9eee7', 1.15, 17, 2);
+    const zoneLights = [
+      { color: '#efd3a0', x: -5.5 },
+      { color: '#9bd0bd', x: 5.5 },
+      { color: '#dfb46d', x: -5.5 },
+      { color: '#7ca7c4', x: 5.5 },
+      { color: '#d5a965', x: -5.5 },
+      { color: '#a9b7d5', x: 5.5 }
+    ];
+    SHOWROOM_ZONES.forEach((zone, index) => {
+      const lightSpec = zoneLights[index];
+      const zoneLight = new THREE.PointLight(lightSpec.color, 0.46, 18, 2);
       zoneLight.position.set(0, 5.55, zone.z);
-      lighting.add(zoneLight);
-    }
+      const sideFill = new THREE.PointLight(lightSpec.color, 0.18, 11, 2);
+      sideFill.position.set(lightSpec.x, 2.8, zone.z - 2.8);
+      lighting.add(zoneLight, sideFill);
+    });
 
     return lighting;
   }
@@ -581,6 +608,7 @@ export class ExhibitionRenderer {
     if (this.disposed) return;
     const deltaSeconds = clampFrameDelta(this.clock.getDelta());
     this.updateMovement(deltaSeconds);
+    this.updateSidePlatformVisibility();
     this.updateMuseumCases(deltaSeconds);
     this.showroom.update(deltaSeconds);
     this.sampleQuality();

@@ -50,28 +50,28 @@ export const EXHIBITION_LAYOUT: ExhibitLayoutItem[] = [
   groundedItem({
     id: 'silk-and-tea',
     kind: 'display-table',
-    position: { x: -3.8, y: 0, z: -1.2 },
+    position: { x: -15.2, y: 0, z: -1.2 },
     size: { width: 2.8, height: 0.89, depth: 1.7 },
     interactive: true
   }),
   groundedItem({
     id: 'silk-garment',
     kind: 'silk-garment',
-    position: { x: 3.8, y: 0, z: -1.2 },
+    position: { x: 15.2, y: 0, z: -1.2 },
     size: { width: 2.5, height: 0.89, depth: 1.5 },
     interactive: true
   }),
   groundedItem({
     id: 'west-lake-bicycle',
     kind: 'bicycle',
-    position: { x: -4.3, y: 0.72, z: -5.6 },
+    position: { x: -15.2, y: 0.72, z: -5.6 },
     size: { width: 2.5, height: 1.45, depth: 1.2 },
     interactive: true
   }),
   groundedItem({
     id: 'green-mobility-car',
     kind: 'shuttle',
-    position: { x: 3.6, y: 0, z: -5.6 },
+    position: { x: 15.2, y: 0, z: -5.6 },
     size: { width: 3.7, height: 1.59, depth: 1.9 },
     interactive: true
   }),

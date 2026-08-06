@@ -42,14 +42,32 @@ export function createJiangnanHall(materials: HallMaterials): THREE.Group {
   shell.add(
     box(HALL_DIMENSIONS.width, HALL_DIMENSIONS.height, 0.24, wall, 0, 3.2, HALL_Z_BOUNDS.min),
     box(HALL_DIMENSIONS.width, HALL_DIMENSIONS.height, 0.24, wall, 0, 3.2, HALL_Z_BOUNDS.max),
-    box(0.24, HALL_DIMENSIONS.height, HALL_DIMENSIONS.depth, wall, -HALF_HALL_WIDTH, 3.2, HALL_CENTER_Z),
-    box(0.24, HALL_DIMENSIONS.height, HALL_DIMENSIONS.depth, wall, HALF_HALL_WIDTH, 3.2, HALL_CENTER_Z),
+    box(
+      0.24,
+      HALL_DIMENSIONS.height,
+      HALL_DIMENSIONS.depth,
+      wall,
+      -HALF_HALL_WIDTH,
+      3.2,
+      HALL_CENTER_Z
+    ),
+    box(
+      0.24,
+      HALL_DIMENSIONS.height,
+      HALL_DIMENSIONS.depth,
+      wall,
+      HALF_HALL_WIDTH,
+      3.2,
+      HALL_CENTER_Z
+    ),
     box(HALL_DIMENSIONS.width, 0.2, HALL_DIMENSIONS.depth, materials.ceiling, 0, 6.3, HALL_CENTER_Z)
   );
 
   const floor = new THREE.Group();
   floor.name = 'stone-floor';
-  floor.add(box(HALL_DIMENSIONS.width, 0.2, HALL_DIMENSIONS.depth, materials.floor, 0, -0.1, HALL_CENTER_Z));
+  floor.add(
+    box(HALL_DIMENSIONS.width, 0.2, HALL_DIMENSIONS.depth, materials.floor, 0, -0.1, HALL_CENTER_Z)
+  );
 
   const moonGate = new THREE.Group();
   moonGate.name = 'moon-gate';
@@ -98,7 +116,9 @@ export function createJiangnanHall(materials: HallMaterials): THREE.Group {
 
   const wayfinding = new THREE.Group();
   wayfinding.name = 'wayfinding';
-  wayfinding.add(box(0.1, 0.018, HALL_DIMENSIONS.depth - 2, materials.lightTrim, 0, 0.018, HALL_CENTER_Z));
+  wayfinding.add(
+    box(0.1, 0.018, HALL_DIMENSIONS.depth - 2, materials.lightTrim, 0, 0.018, HALL_CENTER_Z)
+  );
   for (const z of [52, 38, 24, 10, -4, -18]) {
     wayfinding.add(
       box(5.2, 0.018, 0.08, materials.lightTrim, -2.6, 0.02, z),
@@ -115,6 +135,54 @@ export function createJiangnanHall(materials: HallMaterials): THREE.Group {
   });
   fireExit.add(box(1.1, 0.34, 0.04, signMaterial, 20.4, 4.8, HALL_Z_BOUNDS.min + 0.16));
 
-  hall.add(shell, moonGate, lattice, floor, tracks, scroll, wayfinding, fireExit);
+  const sidePlatforms = new THREE.Group();
+  sidePlatforms.name = 'side-exhibition-platforms';
+  const platformMaterial = new THREE.MeshStandardMaterial({
+    color: '#1f3b38',
+    roughness: 0.52,
+    metalness: 0.18
+  });
+  const accentMaterial = new THREE.MeshStandardMaterial({
+    color: '#c8a85d',
+    emissive: '#775928',
+    emissiveIntensity: 0.22,
+    roughness: 0.3,
+    metalness: 0.48
+  });
+  for (const side of [-1, 1]) {
+    const x = side * 15.2;
+    sidePlatforms.add(
+      box(6.2, 0.16, 12.3, platformMaterial, x, 0.08, -3.5),
+      box(6.02, 0.025, 0.1, accentMaterial, x, 0.18, 2.58),
+      box(6.02, 0.025, 0.1, accentMaterial, x, 0.18, -9.58)
+    );
+    for (const z of [-8.9, 1.9]) {
+      sidePlatforms.add(
+        box(0.16, 3.25, 0.16, materials.wood, x + side * 2.72, 1.62, z),
+        box(0.16, 3.25, 0.16, materials.wood, x - side * 2.72, 1.62, z)
+      );
+    }
+    const bench = new THREE.Group();
+    bench.add(
+      box(1.7, 0.16, 0.44, materials.wood, 0, 0.58, 0),
+      box(0.14, 0.58, 0.34, materials.metal, -0.62, 0.29, 0),
+      box(0.14, 0.58, 0.34, materials.metal, 0.62, 0.29, 0)
+    );
+    bench.position.set(x, 0, 2.02);
+    sidePlatforms.add(bench);
+    const guide = new THREE.Group();
+    guide.add(
+      box(1.36, 1.85, 0.18, materials.wood, 0, 1.2, 0),
+      box(1.12, 1.42, 0.025, accentMaterial, 0, 1.25, 0.11),
+      box(1.6, 0.12, 0.68, materials.floor, 0, 0.08, 0)
+    );
+    guide.position.set(x + side * 2.1, 0, -8.2);
+    sidePlatforms.add(guide);
+    const light = new THREE.PointLight(side < 0 ? '#9edfc9' : '#ffe0a1', 5.5, 7, 2);
+    light.position.set(x, 4.65, -3.6);
+    sidePlatforms.add(light);
+  }
+
+  hall.add(shell, moonGate, lattice, floor, tracks, scroll, wayfinding, fireExit, sidePlatforms);
   return hall;
 }

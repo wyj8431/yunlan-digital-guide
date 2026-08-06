@@ -136,7 +136,7 @@ export class PostProcessingPipeline {
   constructor(private readonly options: PostProcessingPipelineOptions) {
     this.quality = options.quality ?? 'high';
     options.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    options.renderer.toneMappingExposure = 1;
+    options.renderer.toneMappingExposure = 0.72;
     this.composer = new EffectComposer(options.renderer);
     this.renderPass = new RenderPass(options.scene, options.camera);
     this.ssaoPass = new SSAOPass(options.scene, options.camera, 1, 1);
@@ -152,8 +152,10 @@ export class PostProcessingPipeline {
       groundReflector: null,
       selects: null
     });
-    this.ssrPass.thickness = 0.018;
-    this.ssrPass.maxDistance = 4;
+    // Keep floor and wall reflections subtle; large image panels should stay crisp.
+    this.ssrPass.thickness = 0.04;
+    this.ssrPass.maxDistance = 2.4;
+    this.ssrPass.opacity = 0.2;
     this.bloomPass = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.28, 0.42, 0.82);
     this.bokehPass = new BokehPass(options.scene, options.camera, {
       focus: 8,

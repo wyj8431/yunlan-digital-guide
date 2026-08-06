@@ -1,5 +1,6 @@
 import {
   ArrowLeft,
+  ArrowRight,
   AudioLines,
   Bot,
   ExternalLink,
@@ -67,24 +68,72 @@ const EXHIBITS: Record<string, { title: string; description: string; sandTable?:
     title: '乌镇街巷复刻空间',
     description: '沿着水巷、石桥和临水民居，了解乌镇街巷与水路共同形成的生活尺度。'
   },
-  'itinerary-diy': {
-    title: '乌镇路线 DIY 操作台',
-    description: '选择景点、时间和游览偏好，生成一条适合自己的乌镇路线。'
+  'xizha-night-tour-panel': {
+    title: '西栅夜游与场馆',
+    description: '夜色中的水巷、摇橹船、戏台与文化场馆共同构成西栅的夜游体验。'
   },
   'culture-folk': {
     title: '木心与水乡非遗',
     description: '木心美术馆、蓝印花布、杭扇、定胜糕和水乡婚俗在这里并置呈现。'
-  },
+  }
 };
 
 const SHOWROOM_ZONES = [
   { id: 'entrance', name: '乌镇入口前厅' },
   { id: 'wuzhen', name: '乌镇全景总览' },
   { id: 'global', name: '东栅生活街区' },
-  { id: 'interactive', name: '路线与沉浸体验' },
+  { id: 'interactive', name: '西栅夜游与场馆' },
   { id: 'supporting', name: '水巷餐饮与文创' },
   { id: 'culture', name: '木心与非遗文化' }
 ] as const;
+
+const ZONE_GUIDES: Record<
+  string,
+  { eyebrow: string; title: string; description: string; cue: string; duration: string }
+> = {
+  entrance: {
+    eyebrow: '序章 · 入口前厅',
+    title: '先看水路，再看街巷',
+    description: '从乌篷船、临水民居和码头开始，建立乌镇的第一印象。',
+    cue: '留意船、桥与房屋的尺度关系',
+    duration: '建议停留 2 分钟'
+  },
+  wuzhen: {
+    eyebrow: '第一站 · 全景总览',
+    title: '一座被河网塑造的城镇',
+    description: '把河道、桥梁、街屋与日常动线放在同一张空间地图里。',
+    cue: '先看航拍，再找影像里的水巷转角',
+    duration: '建议停留 3 分钟'
+  },
+  global: {
+    eyebrow: '第二站 · 东栅生活',
+    title: '前店后宅，生活就在街边',
+    description: '东栅的魅力来自作坊、茶席、染织与临河店屋共同组成的日常。',
+    cue: '观察蓝印花布与街屋的开窗方式',
+    duration: '建议停留 4 分钟'
+  },
+  interactive: {
+    eyebrow: '第三站 · 西栅夜游',
+    title: '让灯影带你进入夜乌镇',
+    description: '夜色、桥巷、演艺场馆和临水建筑共同构成西栅的夜游节奏。',
+    cue: '从夜景影像移步到场馆模型',
+    duration: '建议停留 4 分钟'
+  },
+  supporting: {
+    eyebrow: '第四站 · 水巷文创',
+    title: '把水乡带回日常',
+    description: '文创、手作、店屋和夜航一起，呈现水巷从白天到夜晚的生活场景。',
+    cue: '先看货架，再看织造与手作细节',
+    duration: '建议停留 3 分钟'
+  },
+  culture: {
+    eyebrow: '终章 · 木心与非遗',
+    title: '在手艺与文字之间收束旅程',
+    description: '蓝印花布、木心美学与河埠空间在这里汇合，留下乌镇的文化记忆。',
+    cue: '从大幅影像走向织造展架与河埠',
+    duration: '建议停留 4 分钟'
+  }
+};
 
 const QUALITY_LABELS: Record<QualityLevel, string> = {
   high: '高',
@@ -130,7 +179,17 @@ export function ExhibitionPage({ onReturnHome, onOpenGuide }: ExhibitionPageProp
   const mutedRef = useRef(false);
   const audioUnlockedRef = useRef(false);
   const focusedExhibitRef = useRef<string | null>(null);
-  const selected = selectedId ? EXHIBITS[selectedId] : undefined;
+  const activeZoneGuide = ZONE_GUIDES[activeZoneId] ?? ZONE_GUIDES.entrance;
+  const activeZoneIndex = Math.max(
+    SHOWROOM_ZONES.findIndex((zone) => zone.id === activeZoneId),
+    0
+  );
+  const selected = selectedId
+    ? (EXHIBITS[selectedId] ?? {
+        title: activeZoneGuide.title,
+        description: `${activeZoneGuide.description} ${activeZoneGuide.cue}。`
+      })
+    : undefined;
 
   const clearTransitionTimer = useCallback(() => {
     if (transitionTimerRef.current !== null) {
@@ -208,7 +267,9 @@ export function ExhibitionPage({ onReturnHome, onOpenGuide }: ExhibitionPageProp
         clearTransitionTimer();
         transitionRef.current = null;
         setTransition(null);
-        setNotice(scene === 'lake' ? '乌镇实景加载失败，已返回展馆' : '展馆加载失败，已返回乌镇实景');
+        setNotice(
+          scene === 'lake' ? '乌镇实景加载失败，已返回展馆' : '展馆加载失败，已返回乌镇实景'
+        );
         setScene(pending.from);
         setPageState(pending.from);
         return;
@@ -364,6 +425,11 @@ export function ExhibitionPage({ onReturnHome, onOpenGuide }: ExhibitionPageProp
     renderer.goToZone(activeZoneId);
   }
 
+  function goToNextZone() {
+    const nextZone = SHOWROOM_ZONES[(activeZoneIndex + 1) % SHOWROOM_ZONES.length];
+    goToZone(nextZone.id);
+  }
+
   async function toggleFullscreen() {
     try {
       if (document.fullscreenElement) {
@@ -477,6 +543,31 @@ export function ExhibitionPage({ onReturnHome, onOpenGuide }: ExhibitionPageProp
             ))}
           </div>
         </nav>
+      )}
+
+      {scene === 'hall' && sceneReady && pageState === 'hall' && (
+        <aside className="exhibition-zone-guide" aria-live="polite">
+          <div className="exhibition-zone-guide-topline">
+            <span>{activeZoneGuide.eyebrow}</span>
+            <strong>
+              {String(activeZoneIndex + 1).padStart(2, '0')} /{' '}
+              {String(SHOWROOM_ZONES.length).padStart(2, '0')}
+            </strong>
+          </div>
+          <h2>{activeZoneGuide.title}</h2>
+          <p>{activeZoneGuide.description}</p>
+          <div className="exhibition-zone-guide-cue">
+            <span>观展线索</span>
+            <strong>{activeZoneGuide.cue}</strong>
+          </div>
+          <div className="exhibition-zone-guide-footer">
+            <span>{activeZoneGuide.duration}</span>
+            <button type="button" onClick={goToNextZone} disabled={transitioning}>
+              下一展厅
+              <ArrowRight aria-hidden="true" />
+            </button>
+          </div>
+        </aside>
       )}
 
       <nav className="exhibition-action-dock" aria-label="展厅快捷操作">

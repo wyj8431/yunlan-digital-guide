@@ -4,13 +4,70 @@ import type { HallMaterials } from '../exhibitionMaterials';
 import type { QualityProfile } from '../quality/qualityProfile';
 
 const CASES = [
-  { name: 'bicycle-plinth', exhibitId: 'west-lake-bicycle', x: -4.3, z: -5.6, glass: false },
-  { name: 'shuttle-plinth', exhibitId: 'green-mobility-car', x: 3.6, z: -5.6, glass: false },
-  { name: 'tea-glass-case', exhibitId: 'silk-and-tea', x: -3.8, z: -1.2, glass: true },
-  { name: 'silk-glass-case', exhibitId: 'silk-garment', x: 3.8, z: -1.2, glass: true }
+  {
+    name: 'bicycle-plinth',
+    exhibitId: 'west-lake-bicycle',
+    x: -15.2,
+    z: -5.6,
+    glass: false,
+    title: 'Slow Travel Bicycle',
+    detail: 'Water-town lanes and bridges'
+  },
+  {
+    name: 'shuttle-plinth',
+    exhibitId: 'green-mobility-car',
+    x: 15.2,
+    z: -5.6,
+    glass: false,
+    title: 'Scenic Shuttle',
+    detail: 'Low-carbon visitor connection'
+  },
+  {
+    name: 'tea-glass-case',
+    exhibitId: 'silk-and-tea',
+    x: -15.2,
+    z: -1.2,
+    glass: true,
+    title: 'Tea Ceremony',
+    detail: 'Water-town hospitality'
+  },
+  {
+    name: 'silk-glass-case',
+    exhibitId: 'silk-garment',
+    x: 15.2,
+    z: -1.2,
+    glass: true,
+    title: 'Silk Garment',
+    detail: 'Jiangnan textile craft'
+  }
 ] as const;
 
 type IesSpotLight = THREE.SpotLight & { iesMap: THREE.Texture | null };
+
+function createCaption(title: string, detail: string) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 768;
+  canvas.height = 256;
+  const context = canvas.getContext('2d');
+  if (!context) return null;
+  context.fillStyle = '#153230';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.strokeStyle = '#c8a85d';
+  context.lineWidth = 8;
+  context.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
+  context.fillStyle = '#f5e6b7';
+  context.font = '600 42px Arial, sans-serif';
+  context.fillText(title, 42, 108);
+  context.fillStyle = '#b8d6c6';
+  context.font = '26px Arial, sans-serif';
+  context.fillText(detail, 42, 164);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return new THREE.Mesh(
+    new THREE.PlaneGeometry(1.42, 0.48),
+    new THREE.MeshBasicMaterial({ map: texture, toneMapped: false })
+  );
+}
 
 export function createMuseumCases(
   _layout: ExhibitLayoutItem[],
@@ -92,6 +149,13 @@ export function createMuseumCases(
     label.userData.exhibitId = definition.exhibitId;
     labels.push(label);
     group.add(label);
+
+    const caption = createCaption(definition.title, definition.detail);
+    if (caption) {
+      caption.position.set(0, 1.62, -0.92);
+      caption.rotation.y = Math.PI;
+      group.add(caption);
+    }
 
     const contactShadow = new THREE.Mesh(
       new THREE.PlaneGeometry(2.35, 1.38),

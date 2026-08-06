@@ -34,7 +34,7 @@ function configureShadows(root: THREE.Object3D) {
 function createFallback(exhibitId: string, layout: ExhibitLayoutItem) {
   const root = new THREE.Group();
   const material = new THREE.MeshStandardMaterial({
-    color: exhibitId === 'silk-garment' ? '#8f2838' : '#b99a59',
+    color: exhibitId === 'silk-garment' ? '#557986' : '#b99a59',
     metalness: 0.12,
     roughness: 0.62
   });
