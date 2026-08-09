@@ -17,17 +17,12 @@ function markExhibit(root: THREE.Object3D, exhibitId: string) {
   });
 }
 
-function configureShadows(root: THREE.Object3D) {
+function disableShadows(root: THREE.Object3D) {
   root.traverse((object) => {
     const mesh = object as THREE.Mesh;
     if (!mesh.isMesh) return;
-    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    const opaque = materials.every((material) => {
-      const physical = material as THREE.MeshPhysicalMaterial;
-      return !material.transparent && (physical.transmission ?? 0) === 0;
-    });
-    mesh.castShadow = opaque;
-    mesh.receiveShadow = opaque;
+    mesh.castShadow = false;
+    mesh.receiveShadow = false;
   });
 }
 
@@ -74,8 +69,8 @@ function createLowDetailProxy(model: THREE.Object3D) {
     new THREE.MeshStandardMaterial({ color: '#64736c', roughness: 0.82 })
   );
   proxy.position.copy(center);
-  proxy.castShadow = true;
-  proxy.receiveShadow = true;
+  proxy.castShadow = false;
+  proxy.receiveShadow = false;
   return proxy;
 }
 
@@ -100,7 +95,7 @@ export function createRealisticExhibits(
     if (source) {
       const detailed = source.clone(true);
       normalizeModel(detailed, binding.maxHeight);
-      configureShadows(detailed);
+      disableShadows(detailed);
       const lod = new THREE.LOD();
       lod.addLevel(detailed, 0);
       lod.addLevel(createLowDetailProxy(detailed), 10);

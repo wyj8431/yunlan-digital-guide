@@ -37,8 +37,8 @@ function mesh<TGeometry extends THREE.BufferGeometry, TMaterial extends THREE.Ma
 ) {
   const result = new THREE.Mesh(geometry, material);
   if (name) result.name = name;
-  result.castShadow = true;
-  result.receiveShadow = true;
+  result.castShadow = false;
+  result.receiveShadow = false;
   return result;
 }
 
@@ -197,7 +197,7 @@ function createVegetation(
   );
   vegetation.name = 'vegetation-instances';
   vegetation.castShadow = profile.shadowMapSize >= 1024;
-  vegetation.receiveShadow = true;
+  vegetation.receiveShadow = false;
   const matrix = new THREE.Matrix4();
   const quaternion = new THREE.Quaternion();
   const position = new THREE.Vector3();

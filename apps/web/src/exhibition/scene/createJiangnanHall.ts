@@ -26,8 +26,8 @@ function box(
 ) {
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
   mesh.position.set(x, y, z);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
+  mesh.castShadow = false;
+  mesh.receiveShadow = false;
   return mesh;
 }
 
@@ -75,7 +75,7 @@ export function createJiangnanHall(materials: HallMaterials): THREE.Group {
     moonGate.add(
       box(SIDE_BAY_WIDTH, 6, 0.34, wall, -SIDE_BAY_CENTER, 3, z),
       box(SIDE_BAY_WIDTH, 6, 0.34, wall, SIDE_BAY_CENTER, 3, z),
-      box(HALL_DIMENSIONS.width - 2, 0.32, 0.42, materials.wood, 0, 6.05, z)
+      box(HALL_DIMENSIONS.width - 2, 0.32, 0.42, materials.metal, 0, 6.05, z)
     );
   }
 
@@ -83,7 +83,7 @@ export function createJiangnanHall(materials: HallMaterials): THREE.Group {
   lattice.name = 'walnut-lattice';
   const latticeGeometry = new THREE.BoxGeometry(0.11, 4.5, 0.16);
   const latticeCount = 72;
-  const instances = new THREE.InstancedMesh(latticeGeometry, materials.wood, latticeCount);
+  const instances = new THREE.InstancedMesh(latticeGeometry, materials.metal, latticeCount);
   instances.name = 'lattice-members';
   const matrix = new THREE.Matrix4();
   for (let index = 0; index < latticeCount; index += 1) {
@@ -92,7 +92,7 @@ export function createJiangnanHall(materials: HallMaterials): THREE.Group {
     matrix.makeTranslation(side * (HALF_HALL_WIDTH - 0.22), 3.15, 56 - local * 1.62);
     instances.setMatrixAt(index, matrix);
   }
-  instances.castShadow = true;
+  instances.castShadow = false;
   lattice.add(instances);
   hall.userData.instancedLatticeCount = latticeCount;
 

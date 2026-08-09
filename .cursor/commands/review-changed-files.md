@@ -1,0 +1,1 @@
+Review the current working-tree and staged diffs using `cursor-skills/code-review/SKILL.md`. Report only actionable findings, ordered P0-P3, with file/line evidence and minimal fixes. Run the smallest relevant checks when practical.

@@ -2,6 +2,11 @@
 .lip-sync-lab {
   display: grid;
   grid-template-columns: 235px minmax(420px, 1fr) 220px;
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'toolbar stage controls'
+    'metrics metrics metrics';
+  height: 100vh;
   min-height: 100vh;
   background: linear-gradient(90deg, rgba(232, 220, 199, 0.86), rgba(139, 157, 131, 0.28)), #e8dcc7;
   color: #24362d;
@@ -23,8 +28,21 @@
 .lip-sync-toolbar,
 .lip-sync-controls,
 .lip-sync-metrics {
+  min-height: 0;
   min-width: 0;
   padding: 16px;
+}
+
+.lip-sync-toolbar {
+  grid-area: toolbar;
+}
+
+.lip-sync-controls {
+  grid-area: controls;
+}
+
+.lip-sync-metrics {
+  grid-area: metrics;
 }
 
 .lip-sync-toolbar,
@@ -125,9 +143,11 @@
 }
 
 .lip-sync-lab__stage {
+  grid-area: stage;
   position: relative;
   min-width: 0;
-  min-height: 100vh;
+  min-height: 0;
+  height: 100%;
   overflow: hidden;
   background:
     radial-gradient(circle at 50% 42%, rgba(192, 142, 58, 0.24), transparent 32%),
@@ -151,7 +171,7 @@
 .lip-sync-stage__host {
   width: 100%;
   height: 100%;
-  min-height: 100vh;
+  min-height: 0;
 }
 
 .lip-sync-stage {
@@ -167,6 +187,16 @@
   background: rgba(36, 54, 45, 0.72);
   padding: 8px 10px;
   color: #e8dcc7;
+}
+
+.lip-sync-stage__host {
+  overflow: hidden;
+}
+
+.lip-sync-stage__host canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .lip-sync-metrics {
@@ -212,6 +242,13 @@
 @media (max-width: 860px) {
   .lip-sync-lab {
     grid-template-columns: 1fr;
+    grid-template-rows: auto auto 68vh auto;
+    grid-template-areas:
+      'toolbar'
+      'controls'
+      'stage'
+      'metrics';
+    height: auto;
   }
 
   .lip-sync-toolbar,
@@ -223,6 +260,7 @@
   .lip-sync-lab__stage,
   .lip-sync-stage,
   .lip-sync-stage__host {
+    height: 68vh;
     min-height: 68vh;
   }
 }

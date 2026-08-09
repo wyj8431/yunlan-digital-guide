@@ -16,12 +16,17 @@ import {
   createHallMaterials,
   type HallMaterials
 } from './exhibitionMaterials';
-import { ExhibitionAssetLoader, type AssetProgress } from './assets/ExhibitionAssetLoader';
+import {
+  ExhibitionAssetLoader,
+  type AssetProgress,
+  type LoadedExhibitionAssets
+} from './assets/ExhibitionAssetLoader';
 import { EXHIBITION_ASSETS } from './assets/exhibitionAssets';
 import { ExhibitionAudio, createExhibitionAudio } from './audio/ExhibitionAudio';
 import {
   FALLBACK_ASSET_SOURCES,
   publishExhibitionTelemetry,
+  type ExhibitionAssetLoadState,
   type ExhibitionAssetSources
 } from './exhibitionTelemetry';
 import { PostProcessingPipeline } from './quality/PostProcessingPipeline';
@@ -38,6 +43,7 @@ import {
   createCuratedShowroom,
   type CuratedShowroom
 } from './scene/createCuratedShowroom';
+import type { ExhibitionWeatherMode } from './visitorGuide';
 
 export type ExhibitionRendererOptions = {
   host: HTMLElement;
@@ -57,6 +63,19 @@ export type ExhibitionCameraPose = {
   pitch: number;
 };
 
+export type ExhibitionModelInteraction = 'orbit' | 'animate' | 'showcase';
+
+type ActiveModelInteraction = {
+  exhibitId: string;
+  mode: ExhibitionModelInteraction;
+  root: THREE.Object3D;
+  elapsedSeconds: number;
+  basePosition: { x: number; y: number; z: number };
+  baseRotationY: number;
+  baseRotationZ: number;
+  baseScale: { x: number; y: number; z: number };
+};
+
 const EYE_HEIGHT = 1.65;
 const MOVE_SPEED = 5;
 const LOOK_SENSITIVITY = 0.0022;
@@ -65,15 +84,45 @@ const ZONE_CAMERA_VIEWS: Record<
   string,
   { position: [number, number, number]; target: [number, number, number] }
 > = {
-  entrance: { position: [6.5, EYE_HEIGHT, 57.2], target: [0, 2.25, 52] },
+  // Begin on the central aisle, aligned with the entrance panorama rather than a side display wall.
+  // A slightly raised eye line keeps the entrance panorama and the aisle in one readable frame.
+  entrance: { position: [0, 1.78, 57.2], target: [0, 2.55, 52.4] },
   wuzhen: { position: [5.2, EYE_HEIGHT, 43.2], target: [0, 2.1, 38] },
   global: { position: [4.8, EYE_HEIGHT, 29.2], target: [0, 1.9, 24] },
   interactive: { position: [5.1, EYE_HEIGHT, 15.2], target: [0, 2.35, 10] },
-  // Stay in the central aisle: the boat, tea table, and rear image wall read as one composition.
-  supporting: { position: [10.8, EYE_HEIGHT, -0.8], target: [11.8, 1.8, -4.1] },
-  // Start outside the foreground reading desk to keep the gallery wall and resting area in view.
-  culture: { position: [-1.2, EYE_HEIGHT, -11.6], target: [3.2, 1.9, -18] }
+  // Keep each curated zone's feature image in the first sightline after navigation.
+  supporting: { position: [4.8, EYE_HEIGHT, -0.8], target: [0, 1.9, -4] },
+  culture: { position: [4.8, EYE_HEIGHT, -11.6], target: [0, 1.9, -18] }
 };
+
+const WEATHER_PRESETS: Record<
+  ExhibitionWeatherMode,
+  { background: string; fog: string | null; density: number; exposure: number; lightScale: number }
+> = {
+  sunny: { background: '#54756a', fog: null, density: 0, exposure: 1.04, lightScale: 1 },
+  night: {
+    background: '#101d24',
+    fog: '#1d3035',
+    density: 0.012,
+    exposure: 0.68,
+    lightScale: 0.58
+  },
+  rain: { background: '#526b6d', fog: '#738b8a', density: 0.018, exposure: 0.82, lightScale: 0.76 }
+};
+
+const TRANSPORT_EXHIBIT_IDS = new Set([
+  'west-lake-bicycle',
+  'green-mobility-car',
+  'entrance-wupeng-boat',
+  'wuzhen-boat',
+  'waterway-night-boat'
+]);
+
+const CRAFT_EXHIBIT_IDS = new Set([
+  'dongzha-weaving-rack',
+  'waterway-loom',
+  'culture-weaving-rack'
+]);
 
 function createBox(
   width: number,
@@ -87,13 +136,16 @@ function createBox(
       ? new THREE.MeshStandardMaterial({ color: materialOrColor, roughness, metalness: 0.08 })
       : materialOrColor;
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
+  mesh.castShadow = false;
+  mesh.receiveShadow = false;
   return mesh;
 }
 
 function markExhibit(root: THREE.Object3D, exhibitId: string) {
   root.userData.exhibitId = exhibitId;
+  if (typeof root.userData.modelBaseRotationY !== 'number') {
+    root.userData.modelBaseRotationY = root.rotation.y;
+  }
   root.traverse((object) => {
     object.userData.exhibitId = exhibitId;
   });
@@ -142,8 +194,19 @@ export class ExhibitionRenderer {
   private quality: QualityLevel = 'high';
   private activeZoneId: string = SHOWROOM_ZONES[0].id;
   private manualQuality: QualityLevel | null = null;
+  private freeRoam = true;
   private fatalErrorReported = false;
+  private readyReported = false;
   private assetSources: ExhibitionAssetSources = { ...FALLBACK_ASSET_SOURCES };
+  private assetLoadState: ExhibitionAssetLoadState = {
+    status: 'loading',
+    completed: 0,
+    total: 0,
+    failedAssetIds: [],
+    failedAssetMessages: []
+  };
+  private readonly upgradedExhibitIds = new Set<string>();
+  private activeModelInteraction: ActiveModelInteraction | null = null;
 
   private readonly handleKeyDown = (event: KeyboardEvent) => {
     if (!this.interactionEnabled) return;
@@ -244,8 +307,7 @@ export class ExhibitionRenderer {
       powerPreference: 'high-performance'
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.enabled = false;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.04;
@@ -257,7 +319,6 @@ export class ExhibitionRenderer {
 
     const hallAssets = EXHIBITION_ASSETS.filter((asset) =>
       [
-        'hall-hdri',
         'stone-pbr',
         'walnut-pbr',
         'display-ies',
@@ -283,8 +344,6 @@ export class ExhibitionRenderer {
     );
 
     this.setupHall();
-    void this.loadHallAudio();
-    void this.loadHallEnvironment();
     this.pipeline = new PostProcessingPipeline({
       renderer: this.renderer,
       scene: this.scene,
@@ -293,12 +352,15 @@ export class ExhibitionRenderer {
         typeof window.matchMedia === 'function' &&
         window.matchMedia('(prefers-reduced-motion: reduce)').matches
     });
+    void this.loadHallAudio();
+    void this.loadHallEnvironment();
     this.attachListeners();
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(this.options.host);
     this.resize();
     this.scheduleFrame();
     this.options.onQualityChange?.(this.quality);
+    queueMicrotask(() => this.reportReady());
   }
 
   resize() {
@@ -348,6 +410,43 @@ export class ExhibitionRenderer {
     this.applyQuality(quality);
   }
 
+  setFreeRoam(enabled: boolean) {
+    this.freeRoam = enabled;
+    if (!enabled) this.pressedKeys.clear();
+  }
+
+  moveByInput(strafe: number, forward: number, deltaSeconds = 0.05) {
+    if (!this.interactionEnabled || !this.freeRoam) return;
+    this.applyMovement(strafe, forward, deltaSeconds);
+  }
+
+  rotateByInput(deltaX: number, deltaY: number) {
+    if (!this.interactionEnabled || !this.freeRoam) return;
+    this.yaw -= deltaX * LOOK_SENSITIVITY;
+    this.pitch = THREE.MathUtils.clamp(
+      this.pitch - deltaY * LOOK_SENSITIVITY,
+      -MAX_PITCH,
+      MAX_PITCH
+    );
+    this.applyCameraRotation();
+  }
+
+  setWeather(mode: ExhibitionWeatherMode) {
+    const preset = WEATHER_PRESETS[mode];
+    this.scene.background = new THREE.Color(preset.background);
+    this.scene.fog = preset.fog ? new THREE.FogExp2(preset.fog, preset.density) : null;
+    this.renderer.toneMappingExposure = preset.exposure;
+    this.scene.traverse((object) => {
+      if (!('intensity' in object) || typeof object.intensity !== 'number') return;
+      const baseIntensity =
+        typeof object.userData.baseWeatherIntensity === 'number'
+          ? object.userData.baseWeatherIntensity
+          : object.intensity;
+      object.userData.baseWeatherIntensity = baseIntensity;
+      object.intensity = baseIntensity * preset.lightScale;
+    });
+  }
+
   setFocus(exhibitId: string | null) {
     if (!exhibitId) {
       this.pipeline.setFocus(null);
@@ -377,6 +476,43 @@ export class ExhibitionRenderer {
     this.setActiveZone(zoneId);
   }
 
+  goToExhibit(exhibitId: string): boolean {
+    const layout = EXHIBITION_LAYOUT.find((item) => item.id === exhibitId);
+    const root = this.exhibitRoots.find(
+      (candidate) => candidate.userData.exhibitId === exhibitId && candidate.visible !== false
+    );
+    if (!layout && !root) {
+      return false;
+    }
+
+    const target = new THREE.Vector3();
+    if (layout) {
+      target.set(layout.position.x, layout.position.y, layout.position.z);
+    } else if (root) {
+      if (
+        typeof root.updateWorldMatrix === 'function' &&
+        typeof root.getWorldPosition === 'function'
+      ) {
+        root.updateWorldMatrix(true, false);
+        root.getWorldPosition(target);
+      } else {
+        target.set(root.position.x, root.position.y, root.position.z);
+      }
+    }
+
+    // Side-platform exhibits need the camera on their display side; the central aisle is blocked by partitions.
+    const xOffset = target.x < 0 ? -3.2 : 3.2;
+    this.camera.position.set(target.x + xOffset, EYE_HEIGHT, target.z + 2.15);
+    this.camera.lookAt(target.x, Math.max(0.9, target.y + 0.85), target.z);
+    this.yaw = this.camera.rotation.y;
+    this.pitch = this.camera.rotation.x;
+    const nearestZone = SHOWROOM_ZONES.reduce((nearest, zone) =>
+      Math.abs(zone.z - target.z) < Math.abs(nearest.z - target.z) ? zone : nearest
+    );
+    this.setActiveZone(nearestZone.id);
+    return true;
+  }
+
   playNarration(exhibitId: string) {
     return this.audio.playNarration(exhibitId);
   }
@@ -385,9 +521,77 @@ export class ExhibitionRenderer {
     this.audio.stopNarration();
   }
 
+  startModelInteraction(exhibitId: string, mode: ExhibitionModelInteraction): boolean {
+    const root = this.exhibitRoots.find(
+      (candidate) => candidate.userData.exhibitId === exhibitId && candidate.visible !== false
+    );
+    if (!root) {
+      return false;
+    }
+
+    this.stopModelInteraction();
+    this.activeModelInteraction = {
+      exhibitId,
+      mode,
+      root,
+      elapsedSeconds: 0,
+      basePosition: { x: root.position.x, y: root.position.y, z: root.position.z },
+      baseRotationY: root.rotation.y,
+      baseRotationZ: root.rotation.z,
+      baseScale: { x: root.scale.x, y: root.scale.y, z: root.scale.z }
+    };
+    return true;
+  }
+
+  rotateModel(exhibitId: string, degrees: number): boolean {
+    const root = this.exhibitRoots.find(
+      (candidate) => candidate.userData.exhibitId === exhibitId && candidate.visible !== false
+    );
+    if (!root) return false;
+
+    this.stopModelInteraction();
+    const baseRotationY =
+      typeof root.userData.modelBaseRotationY === 'number'
+        ? root.userData.modelBaseRotationY
+        : root.rotation.y;
+    root.userData.modelBaseRotationY = baseRotationY;
+    root.rotation.y = baseRotationY + (degrees * Math.PI) / 180;
+    return true;
+  }
+
+  resetModel(exhibitId: string): boolean {
+    const root = this.exhibitRoots.find(
+      (candidate) => candidate.userData.exhibitId === exhibitId && candidate.visible !== false
+    );
+    if (!root) return false;
+
+    this.stopModelInteraction();
+    const baseRotationY =
+      typeof root.userData.modelBaseRotationY === 'number'
+        ? root.userData.modelBaseRotationY
+        : root.rotation.y;
+    root.userData.modelBaseRotationY = baseRotationY;
+    root.rotation.y = baseRotationY;
+    return true;
+  }
+
+  stopModelInteraction() {
+    const active = this.activeModelInteraction;
+    if (!active) {
+      return;
+    }
+
+    active.root.position.set(active.basePosition.x, active.basePosition.y, active.basePosition.z);
+    active.root.rotation.y = active.baseRotationY;
+    active.root.rotation.z = active.baseRotationZ;
+    active.root.scale.set(active.baseScale.x, active.baseScale.y, active.baseScale.z);
+    this.activeModelInteraction = null;
+  }
+
   dispose() {
     if (this.disposed) return;
     this.disposed = true;
+    this.stopModelInteraction();
     this.pressedKeys.clear();
     window.cancelAnimationFrame(this.frameId);
     this.resizeObserver.disconnect();
@@ -443,43 +647,86 @@ export class ExhibitionRenderer {
 
   private async loadHallEnvironment() {
     try {
-      const loaded = await this.assetLoader.load(this.options.onProgress ?? (() => undefined));
+      const loaded = await this.assetLoader.load(
+        (progress) => {
+          this.assetLoadState = {
+            status: 'loading',
+            completed: progress.completed,
+            total: progress.total,
+            failedAssetIds: this.assetLoadState.failedAssetIds,
+            failedAssetMessages: this.assetLoadState.failedAssetMessages
+          };
+          this.options.onProgress?.(progress);
+          this.publishTelemetry();
+        },
+        ({ assetId, assets, error }) => {
+          if (error && !this.assetLoadState.failedAssetIds.includes(assetId)) {
+            this.assetLoadState = {
+              ...this.assetLoadState,
+              failedAssetIds: [...this.assetLoadState.failedAssetIds, assetId],
+              failedAssetMessages: [
+                ...this.assetLoadState.failedAssetMessages,
+                `${assetId}: ${error.message}`
+              ]
+            };
+          }
+          if (!this.disposed) this.applyLoadedVisualAssets(assets);
+        }
+      );
       if (this.disposed) return;
-      if (loaded.environment) {
-        this.scene.environment = loaded.environment;
-        // Keep the HDRI as a restrained reflection/fill source; the hall's authored lights
-        // should define the visible exposure and preserve wall/display detail.
-        this.scene.environmentIntensity = 0.34;
-      }
-      const anisotropy = this.renderer.capabilities?.getMaxAnisotropy?.() ?? 1;
-      applyHallPbrTextures(this.materials, loaded.textures, anisotropy);
-      const iesTexture = loaded.textures.get('display-ies');
-      if (iesTexture) this.museumCases.setIesTexture(iesTexture);
-      const realistic = createRealisticExhibits(loaded, EXHIBITION_LAYOUT);
-      const retainedRoots = this.exhibitRoots.filter((root) => {
-        const replaced = realistic.roots.has(root.userData.exhibitId as string);
-        if (replaced) root.visible = false;
-        return !replaced;
-      });
-      this.exhibitRoots.length = 0;
-      this.exhibitRoots.push(...retainedRoots);
-      for (const root of realistic.roots.values()) {
-        this.exhibitGroup.add(root);
-        this.exhibitRoots.push(root);
-        const source = root.userData.assetSource === 'glb' ? 'glb' : 'fallback';
-        if (root.userData.exhibitId === 'west-lake-bicycle') this.assetSources.bicycle = source;
-        if (root.userData.exhibitId === 'green-mobility-car') this.assetSources.shuttle = source;
-        if (root.userData.exhibitId === 'silk-and-tea') this.assetSources.teaSet = source;
-        if (root.userData.exhibitId === 'silk-garment') this.assetSources.silkGarment = source;
-      }
+      this.assetLoadState = {
+        ...this.assetLoadState,
+        status: 'complete',
+        completed: this.assetLoadState.total
+      };
+      this.applyLoadedVisualAssets(loaded);
       for (const assetId of loaded.failures.keys()) {
         this.options.onRecoverableFailure?.(assetId);
       }
       this.publishTelemetry();
-      this.options.onReady?.();
     } catch (error) {
       this.reportFatalError(error);
     }
+  }
+
+  private applyLoadedVisualAssets(loaded: LoadedExhibitionAssets) {
+    if (loaded.environment) {
+      this.scene.environment = loaded.environment;
+      // Keep the HDRI as a restrained reflection/fill source; the hall's authored lights
+      // should define the visible exposure and preserve wall/display detail.
+      this.scene.environmentIntensity = 0.34;
+    }
+    const anisotropy = this.renderer.capabilities?.getMaxAnisotropy?.() ?? 1;
+    applyHallPbrTextures(this.materials, loaded.textures, anisotropy);
+    const iesTexture = loaded.textures.get('display-ies');
+    if (iesTexture) this.museumCases.setIesTexture(iesTexture);
+    const realistic = createRealisticExhibits(loaded, EXHIBITION_LAYOUT);
+    for (const root of realistic.roots.values()) {
+      const exhibitId = root.userData.exhibitId;
+      if (typeof exhibitId !== 'string' || root.userData.assetSource !== 'glb') continue;
+      if (this.upgradedExhibitIds.has(exhibitId)) continue;
+      const fallbackIndex = this.exhibitRoots.findIndex(
+        (candidate) => candidate.userData.exhibitId === exhibitId
+      );
+      if (fallbackIndex >= 0) {
+        this.exhibitRoots[fallbackIndex].visible = false;
+        this.exhibitRoots.splice(fallbackIndex, 1);
+      }
+      this.exhibitGroup.add(root);
+      this.exhibitRoots.push(root);
+      this.upgradedExhibitIds.add(exhibitId);
+      if (exhibitId === 'west-lake-bicycle') this.assetSources.bicycle = 'glb';
+      if (exhibitId === 'green-mobility-car') this.assetSources.shuttle = 'glb';
+      if (exhibitId === 'silk-and-tea') this.assetSources.teaSet = 'glb';
+      if (exhibitId === 'silk-garment') this.assetSources.silkGarment = 'glb';
+    }
+    this.publishTelemetry();
+  }
+
+  private reportReady() {
+    if (this.disposed || this.readyReported) return;
+    this.readyReported = true;
+    this.options.onReady?.();
   }
 
   private async loadHallAudio() {
@@ -490,27 +737,14 @@ export class ExhibitionRenderer {
   private createLighting() {
     const lighting = new THREE.Group();
     lighting.name = 'hall-lighting';
-    lighting.add(new THREE.HemisphereLight('#fff9e8', '#234b42', 0.82));
-    lighting.add(new THREE.AmbientLight('#d8eadf', 0.28));
+    // Shadow mapping is disabled for the visitor view, so use balanced fill light to keep every
+    // gallery surface legible instead of letting structural edges collapse into black outlines.
+    lighting.add(new THREE.HemisphereLight('#fff9e8', '#6f8f81', 0.95));
+    lighting.add(new THREE.AmbientLight('#e9f1e5', 0.5));
 
-    const sun = new THREE.DirectionalLight('#f1dfc4', 0.78);
+    const sun = new THREE.DirectionalLight('#f1dfc4', 0.96);
     sun.position.set(8, 8, 46);
-    sun.castShadow = true;
-    sun.shadow.mapSize.set(
-      QUALITY_PROFILES[this.qualityController.getLevel()].shadowMapSize,
-      QUALITY_PROFILES[this.qualityController.getLevel()].shadowMapSize
-    );
-    sun.shadow.camera.left = -8;
-    sun.shadow.camera.right = 8;
-    sun.shadow.camera.top = 10;
-    sun.shadow.camera.bottom = -10;
-    sun.shadow.camera.near = 0.5;
-    sun.shadow.camera.far = 24;
-    sun.shadow.camera.left = -25;
-    sun.shadow.camera.right = 25;
-    sun.shadow.camera.top = 62;
-    sun.shadow.camera.bottom = -62;
-    sun.shadow.camera.far = 140;
+    sun.castShadow = false;
     lighting.add(sun);
     const zoneLights = [
       { color: '#efd3a0', x: -5.5 },
@@ -522,9 +756,9 @@ export class ExhibitionRenderer {
     ];
     SHOWROOM_ZONES.forEach((zone, index) => {
       const lightSpec = zoneLights[index];
-      const zoneLight = new THREE.PointLight(lightSpec.color, 0.46, 18, 2);
+      const zoneLight = new THREE.PointLight(lightSpec.color, 0.58, 18, 2);
       zoneLight.position.set(0, 5.55, zone.z);
-      const sideFill = new THREE.PointLight(lightSpec.color, 0.18, 11, 2);
+      const sideFill = new THREE.PointLight(lightSpec.color, 0.28, 11, 2);
       sideFill.position.set(lightSpec.x, 2.8, zone.z - 2.8);
       lighting.add(zoneLight, sideFill);
     });
@@ -610,6 +844,7 @@ export class ExhibitionRenderer {
     this.updateMovement(deltaSeconds);
     this.updateSidePlatformVisibility();
     this.updateMuseumCases(deltaSeconds);
+    this.updateModelInteraction(deltaSeconds);
     this.showroom.update(deltaSeconds);
     this.sampleQuality();
     try {
@@ -636,6 +871,54 @@ export class ExhibitionRenderer {
     this.museumCases.update(deltaSeconds);
   }
 
+  private updateModelInteraction(deltaSeconds: number) {
+    const active = this.activeModelInteraction;
+    if (!active || active.root.visible === false) {
+      return;
+    }
+
+    active.elapsedSeconds += deltaSeconds;
+    const phase = active.elapsedSeconds;
+
+    if (active.mode === 'orbit') {
+      active.root.rotation.y = active.baseRotationY + phase * 0.7;
+      active.root.position.y = active.basePosition.y + Math.sin(phase * 2.4) * 0.035;
+      return;
+    }
+
+    if (active.mode === 'showcase') {
+      const scale = 1 + Math.sin(phase * 2.2) * 0.028;
+      active.root.rotation.y = active.baseRotationY + phase * 0.34;
+      active.root.position.y = active.basePosition.y + Math.sin(phase * 2.2) * 0.025;
+      active.root.scale.set(
+        active.baseScale.x * scale,
+        active.baseScale.y * scale,
+        active.baseScale.z * scale
+      );
+      return;
+    }
+
+    if (TRANSPORT_EXHIBIT_IDS.has(active.exhibitId)) {
+      active.root.position.z = active.basePosition.z + Math.sin(phase * 1.5) * 0.18;
+      active.root.rotation.y = active.baseRotationY + Math.sin(phase * 1.5) * 0.06;
+      return;
+    }
+
+    if (CRAFT_EXHIBIT_IDS.has(active.exhibitId)) {
+      active.root.position.y = active.basePosition.y + Math.sin(phase * 2.2) * 0.035;
+      active.root.rotation.z = active.baseRotationZ + Math.sin(phase * 2.2) * 0.035;
+      return;
+    }
+
+    const scale = 1 + Math.sin(phase * 2.8) * 0.035;
+    active.root.position.y = active.basePosition.y + Math.sin(phase * 2.8) * 0.045;
+    active.root.scale.set(
+      active.baseScale.x * scale,
+      active.baseScale.y * scale,
+      active.baseScale.z * scale
+    );
+  }
+
   private sampleQuality() {
     this.qualitySampleFrames += 1;
     const now = performance.now();
@@ -657,6 +940,15 @@ export class ExhibitionRenderer {
     const strafeInput =
       Number(this.pressedKeys.has('KeyD') || this.pressedKeys.has('ArrowRight')) -
       Number(this.pressedKeys.has('KeyA') || this.pressedKeys.has('ArrowLeft'));
+    if (!this.freeRoam || (forwardInput === 0 && strafeInput === 0)) {
+      this.audio.updateTravelledDistance(0);
+      return;
+    }
+
+    this.applyMovement(strafeInput, forwardInput, deltaSeconds);
+  }
+
+  private applyMovement(strafeInput: number, forwardInput: number, deltaSeconds: number) {
     if (forwardInput === 0 && strafeInput === 0) {
       this.audio.updateTravelledDistance(0);
       return;
@@ -720,6 +1012,7 @@ export class ExhibitionRenderer {
       textures: this.renderer.info?.memory?.textures ?? 0,
       activePasses: this.pipeline.getActivePassNames?.() ?? [],
       assetSources: { ...this.assetSources },
+      assetLoadState: { ...this.assetLoadState },
       visibleZones: ['hall'],
       audioUnlocked: this.audio.isUnlocked(),
       activeCanvasCount: document.querySelectorAll('.exhibition-canvas-host canvas').length

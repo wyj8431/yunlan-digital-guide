@@ -446,4 +446,32 @@ describe('useSpeechSynthesis', () => {
       { text: WELCOME_TEXT, phase: 'end' }
     ]);
   });
+
+  it('stops active speech when the document is hidden', async () => {
+    const { source } = installAudioContext();
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      arrayBuffer: vi.fn(async () => new ArrayBuffer(8))
+    } as unknown as Response);
+    const { result } = renderHook(() => useSpeechSynthesis());
+    const playbackEvents: Array<{ text: string; phase: string }> = [];
+    window.addEventListener(GUIDE_SPEECH_PLAYBACK_EVENT, (event) => {
+      playbackEvents.push((event as CustomEvent<{ text: string; phase: string }>).detail);
+    });
+
+    await act(async () => {
+      await result.current.speak(WELCOME_TEXT);
+    });
+
+    Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+
+    expect(source.stop).toHaveBeenCalledTimes(1);
+    expect(result.current.speaking).toBe(false);
+    expect(playbackEvents.at(-1)).toEqual({ text: WELCOME_TEXT, phase: 'end' });
+
+    Object.defineProperty(document, 'hidden', { configurable: true, value: false });
+  });
 });

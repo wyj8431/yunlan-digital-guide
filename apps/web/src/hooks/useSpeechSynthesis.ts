@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { synthesizeSpeechAudio } from '../api/speechApi';
+import { connectGuideAudioAnalysis, disconnectGuideAudioAnalysis } from '../lib/guideAudioAnalysis';
 import { dispatchGuideSpeechDuration, dispatchGuideSpeechPlayback } from '../lib/guideSpeechSync';
 
 type WindowWithWebkitAudio = Window &
@@ -10,6 +11,7 @@ type WindowWithWebkitAudio = Window &
 type ActiveAudioPlayback = {
   source: AudioBufferSourceNode;
   text: string;
+  playbackId: string;
   finish: () => void;
 };
 
@@ -121,6 +123,7 @@ export function useSpeechSynthesis() {
 
     activeAudioRef.current = null;
     activeAudio.source.onended = null;
+    disconnectGuideAudioAnalysis(activeAudio.playbackId);
 
     try {
       activeAudio.source.stop();
@@ -131,7 +134,10 @@ export function useSpeechSynthesis() {
 
     setSpeaking(false);
     if (phase) {
-      dispatchGuideSpeechPlayback({ text: activeAudio.text, phase });
+      dispatchGuideSpeechPlayback({
+        text: activeAudio.text,
+        phase
+      });
     }
   }, []);
 
@@ -140,7 +146,8 @@ export function useSpeechSynthesis() {
       audioContext: AudioContext,
       text: string,
       decodedAudio: AudioBuffer,
-      dispatchStart: boolean
+      dispatchStart: boolean,
+      playbackId: string
     ): Promise<void> =>
       new Promise((resolve) => {
         const source = audioContext.createBufferSource();
@@ -154,13 +161,14 @@ export function useSpeechSynthesis() {
           if (activeAudioRef.current?.source === source) {
             activeAudioRef.current = null;
           }
+          disconnectGuideAudioAnalysis(playbackId);
           setSpeaking(false);
           resolve();
         };
 
         source.buffer = decodedAudio;
-        source.connect(audioContext.destination);
-        activeAudioRef.current = { source, text, finish };
+        connectGuideAudioAnalysis(audioContext, source, playbackId);
+        activeAudioRef.current = { source, text, playbackId, finish };
         source.onended = finish;
 
         setSpeaking(true);
@@ -181,7 +189,8 @@ export function useSpeechSynthesis() {
       speechChunks: string[],
       loadChunk: (index: number) => Promise<DecodedSpeechChunkResult>,
       prefetchFrom: (index: number) => void,
-      playbackToken: number
+      playbackToken: number,
+      playbackId: string
     ) => {
       try {
         let durationMs = Math.max(1, Math.round(firstDecodedAudio.duration * 1000));
@@ -225,7 +234,7 @@ export function useSpeechSynthesis() {
           dispatchProjectedDuration();
         }
 
-        await playDecodedServerAudio(audioContext, text, firstDecodedAudio, true);
+        await playDecodedServerAudio(audioContext, text, firstDecodedAudio, true, playbackId);
 
         for (let index = firstChunkIndex + 1; index < speechChunks.length; index += 1) {
           if (playbackTokenRef.current !== playbackToken) {
@@ -251,7 +260,7 @@ export function useSpeechSynthesis() {
           if (speechChunks.length >= MIN_PROJECTED_DURATION_CHUNKS) {
             dispatchProjectedDuration();
           }
-          await playDecodedServerAudio(audioContext, text, decodedChunk.audio, false);
+          await playDecodedServerAudio(audioContext, text, decodedChunk.audio, false, playbackId);
         }
 
         if (playbackTokenRef.current === playbackToken) {
@@ -316,7 +325,7 @@ export function useSpeechSynthesis() {
   );
 
   const speakWithServerAudio = useCallback(
-    async (text: string, playbackToken: number): Promise<boolean> => {
+    async (text: string, playbackToken: number, playbackId: string): Promise<boolean> => {
       const AudioContextConstructor = getAudioContextConstructor();
       if (!AudioContextConstructor) {
         return false;
@@ -417,7 +426,8 @@ export function useSpeechSynthesis() {
           speechChunks,
           loadChunk,
           prefetchFrom,
-          playbackToken
+          playbackToken,
+          playbackId
         );
         return true;
       } catch {
@@ -446,8 +456,13 @@ export function useSpeechSynthesis() {
         return;
       }
 
+      const playbackId = crypto.randomUUID();
       dispatchGuideSpeechPlayback({ text: normalizedText, phase: 'preparing' });
-      const playedServerAudio = await speakWithServerAudio(normalizedText, playbackToken);
+      const playedServerAudio = await speakWithServerAudio(
+        normalizedText,
+        playbackToken,
+        playbackId
+      );
       if (!playedServerAudio && playbackTokenRef.current === playbackToken) {
         speakWithBrowser(normalizedText);
       }
@@ -474,7 +489,33 @@ export function useSpeechSynthesis() {
       if (browserSpeechSupported) {
         window.speechSynthesis.cancel();
       }
+
+      const audioContext = audioContextRef.current;
+      audioContextRef.current = null;
+      if (audioContext) {
+        void audioContext.close().catch(() => undefined);
+      }
     };
+  }, [browserSpeechSupported, stopServerAudio]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        return;
+      }
+
+      playbackTokenRef.current += 1;
+      stopServerAudio('end');
+
+      if (browserSpeechSupported) {
+        window.speechSynthesis.cancel();
+      }
+
+      setSpeaking(false);
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [browserSpeechSupported, stopServerAudio]);
 
   return { supported, speaking, speak, stop };

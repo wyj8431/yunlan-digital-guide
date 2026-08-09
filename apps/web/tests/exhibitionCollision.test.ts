@@ -12,13 +12,13 @@ import {
 
 describe('exhibition collision helpers', () => {
   it('clamps the player center inside the room with radius clearance', () => {
-    expect(clampToRoom({ x: 12, z: 0 }, ROOM_BOUNDS, PLAYER_RADIUS)).toEqual({
-      x: 7.6,
+    expect(clampToRoom({ x: 30, z: 0 }, ROOM_BOUNDS, PLAYER_RADIUS)).toEqual({
+      x: ROOM_BOUNDS.maxX - PLAYER_RADIUS,
       z: 0
     });
-    expect(clampToRoom({ x: -20, z: 20 }, ROOM_BOUNDS, PLAYER_RADIUS)).toEqual({
-      x: -7.6,
-      z: 9.6
+    expect(clampToRoom({ x: -30, z: 70 }, ROOM_BOUNDS, PLAYER_RADIUS)).toEqual({
+      x: ROOM_BOUNDS.minX + PLAYER_RADIUS,
+      z: ROOM_BOUNDS.maxZ - PLAYER_RADIUS
     });
   });
 

@@ -5,6 +5,7 @@ import { App } from '../src/App';
 const fetchScenicAreaMock = vi.hoisted(() => vi.fn());
 const streamGuideAnswerMock = vi.hoisted(() => vi.fn());
 const speakMock = vi.hoisted(() => vi.fn());
+const stopMock = vi.hoisted(() => vi.fn());
 
 const speechTimeline = {
   text: 'abcdef',
@@ -22,7 +23,8 @@ vi.mock('../src/hooks/useSpeechSynthesis', () => ({
   useSpeechSynthesis: () => ({
     supported: true,
     speaking: false,
-    speak: speakMock
+    speak: speakMock,
+    stop: stopMock
   })
 }));
 
@@ -69,6 +71,7 @@ describe('App speech and typewriter sync', () => {
     fetchScenicAreaMock.mockReset();
     streamGuideAnswerMock.mockReset();
     speakMock.mockReset();
+    stopMock.mockReset();
   });
 
   it('starts speech once while the typewriter keeps updating the answer', async () => {
@@ -93,6 +96,32 @@ describe('App speech and typewriter sync', () => {
     act(() => {
       vi.advanceTimersByTime(1000);
     });
+
+    expect(speakMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not replay the current answer after opening chat history', async () => {
+    const { rerender } = render(<App />);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ask guide' }));
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(speakMock).toHaveBeenCalledWith('abcdef');
+
+    rerender(<App activeView="history" onNavigate={vi.fn()} />);
+
+    expect(stopMock).toHaveBeenCalled();
+    expect(speakMock).toHaveBeenCalledTimes(1);
+
+    rerender(<App activeView="explore" />);
 
     expect(speakMock).toHaveBeenCalledTimes(1);
   });

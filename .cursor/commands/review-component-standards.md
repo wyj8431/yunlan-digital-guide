@@ -1,0 +1,1 @@
+Review the selected component, hook, or module and its direct callers using `cursor-skills/code-review/SKILL.md`. Focus on React 19, TypeScript, accessibility, async cleanup, dependency stability, and tests.

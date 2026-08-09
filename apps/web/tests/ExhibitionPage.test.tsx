@@ -19,10 +19,20 @@ const rendererState = vi.hoisted(() => ({
   unlockAudio: vi.fn(() => Promise.resolve()),
   setMuted: vi.fn(),
   setQuality: vi.fn(),
+  setFreeRoam: vi.fn(),
+  setWeather: vi.fn(),
+  goToZone: vi.fn(),
+  goToExhibit: vi.fn(() => true),
+  rotateModel: vi.fn(() => true),
+  resetModel: vi.fn(() => true),
+  moveByInput: vi.fn(),
+  rotateByInput: vi.fn(),
   setFocus: vi.fn(),
   setTransitionProgress: vi.fn(),
   playNarration: vi.fn(),
   stopNarration: vi.fn(),
+  startModelInteraction: vi.fn(() => true),
+  stopModelInteraction: vi.fn(),
   audioRuntimeDispose: vi.fn(),
   hallAudio: null as unknown,
   lakeAudio: null as unknown,
@@ -53,10 +63,20 @@ vi.mock('../src/exhibition/ExhibitionRenderer', () => ({
     unlockAudio = rendererState.unlockAudio;
     setMuted = rendererState.setMuted;
     setQuality = rendererState.setQuality;
+    setFreeRoam = rendererState.setFreeRoam;
+    setWeather = rendererState.setWeather;
+    goToZone = rendererState.goToZone;
+    goToExhibit = rendererState.goToExhibit;
+    rotateModel = rendererState.rotateModel;
+    resetModel = rendererState.resetModel;
+    moveByInput = rendererState.moveByInput;
+    rotateByInput = rendererState.rotateByInput;
     setFocus = rendererState.setFocus;
     setTransitionProgress = rendererState.setTransitionProgress;
     playNarration = rendererState.playNarration;
     stopNarration = rendererState.stopNarration;
+    startModelInteraction = rendererState.startModelInteraction;
+    stopModelInteraction = rendererState.stopModelInteraction;
   }
 }));
 
@@ -72,6 +92,10 @@ vi.mock('../src/exhibition/westLakeScene', () => ({
     unlockAudio = rendererState.unlockAudio;
     setMuted = rendererState.setMuted;
     setQuality = rendererState.setQuality;
+    setFreeRoam = rendererState.setFreeRoam;
+    setWeather = rendererState.setWeather;
+    moveByInput = rendererState.moveByInput;
+    rotateByInput = rendererState.rotateByInput;
     setFocus = rendererState.setFocus;
     setTransitionProgress = rendererState.setTransitionProgress;
   }
@@ -147,9 +171,12 @@ describe('ExhibitionPage', () => {
     expect(rendererState.audioRuntimeDispose).toHaveBeenCalledTimes(1);
   });
 
-  it('provides compact audio and quality controls backed by renderer APIs', async () => {
+  it('locks the exhibition to high quality and provides an ambient audio control', async () => {
     render(<ExhibitionPage onReturnHome={vi.fn()} />);
     finishHallLoading();
+
+    expect(rendererState.setQuality).toHaveBeenCalledWith('high');
+    expect(screen.queryByRole('button', { name: /画质/ })).not.toBeInTheDocument();
 
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: '开启环境声音' }));
@@ -158,10 +185,34 @@ describe('ExhibitionPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '静音环境声音' }));
     expect(rendererState.setMuted).toHaveBeenCalledWith(true);
+  });
 
-    act(() => rendererState.hallCallbacks?.onQualityChange?.('high'));
-    fireEvent.click(screen.getByRole('button', { name: '画质：高' }));
-    expect(rendererState.setQuality).toHaveBeenCalledWith('medium');
+  it('exposes visitor information, atmosphere choices, and free-roam controls', () => {
+    render(<ExhibitionPage onReturnHome={vi.fn()} />);
+    finishHallLoading();
+
+    expect(rendererState.setWeather).toHaveBeenCalledWith('sunny');
+    expect(rendererState.setFreeRoam).toHaveBeenCalledWith(true);
+
+    fireEvent.click(screen.getByRole('button', { name: '打开景区地图和服务' }));
+    expect(screen.getByRole('dialog', { name: '景区地图与游客服务' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '时间与服务' }));
+    expect(screen.getByText('常规开放参考')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '场景氛围：晴天' }));
+    fireEvent.click(screen.getByRole('button', { name: '雨景' }));
+    expect(rendererState.setWeather).toHaveBeenLastCalledWith('rain');
+
+    fireEvent.click(screen.getByRole('button', { name: '关闭自由漫游' }));
+    expect(rendererState.setFreeRoam).toHaveBeenLastCalledWith(false);
+  });
+
+  it('keeps authored exhibit fallbacks unobtrusive for visitors', () => {
+    render(<ExhibitionPage onReturnHome={vi.fn()} />);
+    finishHallLoading();
+
+    act(() => rendererState.hallCallbacks?.onRecoverableFailure?.('silk-garment'));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('focuses a selected exhibit, plays narration, and restores the hall on close', () => {
@@ -181,6 +232,76 @@ describe('ExhibitionPage', () => {
     expect(rendererState.setFocus).toHaveBeenLastCalledWith(null);
     expect(rendererState.stopNarration).toHaveBeenCalledTimes(1);
     expect(rendererState.setInteractionEnabled).toHaveBeenLastCalledWith(true);
+  });
+
+  it('tracks exploration discoveries and provides a gallery quiz', () => {
+    render(<ExhibitionPage onReturnHome={vi.fn()} />);
+    finishHallLoading();
+
+    fireEvent.click(screen.getByRole('button', { name: '打开展厅探索互动' }));
+    expect(screen.getByRole('dialog', { name: '展厅探索互动' })).toBeInTheDocument();
+    expect(screen.getByRole('progressbar', { name: '互动展品发现进度' })).toHaveAttribute(
+      'aria-valuenow',
+      '0'
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '前往发现 水乡路线数字沙盘' }));
+    expect(rendererState.goToExhibit).toHaveBeenCalledWith('west-lake-map');
+    expect(screen.getByRole('dialog', { name: '乌镇路线数字沙盘' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '关闭展品介绍' }));
+    fireEvent.click(screen.getByRole('button', { name: '打开展厅探索互动' }));
+    expect(screen.getByRole('progressbar', { name: '互动展品发现进度' })).toHaveAttribute(
+      'aria-valuenow',
+      '1'
+    );
+
+    fireEvent.click(screen.getByRole('radio', { name: '水系' }));
+    expect(screen.getByRole('status')).toHaveTextContent('回答正确');
+  });
+
+  it('runs model interactions from a supported exhibit detail panel', () => {
+    render(<ExhibitionPage onReturnHome={vi.fn()} />);
+    finishHallLoading();
+
+    act(() => rendererState.selectExhibit?.('west-lake-bicycle'));
+
+    fireEvent.click(screen.getByRole('button', { name: '模型环视' }));
+    expect(rendererState.goToExhibit).toHaveBeenLastCalledWith('west-lake-bicycle');
+    expect(rendererState.startModelInteraction).toHaveBeenLastCalledWith(
+      'west-lake-bicycle',
+      'orbit'
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '慢游演示' }));
+    expect(rendererState.startModelInteraction).toHaveBeenLastCalledWith(
+      'west-lake-bicycle',
+      'animate'
+    );
+
+    fireEvent.change(screen.getByRole('slider', { name: '模型角度' }), {
+      target: { value: '45' }
+    });
+    expect(rendererState.rotateModel).toHaveBeenLastCalledWith('west-lake-bicycle', 45);
+
+    fireEvent.click(screen.getByRole('button', { name: '细节聚焦' }));
+    expect(rendererState.startModelInteraction).toHaveBeenLastCalledWith(
+      'west-lake-bicycle',
+      'showcase'
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '复位模型' }));
+    expect(rendererState.resetModel).toHaveBeenCalledWith('west-lake-bicycle');
+
+    fireEvent.click(screen.getByRole('button', { name: '下一个互动模型' }));
+    expect(rendererState.goToExhibit).toHaveBeenLastCalledWith('green-mobility-car');
+
+    fireEvent.click(screen.getByRole('button', { name: '开始模型巡览' }));
+    expect(screen.getByRole('button', { name: '暂停模型巡览' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    fireEvent.click(screen.getByRole('button', { name: '暂停模型巡览' }));
   });
 
   it('fades out, waits for the lake, fades in, and returns to the hall', () => {
@@ -238,6 +359,12 @@ describe('ExhibitionPage', () => {
     act(() => rendererState.hallCallbacks?.onFatalError?.(new Error('WebGL unavailable')));
 
     expect(screen.getByRole('alert')).toHaveTextContent('3D 场景暂时无法加载');
+    fireEvent.click(screen.getByRole('button', { name: '重新加载展馆' }));
+    act(() => rendererState.hallCallbacks?.onReady?.());
+    expect(screen.getByLabelText('乌镇室内 3D 展馆')).toHaveAttribute(
+      'data-exhibition-ready',
+      'true'
+    );
     fireEvent.click(screen.getByRole('button', { name: '返回首页' }));
     fireEvent.click(screen.getByRole('button', { name: '数字人客服' }));
     expect(onReturnHome).toHaveBeenCalledTimes(2);

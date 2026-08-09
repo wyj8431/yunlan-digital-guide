@@ -16,6 +16,8 @@
     "format": "prettier . --write",
     "typecheck": "npm --workspaces run typecheck",
     "test": "npm --workspaces run test",
+    "openspec:validate": "npx --yes @fission-ai/openspec@1.8.0 validate --all --no-interactive",
+    "review:skills": "node tools/validate-code-review-skills.mjs",
     "prepare": "husky"
   },
   "devDependencies": {

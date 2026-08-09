@@ -54,6 +54,9 @@ export type CuratedShowroom = {
   update: (deltaSeconds: number) => void;
 };
 
+const FEATURE_IMAGE_WIDTH = 6.4;
+const FEATURE_IMAGE_HEIGHT = 3.6;
+
 function box(
   width: number,
   height: number,
@@ -65,14 +68,14 @@ function box(
 ) {
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
   mesh.position.set(x, y, z);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
+  mesh.castShadow = false;
+  mesh.receiveShadow = false;
   return mesh;
 }
 
 function panel(width: number, height: number, materials: HallMaterials, color = '#123536') {
   const group = new THREE.Group();
-  group.add(box(width + 0.22, height + 0.22, 0.16, materials.wood));
+  group.add(box(width + 0.22, height + 0.22, 0.16, materials.metal));
   const screen = new THREE.Mesh(
     new THREE.PlaneGeometry(width, height),
     new THREE.MeshBasicMaterial({ color, toneMapped: false })
@@ -124,14 +127,34 @@ function imagePanel(url: string, width: number, height: number, materials: HallM
   const group = panel(width, height, materials);
   if (!Object.prototype.hasOwnProperty.call(THREE, 'TextureLoader')) return group;
 
-  const texture = new THREE.TextureLoader().load(url);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  const image = new THREE.Mesh(
-    new THREE.PlaneGeometry(width, height),
-    new THREE.MeshBasicMaterial({ map: texture, toneMapped: false })
-  );
+  const imageMaterial = new THREE.MeshBasicMaterial({ toneMapped: false });
+  const image = new THREE.Mesh(new THREE.PlaneGeometry(width, height), imageMaterial);
   image.position.z = 0.1;
   group.add(image);
+
+  const texture = new THREE.TextureLoader().load(url, (loadedTexture) => {
+    const source = loadedTexture.image as {
+      height?: number;
+      naturalHeight?: number;
+      naturalWidth?: number;
+      width?: number;
+    };
+    const imageWidth = source.naturalWidth ?? source.width ?? 0;
+    const imageHeight = source.naturalHeight ?? source.height ?? 0;
+
+    if (imageWidth > 0 && imageHeight > 0) {
+      const imageAspect = imageWidth / imageHeight;
+      const displayHeight = Math.min(height, width / imageAspect);
+      const displayWidth = displayHeight * imageAspect;
+      image.scale.set(displayWidth / width, displayHeight / height, 1);
+    }
+
+    imageMaterial.map = loadedTexture;
+    imageMaterial.needsUpdate = true;
+  });
+  texture.colorSpace = THREE.SRGBColorSpace;
+  imageMaterial.map = texture;
+  imageMaterial.needsUpdate = true;
   return group;
 }
 
@@ -238,7 +261,7 @@ function createExhibitTable(materials: HallMaterials, width: number, depth: numb
     for (const z of [-depth / 2 + 0.18, depth / 2 - 0.18]) {
       const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.11, 0.64, 12), materials.wood);
       leg.position.set(x, 0.32, z);
-      leg.castShadow = true;
+      leg.castShadow = false;
       root.add(leg);
     }
   }
@@ -287,7 +310,11 @@ function createLoomDisplay(materials: HallMaterials) {
 function createJiangnanHouse(materials: HallMaterials, width = 3.15) {
   const root = new THREE.Group();
   const plaster = new THREE.MeshStandardMaterial({ color: '#e5e4dc', roughness: 0.92 });
-  const tile = new THREE.MeshStandardMaterial({ color: '#303936', roughness: 0.74 });
+  const tile = new THREE.MeshStandardMaterial({
+    color: '#69776d',
+    roughness: 0.78,
+    metalness: 0.04
+  });
   const windowPaper = new THREE.MeshStandardMaterial({ color: '#d7cfb3', roughness: 0.8 });
   root.name = 'jiangnan-white-wall-house';
   root.add(
@@ -339,7 +366,11 @@ function createCanalPier(materials: HallMaterials) {
 
 function createVenuePavilion(materials: HallMaterials) {
   const root = createExhibitTable(materials, 2.9, 2.1);
-  const roof = new THREE.MeshStandardMaterial({ color: '#36403a', roughness: 0.72 });
+  const roof = new THREE.MeshStandardMaterial({
+    color: '#718077',
+    roughness: 0.76,
+    metalness: 0.04
+  });
   for (const x of [-1.12, 1.12]) root.add(box(0.1, 2.05, 0.1, materials.wood, x, 1.8, 0));
   root.add(box(3.15, 0.11, 1.34, roof, 0, 2.62, 0.28), box(3.15, 0.11, 1.34, roof, 0, 2.62, -0.28));
   root.children[root.children.length - 2].rotation.x = 0.47;
@@ -406,7 +437,7 @@ function createArtifactPedestal(materials: HallMaterials, accent = '#b6c7b2') {
   );
   const artifact = new THREE.Mesh(new THREE.DodecahedronGeometry(0.27, 1), accentMaterial);
   artifact.position.y = 1.2;
-  artifact.castShadow = true;
+  artifact.castShadow = false;
   root.add(artifact);
   return root;
 }
@@ -647,6 +678,20 @@ export function createCuratedShowroom(materials: HallMaterials): CuratedShowroom
   addExhibit(
     dongzha,
     exhibitRoots,
+    'dongzha-feature-image',
+    labeledImagePanel(
+      '/images/wuzhen-real/waterway.jpg',
+      FEATURE_IMAGE_WIDTH,
+      FEATURE_IMAGE_HEIGHT,
+      materials,
+      '东栅水巷日常',
+      'LIFE BY THE CANAL'
+    ),
+    [0, 2.55, 24]
+  );
+  addExhibit(
+    dongzha,
+    exhibitRoots,
     'route-comparison',
     createConsole(materials, 3.3, '东栅街区', '沿街店铺与水巷生活并行'),
     [7.8, 0, 24]
@@ -720,12 +765,12 @@ export function createCuratedShowroom(materials: HallMaterials): CuratedShowroom
     exhibitRoots,
     'dongzha-dyeing-image',
     labeledImagePanel(
-      '/images/wuzhen-frames/dyeworks.jpg',
+      '/wuzhen/textures/indigo-diffuse.jpg',
       4.1,
       2.3,
       materials,
-      '蓝印花布',
-      'BLUE PRINT DYEING'
+      '蓝印花布纹样',
+      'INDIGO TEXTILE PATTERN'
     ),
     [20.45, 2.35, 24],
     -Math.PI / 2
@@ -738,8 +783,8 @@ export function createCuratedShowroom(materials: HallMaterials): CuratedShowroom
     'xizha-night-tour-panel',
     labeledImagePanel(
       '/images/wuzhen-real/night.jpg',
-      7.2,
-      3.35,
+      FEATURE_IMAGE_WIDTH,
+      FEATURE_IMAGE_HEIGHT,
       materials,
       '西栅夜游',
       'XIZHA NIGHT TOUR'
@@ -761,12 +806,12 @@ export function createCuratedShowroom(materials: HallMaterials): CuratedShowroom
     exhibitRoots,
     'xizha-night-image',
     labeledImagePanel(
-      '/images/wuzhen-frames/night-river.jpg',
+      '/images/wuzhen-real/night.jpg',
       4.8,
       2.6,
       materials,
-      '灯影西栅',
-      'NIGHT RIVER AND LANTERNS'
+      '夜色水巷',
+      'NIGHTTIME WATER TOWN'
     ),
     [-20.45, 2.5, 10],
     Math.PI / 2
@@ -873,14 +918,13 @@ export function createCuratedShowroom(materials: HallMaterials): CuratedShowroom
     'waterway-night-image',
     labeledImagePanel(
       '/images/wuzhen-real/waterway.jpg',
-      4.8,
-      2.6,
+      FEATURE_IMAGE_WIDTH,
+      FEATURE_IMAGE_HEIGHT,
       materials,
-      '水巷烟火',
-      'FOOD, CRAFT AND WATERWAYS'
+      '水巷漫游',
+      'WATERWAYS AND TOWNSCAPE'
     ),
-    [20.45, 2.5, -4],
-    -Math.PI / 2
+    [0, 2.55, -4]
   );
 
   const culture = zones.get('culture')!;
@@ -889,12 +933,13 @@ export function createCuratedShowroom(materials: HallMaterials): CuratedShowroom
     exhibitRoots,
     'culture-folk',
     labeledImagePanel(
-      '/images/wuzhen-frames/xizha.jpg',
+      // Keep the side heritage panel on a licensed, watermarked-free Wuzhen photograph.
+      '/images/wuzhen-real/xizha.jpg',
       7.6,
       3,
       materials,
-      '水乡非遗手艺',
-      'MUXIN AND INTANGIBLE HERITAGE'
+      '水乡文化意象',
+      'WATER TOWN CULTURE'
     ),
     [-15.7, 2.7, -18],
     Math.PI / 2
@@ -904,14 +949,15 @@ export function createCuratedShowroom(materials: HallMaterials): CuratedShowroom
     exhibitRoots,
     'culture-ink-gallery',
     labeledImagePanel(
-      '/images/wuzhen-frames/dyeworks.jpg',
-      4.6,
-      2.25,
+      // The indigo fabric texture is the closest local, watermark-free visual for the culture zone.
+      '/wuzhen/textures/indigo-diffuse.jpg',
+      FEATURE_IMAGE_WIDTH,
+      FEATURE_IMAGE_HEIGHT,
       materials,
-      '蓝印花布',
-      '乌镇非遗染印工艺'
+      '蓝印花布纹样',
+      'INDIGO TEXTILE PATTERN'
     ),
-    [0, 2.25, -18]
+    [0, 2.55, -18]
   );
   const cultureHouse = createJiangnanHouse(materials, 3.65);
   cultureHouse.add(createIntroPlaque(materials, '水乡书屋', '阅读、创作与非遗记忆交汇'));

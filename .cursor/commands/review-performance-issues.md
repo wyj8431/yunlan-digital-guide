@@ -1,0 +1,1 @@
+Review the selected rendering, audio, WebSocket, or Three.js path using `cursor-skills/code-review/SKILL.md`. Focus on duplicate work, frame stability, resource disposal, audio latency, and hidden-tab behavior.

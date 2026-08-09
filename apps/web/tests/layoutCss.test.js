@@ -42,7 +42,7 @@ describe('desktop split layout', () => {
     expect(css).toMatch(/\.tourism-itinerary-stream\s*{/);
     expect(css).toMatch(/\.tourism-voice-field\s*{/);
     expect(css).toMatch(/\.tourism-passport\s*{/);
-    expect(dedicatedTourismCss).toContain("url('/images/wuzhen-water-town-bg.jpg')");
+    expect(dedicatedTourismCss).toContain("url('/images/wuzhen-real/waterway.jpg')");
     expect(dedicatedTourismCss).not.toContain("url('/images/solarpunk-reference.png')");
     expect(dedicatedTourismCss).not.toContain("url('/images/tourism-bg.png')");
     expect(dedicatedTourismCss).toMatch(
@@ -73,7 +73,7 @@ describe('desktop split layout', () => {
       /\.exhibition-transition\s*{[^}]*position:\s*absolute;[^}]*inset:\s*0;[^}]*pointer-events:\s*none;/s
     );
     expect(css).toMatch(
-      /@media \(max-width: 640px\)[\s\S]*?\.exhibit-dialog\s*{[^}]*max-height:\s*calc\(100dvh - 152px\);[^}]*overflow-y:\s*auto;/s
+      /@media \(max-width: 640px\)[\s\S]*?\.exhibit-dialog\s*{[^}]*max-height:\s*calc\(100dvh - 238px\);[^}]*overflow-y:\s*auto;/s
     );
   });
 });

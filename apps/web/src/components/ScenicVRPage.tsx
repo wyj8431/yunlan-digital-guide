@@ -41,8 +41,14 @@ const SCENIC_PANORAMAS: ScenicPanorama[] = [
     startYaw: 0.2,
     hotspots: [
       { label: '临水街巷', detail: '沿河店铺和石板路保持着水乡生活的尺度，适合从傍晚开始慢行。' },
-      { label: '古桥视线', detail: '站在桥顶可以同时看到河道、摇橹船和连续的屋檐线，是西栅最完整的取景方向。' },
-      { label: '夜游灯影', detail: '入夜后河面反光会把街巷拉长，建议把拍摄设备调低曝光，保留灯笼层次。' }
+      {
+        label: '古桥视线',
+        detail: '站在桥顶可以同时看到河道、摇橹船和连续的屋檐线，是西栅最完整的取景方向。'
+      },
+      {
+        label: '夜游灯影',
+        detail: '入夜后河面反光会把街巷拉长，建议把拍摄设备调低曝光，保留灯笼层次。'
+      }
     ]
   },
   {
@@ -56,7 +62,10 @@ const SCENIC_PANORAMAS: ScenicPanorama[] = [
     image: PANORAMA_IMAGE,
     startYaw: -0.7,
     hotspots: [
-      { label: '木构老宅', detail: '沿街住宅的进深和天井体现了江南宅院对采光、通风与亲水生活的安排。' },
+      {
+        label: '木构老宅',
+        detail: '沿街住宅的进深和天井体现了江南宅院对采光、通风与亲水生活的安排。'
+      },
       { label: '手工作坊', detail: '蓝印花布、酿造和竹木工艺让东栅保留了更鲜明的传统生产记忆。' },
       { label: '河埠生活', detail: '河埠头既是上下船的位置，也是居民清洗、搬运和交流的日常节点。' }
     ]
@@ -72,9 +81,15 @@ const SCENIC_PANORAMAS: ScenicPanorama[] = [
     image: PANORAMA_IMAGE,
     startYaw: 1.15,
     hotspots: [
-      { label: '水院倒影', detail: '建筑与水面之间保持了安静距离，晴天和阴天会呈现两种完全不同的边界感。' },
+      {
+        label: '水院倒影',
+        detail: '建筑与水面之间保持了安静距离，晴天和阴天会呈现两种完全不同的边界感。'
+      },
       { label: '展厅序列', detail: '展厅之间的转折适合按照时间线慢慢阅读，不必一次看完所有内容。' },
-      { label: '临窗阅读', detail: '临水窗口把古镇环境引入室内，适合在看展后停留片刻，整理自己的观展感受。' }
+      {
+        label: '临窗阅读',
+        detail: '临水窗口把古镇环境引入室内，适合在看展后停留片刻，整理自己的观展感受。'
+      }
     ]
   },
   {
@@ -89,8 +104,14 @@ const SCENIC_PANORAMAS: ScenicPanorama[] = [
     startYaw: 2.2,
     hotspots: [
       { label: '剧场前场', detail: '开阔前场是观演前后的集合空间，适合从正面观察建筑的整体轮廓。' },
-      { label: '水岸立面', detail: '临水一侧的层叠线条会随着视角变化，黄昏时最容易看出它与古镇屋面的呼应。' },
-      { label: '夜间入口', detail: '演出日建议提前到达，入口灯光亮起后，剧院会成为水岸上很清晰的方向标。' }
+      {
+        label: '水岸立面',
+        detail: '临水一侧的层叠线条会随着视角变化，黄昏时最容易看出它与古镇屋面的呼应。'
+      },
+      {
+        label: '夜间入口',
+        detail: '演出日建议提前到达，入口灯光亮起后，剧院会成为水岸上很清晰的方向标。'
+      }
     ]
   },
   {
@@ -104,9 +125,15 @@ const SCENIC_PANORAMAS: ScenicPanorama[] = [
     image: PANORAMA_IMAGE,
     startYaw: -2.05,
     hotspots: [
-      { label: '船市码头', detail: '码头连接水路与街路，早晨更容易看到装卸、采购和短途摆渡的真实场景。' },
+      {
+        label: '船市码头',
+        detail: '码头连接水路与街路，早晨更容易看到装卸、采购和短途摆渡的真实场景。'
+      },
       { label: '临河摊棚', detail: '摊棚顺着河岸展开，视线会在货物、招牌和水面之间不断切换。' },
-      { label: '水巷转角', detail: '从集市转入水巷后人流会变慢，适合顺着河道继续前往染坊与桥梁节点。' }
+      {
+        label: '水巷转角',
+        detail: '从集市转入水巷后人流会变慢，适合顺着河道继续前往染坊与桥梁节点。'
+      }
     ]
   },
   {
@@ -121,7 +148,10 @@ const SCENIC_PANORAMAS: ScenicPanorama[] = [
     startYaw: 2.8,
     hotspots: [
       { label: '塔影入河', detail: '晴朗天气下塔影会落入河面，适合用桥面或船头作为前景。' },
-      { label: '远眺水网', detail: '从开阔位置观察，能够更直观地理解乌镇桥、河、街共同构成的空间结构。' }
+      {
+        label: '远眺水网',
+        detail: '从开阔位置观察，能够更直观地理解乌镇桥、河、街共同构成的空间结构。'
+      }
     ]
   },
   {
@@ -165,7 +195,10 @@ const SCENIC_PANORAMAS: ScenicPanorama[] = [
     image: PANORAMA_IMAGE,
     startYaw: -2.7,
     hotspots: [
-      { label: '双桥交汇', detail: '站在岸边可以看到两座桥的错落关系，适合等待船只经过制造尺度感。' },
+      {
+        label: '双桥交汇',
+        detail: '站在岸边可以看到两座桥的错落关系，适合等待船只经过制造尺度感。'
+      },
       { label: '河道转弯', detail: '河道弯曲让屋檐线自然消失又出现，适合拍摄有层次的水乡远景。' }
     ]
   },
@@ -180,7 +213,10 @@ const SCENIC_PANORAMAS: ScenicPanorama[] = [
     image: PANORAMA_IMAGE,
     startYaw: 1.7,
     hotspots: [
-      { label: '台口木构', detail: '观察台口、檐角和柱网的比例，可以看出传统戏台对观看方向的组织。' },
+      {
+        label: '台口木构',
+        detail: '观察台口、檐角和柱网的比例，可以看出传统戏台对观看方向的组织。'
+      },
       { label: '檐下灯影', detail: '夜间灯光落在木构表面，建议从河对岸观看整体轮廓。' }
     ]
   },
@@ -211,7 +247,10 @@ const SCENIC_PANORAMAS: ScenicPanorama[] = [
     startYaw: 2.5,
     hotspots: [
       { label: '书房空间', detail: '书桌、书柜和窗户共同形成了适合阅读与写作的安静纵深。' },
-      { label: '故居庭院', detail: '庭院把室内生活和东栅街巷连接起来，适合留意门槛、天井与光线的关系。' }
+      {
+        label: '故居庭院',
+        detail: '庭院把室内生活和东栅街巷连接起来，适合留意门槛、天井与光线的关系。'
+      }
     ]
   },
   {
@@ -288,83 +327,97 @@ const googlePanoPreview = (token: string, x = 0, y = 0) =>
 
 const SCENIC_MEDIA_BY_ID: Record<string, ScenicMedia> = {
   'west-gate': {
-    sourceUrl: 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=30.747939,120.489457&heading=0&pitch=0&fov=90',
+    sourceUrl:
+      'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=30.747939,120.489457&heading=0&pitch=0&fov=90',
     fallbackImage: REAL_SCENE_IMAGES.street,
     kind: 'photo'
   },
   'east-gate': {
-    sourceUrl: 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=30.740495,120.496551&heading=0&pitch=0&fov=90',
+    sourceUrl:
+      'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=30.740495,120.496551&heading=0&pitch=0&fov=90',
     fallbackImage: googlePanoPreview(GOOGLE_PANO_TILE_TOKENS.eastGate),
     tileToken: GOOGLE_PANO_TILE_TOKENS.eastGate,
     kind: 'panorama'
   },
   'mu-xin': {
-    sourceUrl: 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=30.750254,120.487742&heading=0&pitch=0&fov=90',
+    sourceUrl:
+      'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=30.750254,120.487742&heading=0&pitch=0&fov=90',
     fallbackImage:
       'https://lh3.googleusercontent.com/gps-cs-s/AHRPTWmR19qz97rAFGPnvxMTZEN2jb7VelcxsTBnUR-84z9dfvqij6EBhQgUIPRqTFFpQ16GxARaVbGyJHng1zbWa4l23rnDS18fBm6crwrJKHv8w1BRUYxxoMYDxkIDn9VtmGYGYmj-=w408-h306-k-no',
     kind: 'photo'
   },
   'grand-theater': {
-    sourceUrl: 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=30.74801,120.491854&heading=0&pitch=0&fov=90',
+    sourceUrl:
+      'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=30.74801,120.491854&heading=0&pitch=0&fov=90',
     fallbackImage: googlePanoPreview(GOOGLE_PANO_TILE_TOKENS.dyehouse, 3, 1),
     kind: 'photo'
   },
   'water-market': {
-    sourceUrl: 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=30.750584,120.484081&heading=0&pitch=0&fov=90',
+    sourceUrl:
+      'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=30.750584,120.484081&heading=0&pitch=0&fov=90',
     fallbackImage:
       'https://lh3.googleusercontent.com/gps-cs-s/AHRPTWlX6MM5142yC3rS6xCTXdPtmaG483wqetikPx_TdbYnAi4qHnQrYRE_NubtO9r5sgnypABoAr7w_85mDBIDaAve53ttTa3JlsTqq4SW-gsCyW7_7_LkDdNoRFraOM48cicEvbQO3g=w408-h306-k-no',
     tileToken: GOOGLE_PANO_TILE_TOKENS.waterMarket,
     kind: 'panorama'
   },
   'bailian-tower': {
-    sourceUrl: 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=30.736598,120.491093&heading=0&pitch=0&fov=90',
+    sourceUrl:
+      'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=30.736598,120.491093&heading=0&pitch=0&fov=90',
     fallbackImage:
       'https://lh3.googleusercontent.com/gps-cs-s/AHRPTWm-i2Owb9llnJDE4ANwRUgi_jeMdOUlT8ZFiJmjsns7bY5pPbdJRupbuYoipFGeX-RJzz3q2tc9SHK9iStLciA0YYBpBI9pXJ9TIID-xwfuUB9EDsyYG_9ci-2D0hYaXI6ZibBmIsXZ0PP2=w408-h544-k-no',
     kind: 'photo'
   },
   'hongyuantai-dyehouse': {
-    sourceUrl: 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=30.740264,120.497389&heading=0&pitch=0&fov=90',
+    sourceUrl:
+      'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=30.740264,120.497389&heading=0&pitch=0&fov=90',
     fallbackImage:
       'https://lh3.googleusercontent.com/gps-cs-s/AHRPTWmG5Zl3IMsO5XyvE2WZRH9fN7_-RoTYLsY8wCp1fUTPENuamqu0RgQpzEdNHNEAFpwHhOsw-oiF-aB10DAO_KPFFzoXFQJDFWkWEpSWpngjVJBJJExzAyGwRpf23P7DHC3Uo6JR=w408-h306-k-no',
     tileToken: GOOGLE_PANO_TILE_TOKENS.dyehouse,
     kind: 'panorama'
   },
   'qiaoli-bridge': {
-    sourceUrl: 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=30.742694,120.48796&heading=0&pitch=0&fov=90',
+    sourceUrl:
+      'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=30.742694,120.48796&heading=0&pitch=0&fov=90',
     fallbackImage: googlePanoPreview(GOOGLE_PANO_TILE_TOKENS.qiaoli),
     kind: 'photo'
   },
   'fengyuan-bridge': {
-    sourceUrl: 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=30.73932,120.49958&heading=0&pitch=0&fov=90',
+    sourceUrl:
+      'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=30.73932,120.49958&heading=0&pitch=0&fov=90',
     fallbackImage:
       'https://lh3.googleusercontent.com/gps-cs-s/AHRPTWnma5QEBNVGF8wf3D5JbnrBB_CZZhFm3KVOxqaxdF4_3bge_xbtxwIVy00k8nstR3GDs7_rqk12Z2oQatU2A4MERUpSgQEw2yKwLjC1W9uXEAK-8Op1Yqq1tOLQcGkAUZhl15RbjQ=w408-h306-k-no',
     kind: 'photo'
   },
   'old-stage': {
-    sourceUrl: 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=30.7409165,120.491204&heading=0&pitch=0&fov=90',
+    sourceUrl:
+      'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=30.7409165,120.491204&heading=0&pitch=0&fov=90',
     fallbackImage: googlePanoPreview(GOOGLE_PANO_TILE_TOKENS.maoDun, 1, 1),
     kind: 'photo'
   },
   'tongji-bridge': {
-    sourceUrl: 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=30.753479,120.47431&heading=0&pitch=0&fov=90',
+    sourceUrl:
+      'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=30.753479,120.47431&heading=0&pitch=0&fov=90',
     fallbackImage: googlePanoPreview(GOOGLE_PANO_TILE_TOKENS.tongji),
     tileToken: GOOGLE_PANO_TILE_TOKENS.tongji,
     kind: 'panorama'
   },
   'mao-dun-house': {
-    sourceUrl: 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=30.739646,120.4895265&heading=0&pitch=0&fov=90',
+    sourceUrl:
+      'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=30.739646,120.4895265&heading=0&pitch=0&fov=90',
     fallbackImage: googlePanoPreview(GOOGLE_PANO_TILE_TOKENS.maoDun),
     kind: 'photo'
   },
   'lizhi-academy': {
-    sourceUrl: 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=30.741407,120.49437&heading=0&pitch=0&fov=90',
+    sourceUrl:
+      'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=30.741407,120.49437&heading=0&pitch=0&fov=90',
     fallbackImage:
       'https://lh3.googleusercontent.com/gps-cs-s/AHRPTWnpjSNEeMAAZQoJ5gRJnaleo5a5TbdjU-ffJifO0KbUNNnX6EY25_a0Krvhb6D9vSR7nMHtuEPgsPpv3Tfe_VLYQUDl9RKT37ZKaqluilkX1_MdorKfCb69T4b1gg9ovjkLuTJunw=w408-h272-k-no',
     tileToken: GOOGLE_PANO_TILE_TOKENS.lizhi,
     kind: 'panorama'
   },
   'jiangnan-bed-hall': {
-    sourceUrl: 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=30.739786,120.498703&heading=0&pitch=0&fov=90',
+    sourceUrl:
+      'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=30.739786,120.498703&heading=0&pitch=0&fov=90',
     fallbackImage:
       'https://lh3.googleusercontent.com/gps-cs-s/AHRPTWmNN6CQUQfQhS78UPQFIr-duzza8DL3K3FwAyx8YMskDc2HYxFY93cvVzCZAHE8lw-H2o2qYUVsgrUyq54U-FCbytmXdS0Oz1wklBVkFVZMVC5aThuq03V0D1d94xhP68ejGdyW=w408-h272-k-no',
     tileToken: GOOGLE_PANO_TILE_TOKENS.bedHall,
@@ -382,22 +435,25 @@ const GOOGLE_PANO_TILE_SIZE = 512;
 function loadGooglePanoTexture(tileToken: string): Promise<THREE.CanvasTexture> {
   const loader = new THREE.ImageLoader();
   loader.setCrossOrigin('anonymous');
-  const tiles = Array.from({ length: GOOGLE_PANO_MAX_TILE_COLUMNS * GOOGLE_PANO_MAX_TILE_ROWS }, (_, index) => {
-    const x = index % GOOGLE_PANO_MAX_TILE_COLUMNS;
-    const y = Math.floor(index / GOOGLE_PANO_MAX_TILE_COLUMNS);
-    const url = `https://lh3.googleusercontent.com/gpms-cs-s/${tileToken}=x${x}-y${y}-z3`;
+  const tiles = Array.from(
+    { length: GOOGLE_PANO_MAX_TILE_COLUMNS * GOOGLE_PANO_MAX_TILE_ROWS },
+    (_, index) => {
+      const x = index % GOOGLE_PANO_MAX_TILE_COLUMNS;
+      const y = Math.floor(index / GOOGLE_PANO_MAX_TILE_COLUMNS);
+      const url = `https://lh3.googleusercontent.com/gpms-cs-s/${tileToken}=x${x}-y${y}-z3`;
 
-    return new Promise<{ x: number; y: number; image: HTMLImageElement } | null>((resolve) => {
-      loader.load(
-        url,
-        (image) => {
-          resolve({ x, y, image });
-        },
-        undefined,
-        () => resolve(null)
-      );
-    });
-  });
+      return new Promise<{ x: number; y: number; image: HTMLImageElement } | null>((resolve) => {
+        loader.load(
+          url,
+          (image) => {
+            resolve({ x, y, image });
+          },
+          undefined,
+          () => resolve(null)
+        );
+      });
+    }
+  );
 
   return Promise.all(tiles).then((loadedTiles) => {
     const validTiles = loadedTiles.filter(
@@ -445,7 +501,10 @@ function fallbackPanorama(spotId: string): ScenicPanorama {
     image: PANORAMA_IMAGE,
     startYaw: 0,
     hotspots: [
-      { label: '水乡街巷', detail: '沿着河岸观察屋檐、桥梁和街面之间的关系，可以更快熟悉周边环境。' },
+      {
+        label: '水乡街巷',
+        detail: '沿着河岸观察屋檐、桥梁和街面之间的关系，可以更快熟悉周边环境。'
+      },
       { label: '建筑细节', detail: '留意门窗、石阶和临水平台，它们共同组成了乌镇日常生活的尺度。' }
     ]
   };
@@ -562,7 +621,10 @@ export function ScenicVRPage({ spotId, onBack }: ScenicVRPageProps) {
 
     const handleWheel = (event: WheelEvent) => {
       event.preventDefault();
-      viewRef.current.fov = Math.min(92, Math.max(42, viewRef.current.fov + (event.deltaY > 0 ? 4 : -4)));
+      viewRef.current.fov = Math.min(
+        92,
+        Math.max(42, viewRef.current.fov + (event.deltaY > 0 ? 4 : -4))
+      );
     };
     canvas.addEventListener('wheel', handleWheel, { passive: false });
     return () => canvas.removeEventListener('wheel', handleWheel);
@@ -580,7 +642,10 @@ export function ScenicVRPage({ spotId, onBack }: ScenicVRPageProps) {
     }
 
     viewRef.current.yaw += (event.clientX - drag.x) * 0.004;
-    viewRef.current.pitch = Math.max(-1.15, Math.min(1.15, viewRef.current.pitch + (event.clientY - drag.y) * 0.003));
+    viewRef.current.pitch = Math.max(
+      -1.15,
+      Math.min(1.15, viewRef.current.pitch + (event.clientY - drag.y) * 0.003)
+    );
     drag.x = event.clientX;
     drag.y = event.clientY;
   };
@@ -609,34 +674,54 @@ export function ScenicVRPage({ spotId, onBack }: ScenicVRPageProps) {
       }}
     >
       <nav className="scenic-vr-clean-toolbar" aria-label="VR 全景控制">
-        <button type="button" className="scenic-vr-icon-button" onClick={onBack} aria-label="返回景点列表" title="返回景点列表">
+        <button
+          type="button"
+          className="scenic-vr-icon-button"
+          onClick={onBack}
+          aria-label="返回景点列表"
+          title="返回景点列表"
+        >
           <ArrowLeft size={20} aria-hidden="true" />
         </button>
         {media.kind === 'panorama' && (
           <div className="scenic-vr-view-controls" aria-label="视角控制">
-            <button type="button" className="scenic-vr-icon-button" onClick={() => changeFov(4)} aria-label="放大视野" title="放大视野">
+            <button
+              type="button"
+              className="scenic-vr-icon-button"
+              onClick={() => changeFov(4)}
+              aria-label="放大视野"
+              title="放大视野"
+            >
               <ZoomIn size={18} aria-hidden="true" />
             </button>
-            <button type="button" className="scenic-vr-icon-button" onClick={resetView} aria-label="重置视角" title="重置视角">
+            <button
+              type="button"
+              className="scenic-vr-icon-button"
+              onClick={resetView}
+              aria-label="重置视角"
+              title="重置视角"
+            >
               <RotateCcw size={18} aria-hidden="true" />
             </button>
-            <button type="button" className="scenic-vr-icon-button" onClick={() => changeFov(-4)} aria-label="缩小视野" title="缩小视野">
+            <button
+              type="button"
+              className="scenic-vr-icon-button"
+              onClick={() => changeFov(-4)}
+              aria-label="缩小视野"
+              title="缩小视野"
+            >
               <ZoomOut size={18} aria-hidden="true" />
             </button>
           </div>
         )}
       </nav>
-      <div className="scenic-vr-mode-badge" aria-label={media.kind === 'panorama' ? '360 度 VR 实景全景' : '真实照片'}>
+      <div
+        className="scenic-vr-mode-badge"
+        aria-label={media.kind === 'panorama' ? '360 度 VR 实景全景' : '真实照片'}
+      >
         <span className="scenic-vr-mode-dot" aria-hidden="true" />
         {media.kind === 'panorama' ? '360° VR 实景' : '真实实景照片'}
       </div>
-      {false && (<iframe
-        className="scenic-vr-embed"
-        title={`${panorama.name} 360 度实景全景`}
-        src="about:blank"
-        allow="fullscreen; xr-spatial-tracking; gyroscope; accelerometer"
-        allowFullScreen
-      />)}
       <canvas
         ref={canvasRef}
         className="scenic-vr-canvas scenic-vr-canvas--immersive"
@@ -649,11 +734,7 @@ export function ScenicVRPage({ spotId, onBack }: ScenicVRPageProps) {
       <div className="scenic-vr-clean-brand">
         <strong>乌镇全景</strong>
         <small>WUZHEN / REAL SCENE</small>
-        <a
-          href={media.sourceUrl}
-          target="_blank"
-          rel="noreferrer"
-        >
+        <a href={media.sourceUrl} target="_blank" rel="noreferrer">
           Google Maps 实景来源
         </a>
         <small className="scenic-vr-clean-status">

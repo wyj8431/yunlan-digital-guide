@@ -10,7 +10,7 @@ export type ExhibitionAssetFile = {
 
 export type ExhibitionAsset = {
   id: string;
-  kind: 'glb' | 'hdr' | 'ktx2' | 'ies' | 'audio';
+  kind: 'glb' | 'hdr' | 'ktx2' | 'texture' | 'ies' | 'audio';
   localPath: `/exhibition/${string}`;
   sourceUrl: `https://${string}`;
   author: string;
@@ -121,76 +121,76 @@ export const EXHIBITION_ASSETS: ExhibitionAsset[] = [
   },
   {
     id: 'stone-pbr',
-    kind: 'ktx2',
-    localPath: '/exhibition/materials/stone-baseColor.ktx2',
+    kind: 'texture',
+    localPath: '/exhibition/materials/stone-baseColor.jpg',
     sourceUrl: 'https://polyhaven.com/a/floor_tiles_06',
     author: 'Poly Haven',
     license: 'CC0-1.0',
     files: [
       remote(
-        '/exhibition/materials/stone-baseColor.ktx2',
+        '/exhibition/materials/stone-baseColor.jpg',
         'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/floor_tiles_06/floor_tiles_06_diff_1k.jpg',
-        118069,
-        'c81b0406394c26a9fe7dd4b2e06abc2844334df22dcec59b62ac632746600c45',
+        356257,
+        'ac159ca6072e30dd9d5c65e2d6eae7bb55a7dc9f06e6d141e9119390563511c2',
         'baseColor'
       ),
       remote(
-        '/exhibition/materials/stone-normal.ktx2',
+        '/exhibition/materials/stone-normal.jpg',
         'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/floor_tiles_06/floor_tiles_06_nor_gl_1k.jpg',
-        37028,
-        '380c173c2d1648a002a0e58a6cccb0c27e04787b3d17232dc3c96457b27c4333',
+        121299,
+        'efaff964d5688dd52ea3b876d5dac63ffee76d8d7270e30c11c81095246d5fdd',
         'normal'
       ),
       remote(
-        '/exhibition/materials/stone-roughness.ktx2',
+        '/exhibition/materials/stone-roughness.jpg',
         'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/floor_tiles_06/floor_tiles_06_rough_1k.jpg',
-        47914,
-        'af41079a75ff0319008b45d5a34dc2d10219d921e16b6abd418362ff1043ebf5',
+        114013,
+        '9c1996177892f220bcfdbc44675d0cd404482cfa80b1c577c7bcc100637ef8b6',
         'roughness'
       ),
       remote(
-        '/exhibition/materials/stone-ao.ktx2',
+        '/exhibition/materials/stone-ao.jpg',
         'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/floor_tiles_06/floor_tiles_06_ao_1k.jpg',
-        90067,
-        'ef5fb4864f75e933810230165db67607d342c2e5b200713bf130838d97b033c0',
+        196815,
+        'b83b09eb794060185d73d6395b87d2df411830b11073474a8e330d373e86ee45',
         'ao'
       )
     ]
   },
   {
     id: 'walnut-pbr',
-    kind: 'ktx2',
-    localPath: '/exhibition/materials/walnut-baseColor.ktx2',
+    kind: 'texture',
+    localPath: '/exhibition/materials/walnut-baseColor.jpg',
     sourceUrl: 'https://polyhaven.com/a/dark_wood',
     author: 'Poly Haven',
     license: 'CC0-1.0',
     files: [
       remote(
-        '/exhibition/materials/walnut-baseColor.ktx2',
+        '/exhibition/materials/walnut-baseColor.jpg',
         'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dark_wood/dark_wood_diff_1k.jpg',
-        120540,
-        'f8028f11548bbc32a45a91c42f195525375b873d2eba87d0420d7bfd58cf0388',
+        754754,
+        'd68da31655bf47024af893156a6a01a6c95bb60f55d97e2dc9bdd47be320e5b5',
         'baseColor'
       ),
       remote(
-        '/exhibition/materials/walnut-normal.ktx2',
+        '/exhibition/materials/walnut-normal.jpg',
         'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dark_wood/dark_wood_nor_gl_1k.jpg',
-        39969,
-        '5e9d4769b2a79c77711802c89fbdb21f64d7e810d640faf5f0b8b26f89b0b044',
+        344338,
+        'c42541f1bda0a14b39f120c24407eeba699af8ac85b371c7cef98ffd7d7b13bf',
         'normal'
       ),
       remote(
-        '/exhibition/materials/walnut-roughness.ktx2',
+        '/exhibition/materials/walnut-roughness.jpg',
         'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dark_wood/dark_wood_rough_1k.jpg',
-        110518,
-        '4feb15829422eb189fb59c2ceec9eb79eb7e19a0e4bef124fa334bba45f3d0ee',
+        574415,
+        '47ea12dbf649109b02eaa164dde9732a74e839957f29ad0ec7f5266b575d1835',
         'roughness'
       ),
       remote(
-        '/exhibition/materials/walnut-ao.ktx2',
+        '/exhibition/materials/walnut-ao.jpg',
         'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/dark_wood/dark_wood_ao_1k.jpg',
-        98674,
-        '82550b95d0602fb031bbe5eac2b8cd97958035e5597bb804c9aac585544abbc6',
+        429293,
+        'f4fc614d45f7413f3ea8d4c35c08f3fe573a882dfea6e13b5425023305cc1d02',
         'ao'
       )
     ]
@@ -331,7 +331,7 @@ export function validateAssetRegistry(assets: ExhibitionAsset[]): string[] {
     if (!asset.files.some((file) => file.localPath === asset.localPath)) {
       errors.push(`primary:${asset.id}`);
     }
-    if (asset.kind === 'ktx2') {
+    if (asset.kind === 'ktx2' || asset.kind === 'texture') {
       const slots = asset.files.map((file) => file.materialSlot);
       if (
         !(['baseColor', 'normal', 'roughness', 'ao'] as const).every((slot) => slots.includes(slot))

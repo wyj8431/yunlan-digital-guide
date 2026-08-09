@@ -14,13 +14,11 @@ import {
 } from './routing/appRoute';
 
 export function RootApp() {
-  const [route, setRoute] = useState<AppRoute>(() =>
-    resolveAppRoute(window.location.pathname, window.location.search)
-  );
+  const [route, setRoute] = useState<AppRoute>(() => resolveAppRoute(window.location.pathname));
 
   useEffect(() => {
     const handlePopState = () => {
-      setRoute(resolveAppRoute(window.location.pathname, window.location.search));
+      setRoute(resolveAppRoute(window.location.pathname));
     };
 
     window.addEventListener('popstate', handlePopState);
@@ -56,7 +54,12 @@ export function RootApp() {
   }
 
   if (route.kind === 'exhibition') {
-    return <ExhibitionPage onReturnHome={() => navigate('explore')} onOpenGuide={() => navigate('explore')} />;
+    return (
+      <ExhibitionPage
+        onReturnHome={() => navigate('explore')}
+        onOpenGuide={() => navigate('explore')}
+      />
+    );
   }
 
   if (route.kind === 'videos') {
@@ -64,12 +67,7 @@ export function RootApp() {
   }
 
   if (route.kind === 'scenic-vr') {
-    return (
-      <BuildingVRPage
-        spotId={route.spotId}
-        onReturnMap={() => navigate('map')}
-      />
-    );
+    return <BuildingVRPage spotId={route.spotId} onReturnMap={() => navigate('map')} />;
   }
 
   return <App activeView={route.view} onNavigate={navigate} onOpenScenic={openScenic} />;

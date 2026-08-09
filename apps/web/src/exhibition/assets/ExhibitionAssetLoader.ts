@@ -22,7 +22,15 @@ export type LoadedExhibitionAssets = {
   failures: Map<string, Error>;
 };
 
-const ASSET_TIMEOUT_MS = 20_000;
+export type VisualAssetLoadEvent = {
+  assetId: string;
+  error: Error | null;
+  assets: LoadedExhibitionAssets;
+};
+
+// Optional visual upgrades must not keep the already-rendered fallback scene waiting.
+const ASSET_TIMEOUT_MS = 12_000;
+const MODEL_TIMEOUT_MS = 45_000;
 
 export class ExhibitionAssetLoader {
   private readonly draco = new DRACOLoader().setDecoderPath('/draco/');
@@ -30,6 +38,7 @@ export class ExhibitionAssetLoader {
   private readonly gltf: GLTFLoader;
   private readonly rgbe = new RGBELoader();
   private readonly ies = new IESLoader();
+  private readonly textureLoader = new THREE.TextureLoader();
   private readonly pmrem: THREE.PMREMGenerator;
   private readonly models = new Map<string, THREE.Group>();
   private readonly textures = new Map<string, THREE.Texture>();
@@ -52,10 +61,13 @@ export class ExhibitionAssetLoader {
     this.pmrem.compileEquirectangularShader();
   }
 
-  async load(onProgress: (progress: AssetProgress) => void): Promise<LoadedExhibitionAssets> {
+  async load(
+    onProgress: (progress: AssetProgress) => void,
+    onAssetSettled?: (event: VisualAssetLoadEvent) => void
+  ): Promise<LoadedExhibitionAssets> {
     if (this.disposed) throw new Error('ExhibitionAssetLoader has been disposed');
     if (this.loadPromise) return this.loadPromise;
-    this.loadPromise = this.loadAll(onProgress);
+    this.loadPromise = this.loadAll(onProgress, onAssetSettled);
     return this.loadPromise;
   }
 
@@ -86,7 +98,8 @@ export class ExhibitionAssetLoader {
   }
 
   private async loadAll(
-    onProgress: (progress: AssetProgress) => void
+    onProgress: (progress: AssetProgress) => void,
+    onAssetSettled?: (event: VisualAssetLoadEvent) => void
   ): Promise<LoadedExhibitionAssets> {
     const visualAssets = this.assets.filter((asset) => asset.kind !== 'audio');
     const visualAssetIds = new Set(visualAssets.map((asset) => asset.id));
@@ -104,25 +117,48 @@ export class ExhibitionAssetLoader {
         total: visualAssets.length
       });
     report();
-    await Promise.all(
-      visualAssets.map(async (asset) => {
-        try {
-          await this.withTimeout(
-            this.loadOne(asset, (key, loaded, total) => {
-              loadedByAsset.set(key, Math.max(loadedByAsset.get(key) ?? 0, loaded));
-              if (total > 0) totalByAsset.set(key, total);
-              report();
-            }),
-            asset.id
-          );
-        } catch (error) {
-          this.failures.set(asset.id, error instanceof Error ? error : new Error(String(error)));
-        } finally {
-          completed += 1;
-          report();
-        }
-      })
+    const loadAsset = async (asset: ExhibitionAsset) => {
+      let failure: Error | null = null;
+      try {
+        await this.withTimeout(
+          this.loadOne(asset, (key, loaded, total) => {
+            loadedByAsset.set(key, Math.max(loadedByAsset.get(key) ?? 0, loaded));
+            if (total > 0) totalByAsset.set(key, total);
+            report();
+          }),
+          asset.id,
+          asset.kind === 'glb' ? MODEL_TIMEOUT_MS : ASSET_TIMEOUT_MS
+        );
+      } catch (error) {
+        failure = error instanceof Error ? error : new Error(String(error));
+        this.failures.set(asset.id, failure);
+      } finally {
+        completed += 1;
+        report();
+        onAssetSettled?.({
+          assetId: asset.id,
+          error: failure,
+          assets: this.getLoadedVisualAssets(visualAssetIds)
+        });
+      }
+    };
+
+    // The material images are immediately usable on every GPU. Larger display models remain
+    // optional upgrades over the authored fallbacks.
+    const priorityAssets = visualAssets.filter(
+      (asset) => asset.kind !== 'glb' && asset.kind !== 'ktx2'
     );
+    const materialAssets = visualAssets.filter((asset) => asset.kind === 'ktx2');
+    const optionalModelAssets = visualAssets.filter((asset) => asset.kind === 'glb');
+    await Promise.all(priorityAssets.map(loadAsset));
+    // A material asset contains four KTX2 files. Loading two material sets together queues eight
+    // transcodes against the same worker pool and can make both miss their individual deadline.
+    for (const asset of materialAssets) await loadAsset(asset);
+    await Promise.all(optionalModelAssets.map(loadAsset));
+    return this.getLoadedVisualAssets(visualAssetIds);
+  }
+
+  private getLoadedVisualAssets(visualAssetIds: Set<string>): LoadedExhibitionAssets {
     return {
       models: this.models,
       textures: this.textures,
@@ -239,6 +275,30 @@ export class ExhibitionAssetLoader {
             )
         )
       ).then(() => undefined);
+    if (asset.kind === 'texture')
+      return Promise.all(
+        asset.files.map(
+          (file) =>
+            new Promise<void>((resolve, reject) =>
+              this.textureLoader.load(
+                file.localPath,
+                (texture) => {
+                  try {
+                    const slot = file.materialSlot;
+                    this.textures.set(slot ? `${asset.id}:${slot}` : asset.id, texture);
+                    if (slot === 'baseColor') this.textures.set(asset.id, texture);
+                    resolve();
+                  } catch (error) {
+                    texture.dispose();
+                    reject(error);
+                  }
+                },
+                (event) => progress(file.localPath, event.loaded, event.total),
+                reject
+              )
+            )
+        )
+      ).then(() => undefined);
     if (asset.kind === 'ies')
       return new Promise((resolve, reject) =>
         this.ies.load(
@@ -283,11 +343,11 @@ export class ExhibitionAssetLoader {
     return Promise.resolve();
   }
 
-  private withTimeout<T>(promise: Promise<T>, assetId: string): Promise<T> {
+  private withTimeout<T>(promise: Promise<T>, assetId: string, timeoutMs: number): Promise<T> {
     return new Promise<T>((resolve, reject) => {
       const timer = window.setTimeout(
         () => reject(new Error(`Asset load timed out: ${assetId}`)),
-        ASSET_TIMEOUT_MS
+        timeoutMs
       );
       promise.then(
         (value) => {

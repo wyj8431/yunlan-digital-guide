@@ -7,6 +7,14 @@ export type ExhibitionAssetSources = {
   silkGarment: 'glb' | 'fallback';
 };
 
+export type ExhibitionAssetLoadState = {
+  status: 'loading' | 'complete';
+  completed: number;
+  total: number;
+  failedAssetIds: string[];
+  failedAssetMessages: string[];
+};
+
 export type ExhibitionTelemetry = {
   scene: 'hall' | 'lake';
   cameraPose: {
@@ -21,6 +29,7 @@ export type ExhibitionTelemetry = {
   textures: number;
   activePasses: string[];
   assetSources: ExhibitionAssetSources;
+  assetLoadState: ExhibitionAssetLoadState;
   visibleZones: string[];
   audioUnlocked: boolean;
   activeCanvasCount: number;

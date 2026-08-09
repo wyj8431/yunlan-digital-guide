@@ -8,6 +8,9 @@ import {
   createMouthMorphController,
   type MouthMorphController
 } from '../lab/lip-sync/three/mouthMorphController';
+import { DEFAULT_MOUTH_SIGNAL_CONFIG } from '../lab/lip-sync/types';
+import { nextMouthSignal } from '../lab/lip-sync/audio/mouthSignal';
+import { sampleGuideAudioAnalysis } from '../lib/guideAudioAnalysis';
 import { disposeObject3D } from '../lib/three/disposeObject3D';
 import { GUIDE_SPEECH_PLAYBACK_EVENT, isGuideSpeechPlaybackEvent } from '../lib/guideSpeechSync';
 import type { GuideSpeechTimeline } from '../types/guide';
@@ -113,12 +116,12 @@ export function DigitalHumanStage({
     virtualHuman.config?.enabled && virtualHuman.config.provider === 'mofa-xingyun'
       ? '魔珐星云数字人'
       : virtualHuman.config?.enabled && virtualHuman.config.provider === 'xfyun-vms'
-        ? virtualHuman.config.displayName ?? '讯飞虚拟人'
+        ? (virtualHuman.config.displayName ?? '讯飞虚拟人')
         : '讯飞虚拟人';
   const guideName = virtualHuman.config?.enabled ? onlineHumanName : FALLBACK_GUIDE_NAME;
   const guideRole =
     virtualHuman.config?.enabled && virtualHuman.config.provider === 'xfyun-vms'
-      ? virtualHuman.config.role ?? FALLBACK_GUIDE_ROLE
+      ? (virtualHuman.config.role ?? FALLBACK_GUIDE_ROLE)
       : FALLBACK_GUIDE_ROLE;
   const shouldShowWakeButton =
     virtualHuman.active &&
@@ -176,6 +179,7 @@ export function DigitalHumanStage({
     let modelRoot: THREE.Object3D | null = null;
     let mouthController: MouthMorphController | null = null;
     let modelBaseY = 0;
+    let mouthOpen = 0;
 
     const scene = new THREE.Scene();
     scene.background = null;
@@ -333,14 +337,25 @@ export function DigitalHumanStage({
             ? 0
             : performance.now() - timelineStartedAt;
         const timelineMouthOpen = getTimelineMouthOpen(timeline, timelineElapsedMs);
+        const audioFrame = sampleGuideAudioAnalysis();
+        mouthOpen = audioFrame.playing
+          ? nextMouthSignal(
+              mouthOpen,
+              audioFrame.rms,
+              Math.max(delta * 1000, 0),
+              DEFAULT_MOUTH_SIGNAL_CONFIG
+            )
+          : timelineMouthOpen > 0
+            ? timelineMouthOpen
+            : nextMouthSignal(mouthOpen, 0, Math.max(delta * 1000, 0), DEFAULT_MOUTH_SIGNAL_CONFIG);
         const speakingMotion =
-          timelineMouthOpen > 0
-            ? timelineMouthOpen * 0.026
+          mouthOpen > 0
+            ? mouthOpen * 0.026
             : speakingRef.current
               ? Math.sin(elapsed * 7.5) * 0.018
               : 0;
 
-        mouthController?.setOpen(timelineMouthOpen);
+        mouthController?.setOpen(mouthOpen);
         modelRoot.rotation.y = GUIDE_BASE_ROTATION_Y + Math.sin(elapsed * 0.52) * 0.045;
         modelRoot.position.y = modelBaseY + Math.sin(elapsed * 1.15) * 0.006 + speakingMotion;
       }
@@ -353,6 +368,8 @@ export function DigitalHumanStage({
     function handleVisibilityChange() {
       if (document.hidden) {
         stopFrameLoop();
+        mouthOpen = 0;
+        mouthController?.reset();
         return;
       }
 
@@ -371,6 +388,7 @@ export function DigitalHumanStage({
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       resizeObserver.disconnect();
       mouthController?.reset();
+      mouthOpen = 0;
       mixer?.stopAllAction();
       if (renderer.domElement.parentElement === host) {
         host.removeChild(renderer.domElement);
@@ -482,7 +500,7 @@ export function DigitalHumanStage({
           className="stage-holo-tool stage-holo-tool--narration"
           onClick={() => onNavigate?.('narration')}
         >
-          <AudioLines size={18} />
+          <AudioLines size={18} aria-hidden="true" />
           <span>实时讲解</span>
           <small>Real-time</small>
         </button>
@@ -491,7 +509,7 @@ export function DigitalHumanStage({
           className="stage-holo-tool stage-holo-tool--map"
           onClick={() => onNavigate?.('map')}
         >
-          <Map size={18} />
+          <Map size={18} aria-hidden="true" />
           <span>景点地图</span>
           <small>Map</small>
         </button>
@@ -500,7 +518,7 @@ export function DigitalHumanStage({
           className="stage-holo-tool stage-holo-tool--route"
           onClick={() => onNavigate?.('itinerary')}
         >
-          <Route size={18} />
+          <Route size={18} aria-hidden="true" />
           <span>智能路线</span>
           <small>Route</small>
         </button>
@@ -509,7 +527,7 @@ export function DigitalHumanStage({
           className="stage-holo-tool stage-holo-tool--voice"
           onClick={() => onNavigate?.('voice')}
         >
-          <Mic2 size={18} />
+          <Mic2 size={18} aria-hidden="true" />
           <span>语音交互</span>
           <small>Voice</small>
         </button>

@@ -12,6 +12,7 @@ export type GuideSpeechPlaybackPhase = 'preparing' | 'start' | 'end' | 'error';
 export type GuideSpeechPlaybackDetail = {
   text: string;
   phase: GuideSpeechPlaybackPhase;
+  playbackId?: string;
 };
 
 export function dispatchGuideSpeechDuration(detail: GuideSpeechDurationDetail) {
@@ -49,9 +50,10 @@ export function isGuideSpeechPlaybackEvent(
   return (
     event.type === GUIDE_SPEECH_PLAYBACK_EVENT &&
     typeof detail?.text === 'string' &&
-    (detail.phase === 'preparing' ||
-      detail.phase === 'start' ||
-      detail.phase === 'end' ||
-      detail.phase === 'error')
+    (detail?.phase === 'preparing' ||
+      detail?.phase === 'start' ||
+      detail?.phase === 'end' ||
+      detail?.phase === 'error') &&
+    (detail?.playbackId === undefined || typeof detail.playbackId === 'string')
   );
 }

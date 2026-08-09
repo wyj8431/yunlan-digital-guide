@@ -23,6 +23,7 @@ import {
   type QualityLevel
 } from './quality/qualityProfile';
 import { WEST_LAKE_COLLIDERS, createWestLakeEnvironment } from './scene/createWestLakeEnvironment';
+import type { ExhibitionWeatherMode } from './visitorGuide';
 
 export type WestLakeSceneOptions = {
   host: HTMLElement;
@@ -38,6 +39,21 @@ const EYE_HEIGHT = 1.65;
 const MOVE_SPEED = 3.2;
 const LOOK_SENSITIVITY = 0.0022;
 const MAX_PITCH = Math.PI * 0.45;
+
+const WEATHER_PRESETS: Record<
+  ExhibitionWeatherMode,
+  { background: string; fog: string; density: number; exposure: number; lightScale: number }
+> = {
+  sunny: { background: '#a9c4bc', fog: '#a9c4bc', density: 0.011, exposure: 0.9, lightScale: 1 },
+  night: {
+    background: '#0d1b26',
+    fog: '#172b35',
+    density: 0.018,
+    exposure: 0.58,
+    lightScale: 0.52
+  },
+  rain: { background: '#647b7b', fog: '#7e9290', density: 0.025, exposure: 0.7, lightScale: 0.72 }
+};
 
 export const LAKE_BOUNDS: Collider = { minX: -10, maxX: 10, minZ: -8, maxZ: 9 };
 
@@ -85,6 +101,7 @@ export class WestLakeScene {
   private qualitySampleFrames = 0;
   private quality: QualityLevel = 'high';
   private manualQuality: QualityLevel | null = null;
+  private freeRoam = true;
   private fatalErrorReported = false;
 
   private readonly handleKeyDown = (event: KeyboardEvent) => {
@@ -128,8 +145,7 @@ export class WestLakeScene {
       powerPreference: 'high-performance'
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.enabled = false;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 0.9;
@@ -146,7 +162,7 @@ export class WestLakeScene {
     this.scene.add(new THREE.HemisphereLight('#fffbea', '#315c50', 0.92));
     const sun = new THREE.DirectionalLight('#fff4d6', 1.05);
     sun.position.set(4, 8, 5);
-    sun.castShadow = true;
+    sun.castShadow = false;
     this.scene.add(sun, this.environment.root);
     this.scene.fog = new THREE.FogExp2('#a9c4bc', 0.011);
     this.environment.setReducedMotion(this.reducedMotion);
@@ -195,6 +211,43 @@ export class WestLakeScene {
   setQuality(quality: QualityLevel) {
     this.manualQuality = quality;
     this.applyQuality(quality);
+  }
+
+  setFreeRoam(enabled: boolean) {
+    this.freeRoam = enabled;
+    if (!enabled) this.pressedKeys.clear();
+  }
+
+  moveByInput(strafe: number, forward: number, deltaSeconds = 0.05) {
+    if (!this.interactionEnabled || !this.freeRoam) return;
+    this.applyMovement(strafe, forward, deltaSeconds);
+  }
+
+  rotateByInput(deltaX: number, deltaY: number) {
+    if (!this.interactionEnabled || !this.freeRoam) return;
+    this.yaw -= deltaX * LOOK_SENSITIVITY;
+    this.pitch = THREE.MathUtils.clamp(
+      this.pitch - deltaY * LOOK_SENSITIVITY,
+      -MAX_PITCH,
+      MAX_PITCH
+    );
+    this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
+  }
+
+  setWeather(mode: ExhibitionWeatherMode) {
+    const preset = WEATHER_PRESETS[mode];
+    this.scene.background = new THREE.Color(preset.background);
+    this.scene.fog = new THREE.FogExp2(preset.fog, preset.density);
+    this.renderer.toneMappingExposure = preset.exposure;
+    this.scene.traverse((object) => {
+      if (!('intensity' in object) || typeof object.intensity !== 'number') return;
+      const baseIntensity =
+        typeof object.userData.baseWeatherIntensity === 'number'
+          ? object.userData.baseWeatherIntensity
+          : object.intensity;
+      object.userData.baseWeatherIntensity = baseIntensity;
+      object.intensity = baseIntensity * preset.lightScale;
+    });
   }
 
   setTransitionProgress(progress: number) {
@@ -250,6 +303,12 @@ export class WestLakeScene {
     const strafe =
       Number(this.pressedKeys.has('KeyD') || this.pressedKeys.has('ArrowRight')) -
       Number(this.pressedKeys.has('KeyA') || this.pressedKeys.has('ArrowLeft'));
+    if (!this.freeRoam || (forward === 0 && strafe === 0)) return;
+    this.applyMovement(strafe, forward, deltaSeconds);
+  }
+
+  private applyMovement(strafe: number, forward: number, deltaSeconds: number) {
+    if (forward === 0 && strafe === 0) return;
     const input = normalizeMovement({ x: strafe, z: forward });
     const distance = MOVE_SPEED * deltaSeconds;
     const next = resolveLakeMovement(
@@ -347,6 +406,13 @@ export class WestLakeScene {
       textures: this.renderer.info?.memory?.textures ?? 0,
       activePasses: this.pipeline.getActivePassNames?.() ?? [],
       assetSources: { ...FALLBACK_ASSET_SOURCES },
+      assetLoadState: {
+        status: 'complete',
+        completed: 0,
+        total: 0,
+        failedAssetIds: [],
+        failedAssetMessages: []
+      },
       visibleZones: ['lake', 'shore', 'vegetation', 'distance'],
       audioUnlocked: this.audio.isUnlocked(),
       activeCanvasCount: document.querySelectorAll('.exhibition-canvas-host canvas').length

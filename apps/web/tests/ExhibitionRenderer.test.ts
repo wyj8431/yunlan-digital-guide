@@ -232,6 +232,7 @@ vi.mock('three', () => {
     PlaneGeometry: MockGeometry,
     CylinderGeometry: MockGeometry,
     SphereGeometry: MockGeometry,
+    DodecahedronGeometry: MockGeometry,
     TorusGeometry: MockGeometry,
     TubeGeometry: MockGeometry,
     LatheGeometry: MockGeometry,
@@ -306,7 +307,8 @@ vi.mock('three', () => {
     },
     PCFSoftShadowMap: 1,
     DoubleSide: 2,
-    SRGBColorSpace: 'srgb'
+    SRGBColorSpace: 'srgb',
+    ACESFilmicToneMapping: 'aces'
   };
 });
 
@@ -518,6 +520,15 @@ describe('ExhibitionRenderer', () => {
     await renderer.unlockAudio();
     renderer.setQuality('medium');
     renderer.setFocus('west-lake-bicycle');
+    expect(renderer.goToExhibit('west-lake-bicycle')).toBe(true);
+    expect(renderer.goToExhibit('entrance-wupeng-boat')).toBe(true);
+    expect(renderer.rotateModel('entrance-wupeng-boat', 45)).toBe(true);
+    expect(renderer.resetModel('entrance-wupeng-boat')).toBe(true);
+    expect(renderer.goToExhibit('missing-exhibit')).toBe(false);
+    expect(renderer.startModelInteraction('west-lake-bicycle', 'animate')).toBe(true);
+    expect(renderer.startModelInteraction('entrance-wupeng-boat', 'animate')).toBe(true);
+    expect(renderer.startModelInteraction('waterway-loom', 'showcase')).toBe(true);
+    renderer.stopModelInteraction();
     renderer.setTransitionProgress(0.75);
 
     expect(state.audioUnlock).toHaveBeenCalled();
@@ -528,7 +539,7 @@ describe('ExhibitionRenderer', () => {
     renderer.dispose();
   });
 
-  it('reports the hall ready only after its visual assets finish processing', async () => {
+  it('reports the hall ready before optional visual assets finish processing', async () => {
     let finishLoading: (() => void) | undefined;
     state.assetLoad.mockImplementationOnce(
       () =>
@@ -549,24 +560,23 @@ describe('ExhibitionRenderer', () => {
 
     expect(onReady).not.toHaveBeenCalled();
     await Promise.resolve();
-    expect(onReady).not.toHaveBeenCalled();
+    expect(onReady).toHaveBeenCalledTimes(1);
     finishLoading?.();
-    await vi.waitFor(() => expect(onReady).toHaveBeenCalledTimes(1));
+    await Promise.resolve();
+    expect(onReady).toHaveBeenCalledTimes(1);
     renderer.dispose();
   });
 
-  it('keeps the procedural West Lake sand table after realistic assets replace other exhibits', async () => {
+  it('keeps the authored showroom visible while visual models load in the background', async () => {
     const renderer = new ExhibitionRenderer({ host, onExhibitSelect: vi.fn() });
 
     await vi.waitFor(() => expect(state.assetLoad).toHaveBeenCalledTimes(1));
     await vi.waitFor(() => {
-      const exhibits = state.sceneChildren.find((child) => child.name === 'exhibits') as
-        { children?: Array<{ name: string; visible?: boolean }> } | undefined;
-      const sandTable = exhibits?.children?.find(
-        (child) => child.name === 'west-lake-map-sand-table'
-      );
-      expect(sandTable).toBeDefined();
-      expect(sandTable?.visible).not.toBe(false);
+      const showroom = state.sceneChildren.find(
+        (child) => child.name === 'curated-six-zone-wuzhen-showroom'
+      ) as { visible?: boolean } | undefined;
+      expect(showroom).toBeDefined();
+      expect(showroom?.visible).not.toBe(false);
     });
 
     renderer.dispose();

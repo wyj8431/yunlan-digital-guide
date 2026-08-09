@@ -99,20 +99,21 @@ export function createMuseumCases(
     group.position.set(definition.x, 0, definition.z);
     const base = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.62, 1.75), materials.floor);
     base.position.y = 0.31;
-    base.castShadow = true;
-    base.receiveShadow = true;
+    base.castShadow = false;
+    base.receiveShadow = false;
     group.add(base);
 
     if (definition.glass) {
       const glassMaterial = new THREE.MeshPhysicalMaterial({
-        color: '#e8fff7',
+        color: '#d8eee5',
         transparent: true,
-        opacity: 0.24,
-        transmission: 0.9,
-        thickness: 0.018,
-        roughness: 0.06,
-        ior: 1.48,
-        side: THREE.DoubleSide
+        opacity: 0.16,
+        transmission: 0.18,
+        thickness: 0.01,
+        roughness: 0.16,
+        ior: 1.45,
+        depthWrite: false,
+        side: THREE.FrontSide
       });
       glassMaterials.push(glassMaterial);
       const glass = new THREE.Mesh(new THREE.BoxGeometry(2.45, 1.55, 1.42), glassMaterial);
@@ -122,9 +123,9 @@ export function createMuseumCases(
       glassMeshes.push(glass);
       group.add(glass);
       const trimMaterial = new THREE.MeshStandardMaterial({
-        color: '#171b19',
-        metalness: 0.76,
-        roughness: 0.24
+        color: '#6c8177',
+        metalness: 0.28,
+        roughness: 0.46
       });
       for (const x of [-1.24, 1.24]) {
         for (const z of [-0.72, 0.72]) {
@@ -157,25 +158,12 @@ export function createMuseumCases(
       group.add(caption);
     }
 
-    const contactShadow = new THREE.Mesh(
-      new THREE.PlaneGeometry(2.35, 1.38),
-      new THREE.ShadowMaterial({ color: '#111815', opacity: 0.28, transparent: true })
-    );
-    contactShadow.name = `${definition.name}-contact-shadow`;
-    contactShadow.position.y = 0.635;
-    contactShadow.rotation.x = -Math.PI / 2;
-    contactShadow.castShadow = false;
-    contactShadow.receiveShadow = true;
-    contactShadows.push(contactShadow);
-    group.add(contactShadow);
-
     const spot = new THREE.SpotLight('#fff0cf', 42, 9, Math.PI / 7, 0.42, 1.3) as IesSpotLight;
     spot.iesMap = null;
     spot.name = `${definition.name}-ies-spot`;
     spot.position.set(0, 4.15, 0.35);
     spot.target.position.set(0, 0.8, 0);
-    spot.castShadow = true;
-    spot.shadow.mapSize.set(profile.shadowMapSize, profile.shadowMapSize);
+    spot.castShadow = false;
     spot.userData.exhibitId = definition.exhibitId;
     group.add(spot, spot.target);
     iesLights.push(spot);

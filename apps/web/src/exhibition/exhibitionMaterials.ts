@@ -1,14 +1,14 @@
 import * as THREE from 'three';
 
 export const EXHIBITION_COLORS = {
-  wall: '#edf0e8',
+  wall: '#e8eee7',
   ceiling: '#f8f5ec',
-  floor: '#70877b',
-  darkGreen: '#173f35',
+  floor: '#9aa99e',
+  darkGreen: '#2d5b4d',
   mint: '#a9d8b8',
   gold: '#c5a35a',
   lake: '#73aeb2',
-  ink: '#253632',
+  ink: '#3b554a',
   white: '#f8faf5',
   foliage: '#5e9870',
   car: '#497c68'
@@ -19,7 +19,12 @@ export function createHallMaterials() {
     wall: new THREE.MeshStandardMaterial({ color: EXHIBITION_COLORS.wall, roughness: 0.84 }),
     ceiling: new THREE.MeshStandardMaterial({ color: EXHIBITION_COLORS.ceiling, roughness: 0.95 }),
     floor: new THREE.MeshStandardMaterial({ color: EXHIBITION_COLORS.floor, roughness: 0.9 }),
-    wood: new THREE.MeshStandardMaterial({ color: '#4c352a', roughness: 0.76 }),
+    wood: new THREE.MeshStandardMaterial({
+      color: '#a77c55',
+      emissive: '#4b3428',
+      emissiveIntensity: 0.08,
+      roughness: 0.68
+    }),
     lightTrim: new THREE.MeshStandardMaterial({
       color: EXHIBITION_COLORS.gold,
       emissive: EXHIBITION_COLORS.gold,
@@ -28,7 +33,9 @@ export function createHallMaterials() {
       metalness: 0.22
     }),
     metal: new THREE.MeshStandardMaterial({
-      color: EXHIBITION_COLORS.darkGreen,
+      color: '#789487',
+      emissive: '#47675a',
+      emissiveIntensity: 0.18,
       roughness: 0.58,
       metalness: 0.28
     }),

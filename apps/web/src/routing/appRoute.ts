@@ -41,7 +41,7 @@ function normalizePathname(pathname: string) {
   return pathname.replace(/\/+$/, '') || '/';
 }
 
-export function resolveAppRoute(pathname: string, _search = ''): AppRoute {
+export function resolveAppRoute(pathname: string): AppRoute {
   const normalizedPathname = normalizePathname(pathname);
 
   if (normalizedPathname === '/lab/lip-sync') {

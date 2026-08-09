@@ -1,5 +1,5 @@
 // 数字人客服主页，组合导游对话、数字人舞台和景区内容面板。
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { fetchScenicArea } from './api/guideApi';
 import { DigitalHumanStage } from './components/DigitalHumanStage';
 import { GuidePanel } from './components/GuidePanel';
@@ -35,7 +35,8 @@ export function App({
   const [speechDriver, setSpeechDriver] = useState<SpeechDriver>('browser');
   const chat = useGuideChat();
   const speech = useSpeechSynthesis();
-  const { speak, speaking } = speech;
+  const { speak, speaking, stop } = speech;
+  const lastSpokenAnswerRef = useRef('');
   const voice = useVoiceGuideSession({
     onFinalTranscript: (sessionId, text) => {
       chat.beginExternalQuestion(sessionId, text);
@@ -55,10 +56,26 @@ export function App({
   }, []);
 
   useEffect(() => {
-    if (chat.latestAnswer && speechDriver === 'browser') {
-      speak(chat.latestAnswer);
+    const answer = chat.latestAnswer.trim();
+
+    if (activeView !== 'explore' || speechDriver !== 'browser') {
+      stop();
+      if (answer) {
+        lastSpokenAnswerRef.current = answer;
+      }
+      return;
     }
-  }, [chat.latestAnswer, speak, speechDriver]);
+
+    if (!answer) {
+      lastSpokenAnswerRef.current = '';
+      return;
+    }
+
+    if (speechDriver === 'browser' && answer !== lastSpokenAnswerRef.current) {
+      lastSpokenAnswerRef.current = answer;
+      void speak(answer);
+    }
+  }, [activeView, chat.latestAnswer, speak, speechDriver, stop]);
 
   if (activeView === 'history') {
     return (
