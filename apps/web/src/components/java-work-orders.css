@@ -1,0 +1,324 @@
+.java-work-orders-page {
+  min-height: 100vh;
+  padding: 32px clamp(20px, 5vw, 72px) 72px;
+  color: #17231f;
+  background: #f3f6f4;
+}
+
+.java-work-orders-auth {
+  display: grid;
+  place-items: center;
+}
+.java-work-orders-header,
+.java-work-orders-grid,
+.java-work-orders-tabs {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+.java-work-orders-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: end;
+  border-bottom: 1px solid #c8c8bb;
+  padding-bottom: 24px;
+}
+.java-work-orders-header h1,
+.java-work-orders-login-panel h1 {
+  margin: 6px 0;
+  font-size: 44px;
+  letter-spacing: 0;
+}
+.java-work-orders-header p,
+.java-work-orders-login-panel p {
+  max-width: 620px;
+  color: #52645c;
+}
+.java-work-orders-kicker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #2b6d57;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+.java-work-orders-account {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #52645c;
+}
+.java-work-orders-account button,
+.java-work-orders-tabs button,
+.java-work-orders-panel button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid #315c4d;
+  border-radius: 4px;
+  padding: 9px 13px;
+  background: #315c4d;
+  color: white;
+  cursor: pointer;
+}
+.java-work-orders-account button {
+  background: transparent;
+  color: #315c4d;
+}
+.java-work-orders-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 18px 0;
+}
+.java-work-orders-tabs button {
+  background: transparent;
+  color: #315c4d;
+}
+.java-work-orders-tabs button.is-active {
+  background: #315c4d;
+  color: white;
+}
+.java-work-orders-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.75fr) minmax(0, 1.25fr);
+  gap: 18px;
+}
+.java-work-orders-panel {
+  border: 1px solid #d3ddd8;
+  background: #ffffff;
+  padding: 22px;
+  box-shadow: 0 8px 20px rgba(32, 52, 43, 0.05);
+}
+.java-work-orders-login-panel {
+  width: min(100%, 460px);
+}
+.java-work-orders-panel h2 {
+  margin: 0 0 17px;
+  font-size: 20px;
+}
+.java-work-orders-form {
+  display: grid;
+  gap: 14px;
+}
+.java-work-orders-form label {
+  display: grid;
+  gap: 6px;
+  color: #52645c;
+  font-size: 13px;
+  font-weight: 700;
+}
+.java-work-orders-form input,
+.java-work-orders-form textarea,
+.java-work-orders-panel select {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #c8d4cf;
+  border-radius: 3px;
+  padding: 11px;
+  background: white;
+  color: #17231f;
+  font: inherit;
+}
+.java-work-orders-form textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+.java-work-orders-panel select {
+  margin-bottom: 16px;
+}
+.java-work-orders-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.java-work-orders-section-heading button {
+  padding: 7px;
+}
+.java-work-orders-list {
+  display: grid;
+  gap: 10px;
+}
+.java-work-orders-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  border-top: 1px solid #e0e0d7;
+  padding: 15px 0;
+}
+.java-work-orders-item.is-selected {
+  margin: 0 -10px;
+  padding: 15px 10px;
+  background: #edf7ef;
+}
+.java-work-orders-item.is-unread {
+  border-left: 3px solid #2b6d57;
+  padding-left: 10px;
+}
+.java-work-orders-link {
+  display: inline;
+  border: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  color: #17231f !important;
+  text-align: left;
+}
+.java-work-orders-item p {
+  margin: 6px 0 0;
+  color: #52645c;
+}
+.java-work-orders-item-meta {
+  display: grid;
+  justify-items: end;
+  align-content: start;
+  gap: 8px;
+  color: #2b6d57;
+  white-space: normal;
+  text-align: right;
+}
+.java-work-orders-item-meta button {
+  font-size: 12px;
+  padding: 7px 9px;
+}
+.java-work-orders-item-meta small {
+  color: #52645c;
+}
+.java-work-orders-options {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+}
+.java-work-orders-options button {
+  justify-content: flex-start;
+  background: white;
+  color: #17231f;
+  border-color: #c8c8bb;
+}
+.java-work-orders-options button.is-selected {
+  border-color: #2b6d57;
+  background: #e4eee7;
+}
+.java-work-orders-options b {
+  min-width: 20px;
+}
+.java-work-orders-panel pre {
+  max-height: 420px;
+  overflow: auto;
+  padding: 14px;
+  background: #17231f;
+  color: #e4eee7;
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+.java-work-orders-actions {
+  display: flex;
+  gap: 8px;
+}
+.java-work-orders-actions button:last-child {
+  background: transparent;
+  color: #315c4d;
+}
+.java-work-orders-stat-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin: 0 0 4px;
+  color: #52645c;
+  font-size: 12px;
+}
+.java-work-orders-stat-strip strong {
+  color: #2b6d57;
+}
+.java-work-orders-comments {
+  display: grid;
+  gap: 9px;
+  max-height: 280px;
+  overflow: auto;
+  margin-bottom: 16px;
+}
+.java-work-orders-comments article {
+  border-left: 2px solid #b7d1c0;
+  padding-left: 10px;
+}
+.java-work-orders-comments p {
+  margin: 0 0 4px;
+  color: #17231f;
+}
+.java-work-orders-comments small,
+.java-work-orders-events small {
+  color: #52645c;
+}
+.java-work-orders-events {
+  display: grid;
+  gap: 6px;
+  margin-top: 20px;
+  border-top: 1px solid #e0e0d7;
+  padding-top: 14px;
+}
+.java-work-orders-events h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 3px;
+  font-size: 14px;
+}
+.java-work-orders-review-queue {
+  align-self: start;
+}
+.java-work-orders-review-item {
+  width: 100%;
+  display: grid !important;
+  justify-items: start !important;
+  gap: 5px;
+  border-color: #c8c8bb !important;
+  background: white !important;
+  color: #17231f !important;
+  text-align: left;
+}
+.java-work-orders-review-item span {
+  color: #52645c;
+  font-size: 12px;
+}
+.java-work-orders-review-item.is-selected {
+  border-color: #2b6d57 !important;
+  background: #e4eee7 !important;
+}
+.java-work-orders-error,
+.java-work-orders-notice {
+  max-width: 1180px;
+  margin: 0 auto 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid #dbad9f;
+  background: #fff5f1;
+  color: #9a3e2f;
+}
+.java-work-orders-notice {
+  border-color: #b7d1c0;
+  background: #edf7ef;
+  color: #2b6d57;
+}
+
+@media (max-width: 760px) {
+  .java-work-orders-header h1,
+  .java-work-orders-login-panel h1 {
+    font-size: 32px;
+  }
+  .java-work-orders-header,
+  .java-work-orders-item {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .java-work-orders-grid {
+    grid-template-columns: 1fr;
+  }
+  .java-work-orders-item-meta {
+    justify-items: start;
+    text-align: left;
+  }
+}

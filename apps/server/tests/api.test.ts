@@ -34,6 +34,50 @@ describe('server api', () => {
       });
   });
 
+  it('serves a controlled official-notice response for the Coze plugin', async () => {
+    const liveService = new ScenicLiveService({
+      feedUrl: 'https://official.example/wuzhen/live.json',
+      fetchImpl: vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          notices: ['Temporary evening-entry guidance'],
+          sourceUrl: 'https://official.example/wuzhen/notices',
+          updatedAt: '2026-08-11T10:00:00+08:00'
+        })
+      } as Response),
+      fallback: getScenicAreaSummary
+    });
+    const app = createApp({ scenicLiveService: liveService });
+
+    await request(app.callback())
+      .get('/api/coze/plugins/official-notices/wuzhen-scenic-area')
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          title: '乌镇景区 official notices',
+          content: 'Temporary evening-entry guidance',
+          sourceUrl: 'https://official.example/wuzhen/notices',
+          updatedAt: '2026-08-11T10:00:00+08:00',
+          status: 'live'
+        });
+      });
+  });
+
+  it('rejects unknown Coze plugin spot identifiers', async () => {
+    const app = createApp();
+
+    await request(app.callback())
+      .get('/api/coze/plugins/official-notices/unknown-spot')
+      .expect(404)
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          code: 'OFFICIAL_NOTICE_SPOT_NOT_FOUND',
+          message: 'Only the registered Wuzhen scenic-area identifier is available.'
+        });
+      });
+  });
+
   it('uses the same live scenic snapshot for the panel, retrieval, and chat', async () => {
     vi.stubEnv('LLM_PROVIDER', '');
     vi.stubEnv('LLM_BASE_URL', '');
@@ -105,6 +149,7 @@ describe('server api', () => {
       .expect(({ body }) => {
         expect(body.openapi).toBe('3.1.0');
         expect(body.paths).toHaveProperty('/api/guide/chat');
+        expect(body.paths).toHaveProperty('/api/coze/plugins/official-notices/{spotId}');
         expect(body.paths).toHaveProperty('/api/destinations');
         expect(body.paths).toHaveProperty('/api/voice');
         expect(body.paths).toHaveProperty('/api/videos');

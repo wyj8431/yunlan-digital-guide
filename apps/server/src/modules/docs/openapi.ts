@@ -36,6 +36,7 @@ export function createOpenApiDocument(serverUrl: string) {
       { name: 'System', description: '健康检查与接口文档' },
       { name: 'Scenic', description: '景区基础资料' },
       { name: 'Guide', description: '景区导游智能体问答与检索' },
+      { name: 'Coze Plugin', description: 'Coze 可调用的受控只读景区数据' },
       { name: 'Speech', description: '讯飞 ASR/TTS 兼容接口' },
       { name: 'Virtual Human', description: '讯飞虚拟人配置' },
       { name: 'Video', description: '示例视频、字幕和弹幕' },
@@ -110,9 +111,7 @@ export function createOpenApiDocument(serverUrl: string) {
         get: {
           tags: ['Exhibition'],
           summary: '获取单个展厅物件',
-          parameters: [
-            { name: 'itemId', in: 'path', required: true, schema: { type: 'string' } }
-          ],
+          parameters: [{ name: 'itemId', in: 'path', required: true, schema: { type: 'string' } }],
           responses: {
             '200': jsonResponse('展厅物件', {
               type: 'object',
@@ -129,6 +128,28 @@ export function createOpenApiDocument(serverUrl: string) {
           summary: '获取当前景区资料摘要',
           responses: {
             '200': jsonResponse('景区资料摘要', { $ref: '#/components/schemas/ScenicAreaSummary' })
+          }
+        }
+      },
+      '/api/coze/plugins/official-notices/{spotId}': {
+        get: {
+          tags: ['Coze Plugin'],
+          summary: '查询已登记景区的官方公告',
+          description:
+            '仅接受已登记的景区 ID；不接受任意提示词或 URL，也不会执行写入操作。适合配置为 Coze 的只读插件。',
+          parameters: [
+            {
+              name: 'spotId',
+              in: 'path',
+              required: true,
+              schema: { type: 'string', enum: ['wuzhen-scenic-area'] }
+            }
+          ],
+          responses: {
+            '200': jsonResponse('官方公告查询结果', {
+              $ref: '#/components/schemas/CozeOfficialNotice'
+            }),
+            '404': jsonResponse('未登记的景区 ID', errorSchema('OFFICIAL_NOTICE_SPOT_NOT_FOUND'))
           }
         }
       },
@@ -584,9 +605,20 @@ export function createOpenApiDocument(serverUrl: string) {
             status: { type: 'string', enum: ['live', 'stale', 'fallback', 'unconfigured'] },
             sourceName: { type: 'string' },
             sourceUrl: { type: 'string', format: 'uri' },
-            updatedAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string' },
             checkedAt: { type: 'string', format: 'date-time' },
             notices: { type: 'array', items: { type: 'string' } }
+          }
+        },
+        CozeOfficialNotice: {
+          type: 'object',
+          required: ['title', 'content', 'sourceUrl', 'updatedAt', 'status'],
+          properties: {
+            title: { type: 'string' },
+            content: { type: 'string' },
+            sourceUrl: { type: 'string', format: 'uri' },
+            updatedAt: { type: 'string', format: 'date-time' },
+            status: { type: 'string', enum: ['live', 'stale', 'fallback', 'unconfigured'] }
           }
         },
         ScenicAreaInfo: {
@@ -714,7 +746,21 @@ export function createOpenApiDocument(serverUrl: string) {
             retrievedKnowledge: {
               type: 'array',
               items: { $ref: '#/components/schemas/GuideKnowledgeResult' }
-            }
+            },
+            avatarDirective: { $ref: '#/components/schemas/GuideAvatarDirective' }
+          }
+        },
+        GuideAvatarDirective: {
+          type: 'object',
+          description:
+            'Validated optional directive for the currently enabled digital-human avatar.',
+          properties: {
+            emotion: { type: 'string', enum: ['neutral', 'warm', 'happy', 'thoughtful'] },
+            action: {
+              type: 'string',
+              description: 'Action ID from the virtual-human config catalog.'
+            },
+            scene: { type: 'string', maxLength: 48 }
           }
         },
         RouteCard: {

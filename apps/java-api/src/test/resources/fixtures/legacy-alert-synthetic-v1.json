@@ -1,0 +1,67 @@
+{
+  "provenance": "SYNTHETIC TEST DATA ONLY - not evidence of a historical Koa contract",
+  "target": {
+    "method": "POST",
+    "path": "/api/alerts/compat/v1",
+    "authentication": "Bearer JWT required"
+  },
+  "cases": [
+    {
+      "name": "accepts_warn_alias",
+      "request": {
+        "device_id": "synthetic-device-001",
+        "alert_type": "temperature",
+        "severity": "WARN",
+        "message": "Synthetic test: temperature threshold exceeded.",
+        "occurred_at": "2026-08-11T08:00:00Z"
+      },
+      "expected": {
+        "httpStatus": 202,
+        "status": "accepted",
+        "canonicalLevel": "WARNING"
+      }
+    },
+    {
+      "name": "accepts_critical",
+      "request": {
+        "device_id": "synthetic-device-002",
+        "alert_type": "power",
+        "severity": "CRITICAL",
+        "message": "Synthetic test: power input unavailable.",
+        "occurred_at": "2026-08-11T08:05:00Z"
+      },
+      "expected": {
+        "httpStatus": 202,
+        "status": "accepted",
+        "canonicalLevel": "CRITICAL"
+      }
+    },
+    {
+      "name": "rejects_unknown_severity",
+      "request": {
+        "device_id": "synthetic-device-003",
+        "alert_type": "humidity",
+        "severity": "LOW",
+        "message": "Synthetic test: unsupported severity.",
+        "occurred_at": "2026-08-11T08:10:00Z"
+      },
+      "expected": {
+        "httpStatus": 400,
+        "errorCode": "INVALID_ALERT_LEVEL"
+      }
+    },
+    {
+      "name": "rejects_missing_required_field",
+      "request": {
+        "device_id": "synthetic-device-004",
+        "severity": "INFO",
+        "message": "Synthetic test: missing alert type.",
+        "occurred_at": "2026-08-11T08:15:00Z"
+      },
+      "expected": {
+        "httpStatus": 400,
+        "errorCode": "VALIDATION_FAILED"
+      }
+    }
+  ]
+}

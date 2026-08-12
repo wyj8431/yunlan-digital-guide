@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { mkdir, writeFile } from 'node:fs/promises';
 import zlib from 'node:zlib';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
-import { chromium } from 'playwright';
+import { chromium, firefox, webkit } from 'playwright';
 import { describe, it } from 'vitest';
 
 const MODE = process.env.PHASE3A_BROWSER_MODE ?? 'smoke';
@@ -14,6 +15,9 @@ const TARGET_ORIGIN = new URL(TARGET_URL).origin;
 const WEB_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const NPM_COMMAND = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const EDGE_EXECUTABLE_PATH = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
+const BENCHMARK_OUTPUT = process.env.PHASE3A_BENCHMARK_OUTPUT;
+const BROWSER_NAME = (process.env.PHASE3A_BROWSER ?? 'chromium').toLowerCase();
+const BROWSER_TYPES = { chromium, firefox, webkit };
 
 async function waitForServer(url, timeoutMs = 120000) {
   const startedAt = Date.now();
@@ -60,14 +64,14 @@ async function withDevServer(run) {
 }
 
 function browserLaunchOptions() {
-  if (process.env.PHASE3A_BROWSER_EXECUTABLE) {
+  if (BROWSER_NAME === 'chromium' && process.env.PHASE3A_BROWSER_EXECUTABLE) {
     return {
       executablePath: process.env.PHASE3A_BROWSER_EXECUTABLE,
       headless: true
     };
   }
 
-  if (process.platform === 'win32') {
+  if (BROWSER_NAME === 'chromium' && process.platform === 'win32') {
     return {
       executablePath: EDGE_EXECUTABLE_PATH,
       headless: true
@@ -351,12 +355,47 @@ async function benchmarkCheck(page) {
   );
   await assertRouteCleanup(page);
 
-  console.log(JSON.stringify({ results, stability }, null, 2));
+  const report = {
+    generatedAt: new Date().toISOString(),
+    browser: BROWSER_NAME,
+    criteria: {
+      desktopAverageFps: 55,
+      mobileAverageFps: 30,
+      mouthResponseMs: 200,
+      stabilityDurationMs: 600000
+    },
+    results,
+    stability,
+    checks: {
+      desktopAverageFps: results
+        .filter((result) => result.label.startsWith('desktop-'))
+        .every((result) => result.averageFps >= 55),
+      mobileAverageFps: results
+        .filter((result) => result.label.startsWith('mobile-'))
+        .every((result) => result.averageFps >= 30),
+      mouthResponseMs: [...results, stability].every((result) => result.responseLatencyMs <= 200),
+      stabilityCompleted: stability.mouthOpen < 0.01
+    }
+  };
+
+  if (BENCHMARK_OUTPUT) {
+    await mkdir(path.dirname(BENCHMARK_OUTPUT), { recursive: true });
+    await writeFile(BENCHMARK_OUTPUT, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+  }
+
+  assert.ok(report.checks.desktopAverageFps, 'desktop average FPS must remain at or above 55');
+  assert.ok(report.checks.mobileAverageFps, 'mobile average FPS must remain at or above 30');
+  assert.ok(report.checks.mouthResponseMs, 'mouth response must occur within 200 ms');
+  assert.ok(report.checks.stabilityCompleted, 'mouth must close after the stability run');
+  console.log(JSON.stringify(report, null, 2));
 }
 
 async function runBrowserAcceptance() {
+  const browserType = BROWSER_TYPES[BROWSER_NAME];
+  assert.ok(browserType, `Unsupported PHASE3A_BROWSER: ${BROWSER_NAME}`);
+
   await withDevServer(async () => {
-    const browser = await chromium.launch(browserLaunchOptions());
+    const browser = await browserType.launch(browserLaunchOptions());
     const page = await browser.newPage();
 
     try {

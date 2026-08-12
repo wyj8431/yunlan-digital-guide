@@ -16,6 +16,13 @@
     "format": "prettier . --write",
     "typecheck": "npm --workspaces run typecheck",
     "test": "npm --workspaces run test",
+    "check:work-orders": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-work-orders.ps1",
+    "check:work-orders:e2e": "npm --workspace apps/web run test:e2e:work-orders",
+    "check:work-orders:e2e:negative": "npm --workspace apps/web run test:e2e:work-orders:negative",
+    "load:work-orders": "node tools/work-orders-load-test.mjs",
+    "summarize:work-orders-load": "node tools/summarize-work-orders-load.mjs",
+    "evaluate:learning-golden": "node tools/evaluate-learning-golden-cases.mjs",
+    "test:learning-golden-evaluator": "node --test tools/evaluate-learning-golden-cases.test.mjs",
     "openspec:validate": "npx --yes @fission-ai/openspec@1.8.0 validate --all --no-interactive",
     "review:skills": "node tools/validate-code-review-skills.mjs",
     "prepare": "husky"

@@ -9,7 +9,9 @@
     "start": "node dist/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "eval:guide": "tsx src/scripts/evaluate-guide.ts"
+    "eval:guide": "tsx src/scripts/evaluate-guide.ts",
+    "eval:coze-platform": "tsx src/scripts/evaluate-coze-platform.ts",
+    "serve:coze-plugin": "tsx src/scripts/serve-coze-plugin.ts"
   },
   "dependencies": {
     "@koa/cors": "^5.0.0",

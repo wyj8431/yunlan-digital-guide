@@ -1,9 +1,13 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { LipSyncLab } from '../src/lab/lip-sync/LipSyncLab';
 
 vi.mock('../src/lab/lip-sync/components/LipSyncStage', () => ({
   LipSyncStage: () => <section aria-label="本地 3D 数字人口型预览" />
+}));
+
+vi.mock('../src/lab/lip-sync/components/XfyunLabStage', () => ({
+  XfyunLabStage: () => <section aria-label="xfyun-online-avatar-preview" />
 }));
 
 describe('LipSyncLab', () => {
@@ -29,5 +33,18 @@ describe('LipSyncLab', () => {
     expect(screen.getByRole('status', { name: '播放状态' })).toBeInTheDocument();
     expect(screen.getByRole('status', { name: '性能指标' })).toBeInTheDocument();
     expect(container.querySelector('.lip-sync-panel .lip-sync-panel')).not.toBeInTheDocument();
+  });
+
+  it('switches to the XFYUN online avatar without rendering local audio controls', () => {
+    const { container } = render(<LipSyncLab />);
+    const scope = within(container);
+
+    fireEvent.click(scope.getByRole('button', { name: '讯飞在线模型' }));
+
+    expect(scope.getByLabelText('xfyun-online-avatar-preview')).toBeInTheDocument();
+    expect(
+      scope.getByText('讯飞 VMS 负责形象渲染、语音播放和口型。该模式不会同时播放本地音频。')
+    ).toBeInTheDocument();
+    expect(scope.queryByRole('button', { name: '播放' })).not.toBeInTheDocument();
   });
 });

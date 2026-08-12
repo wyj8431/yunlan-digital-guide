@@ -8,9 +8,12 @@ import {
 
 const env = {
   ...readEnv(),
+  llmProvider: '',
   llmBaseUrl: '',
   llmApiKey: '',
-  llmModel: ''
+  llmModel: '',
+  cozeApiToken: '',
+  cozeBotId: ''
 };
 
 const summary = await runGoldenEvaluation(offlineDetailedGoldenCases, async (message) => {

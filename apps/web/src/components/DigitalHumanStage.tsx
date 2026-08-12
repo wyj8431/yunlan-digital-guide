@@ -3,6 +3,7 @@ import { AudioLines, ChevronDown, Map, Mic2, PersonStanding, RefreshCw, Route } 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { useXfyunVirtualHuman } from '../hooks/useXfyunVirtualHuman';
+import { live2DConfig } from '../lib/live2dConfig';
 import { QUALITY_PROFILES } from '../lab/lip-sync/performance/qualityController';
 import {
   createMouthMorphController,
@@ -13,8 +14,9 @@ import { nextMouthSignal } from '../lab/lip-sync/audio/mouthSignal';
 import { sampleGuideAudioAnalysis } from '../lib/guideAudioAnalysis';
 import { disposeObject3D } from '../lib/three/disposeObject3D';
 import { GUIDE_SPEECH_PLAYBACK_EVENT, isGuideSpeechPlaybackEvent } from '../lib/guideSpeechSync';
-import type { GuideSpeechTimeline } from '../types/guide';
+import type { GuideAvatarDirective, GuideSpeechTimeline } from '../types/guide';
 import type { SpeechDriver } from '../types/virtualHuman';
+import { Live2DStage } from './Live2DStage';
 
 // 数字人舞台在在线视频流与本地 Three.js 模型之间提供无缝降级。
 
@@ -45,6 +47,7 @@ type DigitalHumanStageProps = {
   speaking: boolean;
   answerText?: string;
   speechTimeline?: GuideSpeechTimeline | null;
+  avatarDirective?: GuideAvatarDirective | null;
   onSpeechDriverChange?: (driver: SpeechDriver) => void;
   onNavigate?: (view: 'narration' | 'map' | 'itinerary' | 'voice') => void;
 };
@@ -88,6 +91,7 @@ export function DigitalHumanStage({
   speaking,
   answerText,
   speechTimeline,
+  avatarDirective,
   onSpeechDriverChange,
   onNavigate
 }: DigitalHumanStageProps) {
@@ -100,6 +104,9 @@ export function DigitalHumanStage({
   const effectiveSpeaking = virtualHuman.speaking || speaking;
   const onlineHumanPending = virtualHuman.status === 'loading';
   const onlineHumanUnavailable = virtualHuman.status === 'error' && virtualHuman.config?.enabled;
+  const [live2DState, setLive2DState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const shouldRenderLive2D =
+    live2DConfig !== null && live2DState !== 'error' && !virtualHuman.active && !onlineHumanPending;
   const speakingRef = useRef(effectiveSpeaking);
   const speechTimelineRef = useRef<GuideSpeechTimeline | null>(null);
   const speechTimelineStartedAtRef = useRef<number | null>(null);
@@ -108,6 +115,7 @@ export function DigitalHumanStage({
   const [selectedActionId, setSelectedActionId] = useState(FALLBACK_ACTIONS[0].id);
   const [actionMessage, setActionMessage] = useState('');
   const [wakeHintVisible, setWakeHintVisible] = useState(true);
+  const appliedDirectiveRef = useRef<string | null>(null);
   const actionOptions =
     virtualHuman.config?.enabled && virtualHuman.config.actions.length > 0
       ? virtualHuman.config.actions
@@ -134,6 +142,43 @@ export function DigitalHumanStage({
   useEffect(() => {
     speakingRef.current = effectiveSpeaking;
   }, [effectiveSpeaking]);
+
+  useEffect(() => {
+    if (!avatarDirective || !virtualHuman.active || virtualHuman.acting) {
+      return;
+    }
+
+    const emotionAction = {
+      warm: 'A_RLH_welcome_O',
+      happy: 'A_RH_good_O',
+      thoughtful: 'A_H_listen_C'
+    } as const;
+    const actionId =
+      avatarDirective.action ??
+      (avatarDirective.emotion && avatarDirective.emotion !== 'neutral'
+        ? emotionAction[avatarDirective.emotion]
+        : undefined);
+    if (!actionId || !actionOptions.some((action) => action.id === actionId)) {
+      return;
+    }
+
+    const signature = JSON.stringify(avatarDirective);
+    if (appliedDirectiveRef.current === signature) {
+      return;
+    }
+    appliedDirectiveRef.current = signature;
+    setSelectedActionId(actionId);
+
+    void virtualHuman.triggerAction(actionId).catch(() => {
+      // The text answer remains available when an online provider rejects an action.
+    });
+  }, [
+    actionOptions,
+    avatarDirective,
+    virtualHuman.active,
+    virtualHuman.acting,
+    virtualHuman.triggerAction
+  ]);
 
   useEffect(() => {
     speechTimelineRef.current = speechTimeline ?? null;
@@ -167,6 +212,10 @@ export function DigitalHumanStage({
   }, []);
 
   useEffect(() => {
+    if (shouldRenderLive2D) {
+      return;
+    }
+
     const host = hostRef.current;
 
     if (!host) {
@@ -396,7 +445,7 @@ export function DigitalHumanStage({
       disposeObject3D(scene);
       renderer.dispose();
     };
-  }, []);
+  }, [shouldRenderLive2D]);
 
   async function handleActionSelect(actionId: string) {
     const action = actionOptions.find((item) => item.id === actionId);
@@ -451,7 +500,11 @@ export function DigitalHumanStage({
         <div className="xfyun-stream-host" aria-label="线上数字人画面">
           <div id={XFYUN_STREAM_DOM_ID} className="online-stream-mount" />
         </div>
-        <div ref={hostRef} className="model-host" />
+        {shouldRenderLive2D ? (
+          <Live2DStage speaking={effectiveSpeaking} onStatusChange={setLive2DState} />
+        ) : (
+          <div ref={hostRef} className="model-host" />
+        )}
         {shouldShowWakeButton ? (
           <button type="button" className="avatar-wake-button" onClick={handleWakeAvatar}>
             <PersonStanding size={18} aria-hidden="true" />
@@ -464,11 +517,15 @@ export function DigitalHumanStage({
               ? onlineHumanName
               : onlineHumanPending || onlineHumanUnavailable
                 ? onlineHumanName
-                : modelState === 'ready'
-                  ? '3D 数字人模型'
-                  : modelState === 'error'
-                    ? '模型加载失败'
-                    : '正在加载3D数字人'}
+                : shouldRenderLive2D
+                  ? live2DState === 'ready'
+                    ? 'Live2D digital human'
+                    : 'Loading Live2D digital human'
+                  : modelState === 'ready'
+                    ? '3D 数字人模型'
+                    : modelState === 'error'
+                      ? '模型加载失败'
+                      : '正在加载3D数字人'}
           </span>
           <strong>
             {onlineHumanPending

@@ -7,7 +7,9 @@
     "dev": "vite --host 0.0.0.0",
     "build": "npm run typecheck && vite build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:e2e:work-orders": "node tests/work-orders.e2e.mjs",
+    "test:e2e:work-orders:negative": "node tests/work-orders-negative.e2e.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",
@@ -15,6 +17,8 @@
     "@reduxjs/toolkit": "^2.12.0",
     "@vitejs/plugin-react": "^4.6.0",
     "lucide-react": "^1.25.0",
+    "pixi-live2d-display": "^0.3.1",
+    "pixi.js": "^5.3.12",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-markdown": "^10.1.0",

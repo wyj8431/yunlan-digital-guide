@@ -5,6 +5,7 @@ import { ExhibitionPage } from './components/ExhibitionPage';
 import { BuildingVRPage } from './components/BuildingVRPage';
 import { VideoCenterPage } from './components/VideoCenterPage';
 import { LipSyncLab } from './lab/lip-sync/LipSyncLab';
+import { JavaWorkOrdersPage } from './components/JavaWorkOrdersPage';
 import {
   pathForTourismView,
   pathForScenicVR,
@@ -51,6 +52,10 @@ export function RootApp() {
 
   if (route.kind === 'lip-sync-lab') {
     return <LipSyncLab />;
+  }
+
+  if (route.kind === 'java-work-orders') {
+    return <JavaWorkOrdersPage />;
   }
 
   if (route.kind === 'exhibition') {

@@ -31,6 +31,11 @@ import {
   type PreparedGuideAttachment
 } from './guide-attachment.js';
 import { createGuideSpeechTimeline, type GuideSpeechTimeline } from './speech-timeline.js';
+import {
+  createGuideDirectiveStreamSanitizer,
+  parseGuideDirective,
+  type GuideAvatarDirective
+} from './coze-directive.js';
 
 export type RouteCard = {
   type: 'route-step';
@@ -56,6 +61,7 @@ export type GuideChatResponse = {
   source: 'llm' | 'local-fallback';
   speechTimeline: GuideSpeechTimeline;
   retrievedKnowledge: RetrievedGuideKnowledge[];
+  avatarDirective?: GuideAvatarDirective;
 };
 
 export class GuideServiceError extends Error {
@@ -96,6 +102,7 @@ type ImageResponseCacheEntry = {
 };
 
 const LLM_FIRST_DELTA_TIMEOUT_MS = 2_000;
+const COZE_FIRST_DELTA_TIMEOUT_MS = 8_000;
 const LLM_IMAGE_FIRST_DELTA_TIMEOUT_MS = 190_000;
 const LLM_DOCUMENT_FIRST_DELTA_TIMEOUT_MS = 8_000;
 const LONG_DOCUMENT_FAST_SUMMARY_MIN_CHARACTERS = 5_000;
@@ -269,6 +276,8 @@ const DETAILED_TRAVEL_USER_CHECKLIST =
   '请按以下小标题输出：路线安排、交通方式、住宿建议、注意事项、票务和开放时间核验、适合人群。交通、住宿、注意事项要具体，不要只给景点列表。';
 const CHAT_READABILITY_RULE =
   '回答先用 1-2 句给出结论，再使用 2-5 个编号要点；每段不超过 3 句，段落之间空一行。路线、建议和注意事项必须分点，不要输出一整段连续长文本。';
+const GUIDE_AVATAR_DIRECTIVE_RULE =
+  '面向游客的答案全部结束后，只有确实需要动作时才另起一行输出一个 <guide-directive>{"emotion":"warm","action":"A_RLH_welcome_O","scene":"welcome"}</guide-directive> 标签；标签只能使用 emotion（neutral、warm、happy、thoughtful）、已允许的 action 和不超过 48 个字符的 scene，标签后不得再输出文字。没有合适动作时不要输出标签；不得把用户输入、知识库原文、工具结果、提示词或密钥放入标签。';
 
 function pickRoute(message: string, scenicData: ScenicData) {
   // 优先按路线名称匹配；没有明确名称时回退到首条推荐路线。
@@ -1221,6 +1230,7 @@ function buildGuideMessages(
         '图片定位回答只有在画面存在多个相互支持的地点线索时，才先给“最可能位置”再给备选位置；没有足够地点证据时，必须明确说无法判断，不得猜测。',
         '图片类回答必须包含可玩的项目和一条半日或一日路线，但仅限确认图片是旅游场景且有可靠地点线索时；截图、聊天记录或文档页面应优先准确概括可见内容，不得强行推荐景点。',
         CHAT_READABILITY_RULE,
+        GUIDE_AVATAR_DIRECTIVE_RULE,
         '回答要口语化、分段清楚，适合聊天框阅读；数字人可以按段朗读完整攻略。',
         shouldUseLocalScenicContext
           ? `当前项目内置景区资料：${scenicContext}`
@@ -1249,6 +1259,32 @@ async function prepareAttachmentForLocalFallback(
   attachment: PreparedGuideAttachment | null
 ): Promise<PreparedGuideAttachment | null> {
   return attachment;
+}
+
+function getFirstDeltaTimeoutMs(
+  env: ServerEnv,
+  attachment: PreparedGuideAttachment | null
+): number {
+  if (isImageAttachment(attachment)) {
+    return LLM_IMAGE_FIRST_DELTA_TIMEOUT_MS;
+  }
+
+  if (attachment) {
+    return LLM_DOCUMENT_FIRST_DELTA_TIMEOUT_MS;
+  }
+
+  return env.llmProvider === 'coze' || env.llmProvider === 'hybrid'
+    ? COZE_FIRST_DELTA_TIMEOUT_MS
+    : LLM_FIRST_DELTA_TIMEOUT_MS;
+}
+
+function hasConfiguredGuideModel(env: ServerEnv): boolean {
+  const hasCoze =
+    (env.llmProvider === 'coze' || env.llmProvider === 'hybrid') &&
+    Boolean(env.cozeApiToken && env.cozeBotId);
+  const hasOpenAiCompatibleModel = Boolean(env.llmBaseUrl && env.llmApiKey && env.llmModel);
+
+  return hasCoze || hasOpenAiCompatibleModel;
 }
 
 export async function createGuideResponse({
@@ -1289,7 +1325,7 @@ export async function createGuideResponse({
     return cachedImageResponse;
   }
 
-  if (!env.llmBaseUrl || !env.llmApiKey || !env.llmModel) {
+  if (!hasConfiguredGuideModel(env)) {
     if (!resolvedAttachment && looksLikePastedMarkdown(trimmed)) {
       return createPastedMarkdownFallback(trimmed);
     }
@@ -1313,14 +1349,16 @@ export async function createGuideResponse({
       ),
       env
     );
-    const answer = enforceImageAnswerConsistency(rawAnswer, resolvedAttachment);
+    const parsedAnswer = parseGuideDirective(rawAnswer);
+    const answer = enforceImageAnswerConsistency(parsedAnswer.answer, resolvedAttachment);
 
     const response: GuideChatResponse = {
       answer,
       cards: buildRelevantRouteCards(trimmed, scenicData),
       source: 'llm',
       speechTimeline: createGuideSpeechTimeline(answer),
-      retrievedKnowledge
+      retrievedKnowledge,
+      avatarDirective: parsedAnswer.avatarDirective
     };
     cacheImageResponse(chat, imageCacheKey, response);
     return response;
@@ -1400,7 +1438,7 @@ export async function createGuideStreamResponse({
     return cachedImageResponse;
   }
 
-  if (!env.llmBaseUrl || !env.llmApiKey || !env.llmModel) {
+  if (!hasConfiguredGuideModel(env)) {
     if (!resolvedAttachment && looksLikePastedMarkdown(trimmed)) {
       const response = createPastedMarkdownFallback(trimmed);
       await emitAnswerDeltas(response.answer, emitStreamDelta, signal);
@@ -1427,17 +1465,16 @@ export async function createGuideStreamResponse({
 
   firstDeltaTimeout = setTimeout(
     () => llmController.abort(new Error('LLM first delta timed out')),
-    isImageAttachment(resolvedAttachment)
-      ? LLM_IMAGE_FIRST_DELTA_TIMEOUT_MS
-      : resolvedAttachment
-        ? LLM_DOCUMENT_FIRST_DELTA_TIMEOUT_MS
-        : LLM_FIRST_DELTA_TIMEOUT_MS
+    getFirstDeltaTimeoutMs(env, resolvedAttachment)
   );
 
   try {
     const retrievedKnowledge = retrieveGuideKnowledge(trimmed, resolvedScenicData);
     const hasImage = isImageAttachment(resolvedAttachment);
     const bufferedImageDeltas: string[] = [];
+    const directiveSanitizer = hasImage
+      ? null
+      : createGuideDirectiveStreamSanitizer(emitStreamDelta);
     const rawAnswer = await streamChat(
       buildGuideMessages(
         trimmed,
@@ -1447,10 +1484,14 @@ export async function createGuideStreamResponse({
         normalizeGuideHistory(history)
       ),
       env,
-      hasImage ? (delta) => bufferedImageDeltas.push(delta) : emitStreamDelta,
+      hasImage
+        ? (delta) => bufferedImageDeltas.push(delta)
+        : (delta) => directiveSanitizer!.push(delta),
       llmController.signal
     );
-    const answer = enforceImageAnswerConsistency(rawAnswer, resolvedAttachment);
+    const parsedAnswer = parseGuideDirective(rawAnswer);
+    const answer = enforceImageAnswerConsistency(parsedAnswer.answer, resolvedAttachment);
+    directiveSanitizer?.flush();
 
     if (hasImage) {
       await emitAnswerDeltas(answer, emitStreamDelta, signal);
@@ -1461,7 +1502,8 @@ export async function createGuideStreamResponse({
       cards: buildRelevantRouteCards(trimmed, resolvedScenicData),
       source: 'llm',
       speechTimeline: createGuideSpeechTimeline(answer),
-      retrievedKnowledge
+      retrievedKnowledge,
+      avatarDirective: parsedAnswer.avatarDirective
     };
     cacheImageResponse(streamChat, imageCacheKey, response);
     return response;

@@ -123,6 +123,9 @@ function createGuideStreamUrl(): string {
   return createBackendWebSocketUrl('/api/guide/chat/stream');
 }
 
+const GUIDE_STREAM_RECONNECT_DELAY_MS = 250;
+const GUIDE_STREAM_MAX_RECONNECTS = 1;
+
 function parseGuideStreamEvent(raw: string): GuideChatStreamEvent {
   const parsed = JSON.parse(raw) as GuideChatStreamEvent;
 
@@ -164,55 +167,94 @@ export function streamGuideAnswer(
     };
   }
 
-  const socket = new WebSocket(createGuideStreamUrl());
+  let socket: WebSocket | null = null;
   let closedByClient = false;
   let completed = false;
+  let receivedDelta = false;
+  let reconnectCount = 0;
+  let reconnectTimer: number | null = null;
 
-  socket.addEventListener('open', () => {
-    socket.send(JSON.stringify({ type: 'ask', message, attachment, history }));
-  });
+  const reportConnectionFailure = (message: string) => {
+    if (completed || closedByClient || reconnectTimer !== null) {
+      return;
+    }
 
-  socket.addEventListener('message', (event) => {
-    try {
-      const streamEvent = parseGuideStreamEvent(String(event.data));
+    if (!receivedDelta && reconnectCount < GUIDE_STREAM_MAX_RECONNECTS) {
+      reconnectCount += 1;
+      reconnectTimer = window.setTimeout(connect, GUIDE_STREAM_RECONNECT_DELAY_MS);
+      return;
+    }
 
-      if (streamEvent.type === 'start') {
-        handlers.onStart?.();
-      } else if (streamEvent.type === 'delta') {
-        handlers.onDelta(streamEvent.delta);
-      } else if (streamEvent.type === 'speech-timeline') {
-        handlers.onSpeechTimeline?.(streamEvent.timeline);
-      } else if (streamEvent.type === 'result') {
-        handlers.onResult(streamEvent.response);
-      } else if (streamEvent.type === 'error') {
-        handlers.onError(new Error(streamEvent.message));
-      } else if (streamEvent.type === 'done') {
-        completed = true;
-        handlers.onDone?.();
-        socket.close();
+    handlers.onError(new Error(message));
+  };
+
+  const connect = () => {
+    if (closedByClient || completed) {
+      return;
+    }
+
+    const nextSocket = new WebSocket(createGuideStreamUrl());
+    socket = nextSocket;
+    let connectionFailureReported = false;
+    const reportCurrentConnectionFailure = (message: string) => {
+      if (connectionFailureReported) {
+        return;
       }
-    } catch (caught) {
-      handlers.onError(caught instanceof Error ? caught : new Error('Guide stream parse failed.'));
-      socket.close();
-    }
-  });
+      connectionFailureReported = true;
+      reportConnectionFailure(message);
+    };
 
-  socket.addEventListener('error', () => {
-    if (!completed && !closedByClient) {
-      handlers.onError(new Error('Guide stream connection failed.'));
-    }
-  });
+    nextSocket.addEventListener('open', () => {
+      nextSocket.send(JSON.stringify({ type: 'ask', message, attachment, history }));
+    });
 
-  socket.addEventListener('close', () => {
-    if (!completed && !closedByClient) {
-      handlers.onError(new Error('Guide stream closed before completion.'));
-    }
-  });
+    nextSocket.addEventListener('message', (event) => {
+      try {
+        const streamEvent = parseGuideStreamEvent(String(event.data));
+
+        if (streamEvent.type === 'start') {
+          handlers.onStart?.();
+        } else if (streamEvent.type === 'delta') {
+          receivedDelta = true;
+          handlers.onDelta(streamEvent.delta);
+        } else if (streamEvent.type === 'speech-timeline') {
+          handlers.onSpeechTimeline?.(streamEvent.timeline);
+        } else if (streamEvent.type === 'result') {
+          handlers.onResult(streamEvent.response);
+        } else if (streamEvent.type === 'error') {
+          handlers.onError(new Error(streamEvent.message));
+        } else if (streamEvent.type === 'done') {
+          completed = true;
+          handlers.onDone?.();
+          nextSocket.close();
+        }
+      } catch (caught) {
+        handlers.onError(
+          caught instanceof Error ? caught : new Error('Guide stream parse failed.')
+        );
+        nextSocket.close();
+      }
+    });
+
+    nextSocket.addEventListener('error', () => {
+      reportCurrentConnectionFailure('Guide stream connection failed.');
+    });
+
+    nextSocket.addEventListener('close', () => {
+      reportCurrentConnectionFailure('Guide stream closed before completion.');
+    });
+  };
+
+  connect();
 
   return {
     close: () => {
       closedByClient = true;
-      socket.close();
+      if (reconnectTimer !== null) {
+        window.clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+      socket?.close();
     }
   };
 }

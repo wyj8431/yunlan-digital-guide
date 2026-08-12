@@ -12,4 +12,4 @@
 - [x] Run the 60-second desktop/mobile and 10-minute GPU stability benchmark.
 - [x] Record the supplied Figma workspace reference in the work-order record.
 - [x] Record the supplied NotebookLM analysis link in the work-order record.
-- [ ] Validate the three review commands inside Cursor.
+- [x] Validate the three review commands inside Cursor.

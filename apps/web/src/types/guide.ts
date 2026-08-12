@@ -73,12 +73,21 @@ export type GuideSpeechTimeline = {
   source: 'estimated';
 };
 
+export type GuideAvatarEmotion = 'neutral' | 'warm' | 'happy' | 'thoughtful';
+
+export type GuideAvatarDirective = {
+  emotion?: GuideAvatarEmotion;
+  action?: string;
+  scene?: string;
+};
+
 export type GuideChatResponse = {
   answer: string;
   cards: RouteCard[];
   source: 'llm' | 'local-fallback';
   speechTimeline: GuideSpeechTimeline;
   retrievedKnowledge: GuideKnowledgeResult[];
+  avatarDirective?: GuideAvatarDirective;
 };
 
 export type GuideAttachmentKind =

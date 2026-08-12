@@ -169,6 +169,7 @@ export function App({
           speaking={speaking || chat.loading}
           answerText={chat.latestAnswer}
           speechTimeline={chat.speechTimeline}
+          avatarDirective={chat.avatarDirective}
           onSpeechDriverChange={setSpeechDriver}
           onNavigate={onNavigate}
         />

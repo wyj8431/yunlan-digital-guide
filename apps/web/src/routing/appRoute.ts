@@ -12,6 +12,7 @@ export type TourismView =
 
 export type AppRoute =
   | { kind: 'lip-sync-lab' }
+  | { kind: 'java-work-orders' }
   | { kind: 'tourism'; view: TourismView }
   | { kind: 'exhibition' }
   | { kind: 'videos' }
@@ -46,6 +47,10 @@ export function resolveAppRoute(pathname: string): AppRoute {
 
   if (normalizedPathname === '/lab/lip-sync') {
     return { kind: 'lip-sync-lab' };
+  }
+
+  if (normalizedPathname === '/work-orders') {
+    return { kind: 'java-work-orders' };
   }
 
   if (normalizedPathname === '/exhibition') {

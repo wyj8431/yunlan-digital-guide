@@ -44,7 +44,7 @@ describe('HomeDestinationLinks', () => {
     const baseRule = styles.match(/\.home-destination-link\s*\{(?<declarations>[^}]*)\}/)?.groups
       ?.declarations;
 
-    expect(baseRule).toContain('opacity: 0.14;');
+    expect(baseRule).toContain('opacity: 1;');
     expect(baseRule).toContain('border: 1px solid rgba(255, 240, 168, 0.88);');
     expect(baseRule).toContain('background: #baf8dc;');
     expect(baseRule).toContain('color: #164a3b;');

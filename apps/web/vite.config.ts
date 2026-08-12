@@ -6,6 +6,18 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      '/api/platform': {
+        target: 'http://localhost:8080'
+      },
+      '/api/tickets': {
+        target: 'http://localhost:8080'
+      },
+      '/api/learning': {
+        target: 'http://localhost:8080'
+      },
+      '/api/alerts': {
+        target: 'http://localhost:8080'
+      },
       '/api': {
         target: 'http://localhost:8787',
         ws: true

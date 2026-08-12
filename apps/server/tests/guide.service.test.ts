@@ -57,6 +57,25 @@ describe('guide service', () => {
     expect(chat).toHaveBeenCalledTimes(1);
   });
 
+  it('uses Coze when the OpenAI-compatible fallback is not configured', async () => {
+    const chat = vi.fn().mockResolvedValue('Coze guide answer');
+
+    const response = await createGuideResponse({
+      message: 'route',
+      env: {
+        ...env,
+        llmProvider: 'hybrid',
+        cozeApiToken: 'test-token',
+        cozeBotId: 'test-bot'
+      },
+      chat
+    });
+
+    expect(chat).toHaveBeenCalledTimes(1);
+    expect(chat.mock.calls[0][0][0].content).toContain('<guide-directive>');
+    expect(response).toMatchObject({ answer: 'Coze guide answer', source: 'llm' });
+  });
+
   it('falls back to family route cards when the question is about children', async () => {
     const response = await createGuideResponse({
       message: '带孩子游览乌镇怎么安排？',
@@ -819,6 +838,37 @@ describe('guide service', () => {
       expect(response.answer).toContain('木心美术馆');
       expect(response.answer).toContain('\n\n1.');
       expect(deltas.join('')).toBe(response.answer);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('allows Coze hybrid streams to wait for their longer first response', async () => {
+    vi.useFakeTimers();
+    const deltas: string[] = [];
+    const streamChat = vi.fn(
+      (_messages, _env, onDelta: (delta: string) => void) =>
+        new Promise<string>((resolve) => {
+          setTimeout(() => {
+            onDelta('Coze answer');
+            resolve('Coze answer');
+          }, 5_000);
+        })
+    );
+
+    try {
+      const pending = createGuideStreamResponse({
+        message: 'route',
+        env: { ...llmEnv, llmProvider: 'hybrid' },
+        streamChat,
+        onDelta: (delta) => deltas.push(delta)
+      });
+
+      await vi.advanceTimersByTimeAsync(5_000);
+      const response = await pending;
+
+      expect(response).toMatchObject({ answer: 'Coze answer', source: 'llm' });
+      expect(deltas.join('')).toBe('Coze answer');
     } finally {
       vi.useRealTimers();
     }

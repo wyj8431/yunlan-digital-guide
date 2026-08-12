@@ -100,6 +100,100 @@ describe('useGuideChat', () => {
     expect(result.current.messages[1]).toMatchObject({ content: 'abcdef', streaming: false });
   });
 
+  it('queues rapid questions and starts the next stream only after the prior result', async () => {
+    const handlersByMessage = new Map<string, GuideChatStreamHandlers>();
+    streamGuideAnswerMock.mockImplementation(
+      (message: string, _attachment: unknown, handlers: GuideChatStreamHandlers) => {
+        handlersByMessage.set(message, handlers);
+        return { close: vi.fn() };
+      }
+    );
+    const { result } = renderHook(() => useGuideChat());
+
+    act(() => {
+      result.current.ask('first');
+      result.current.ask('second');
+    });
+
+    expect(streamGuideAnswerMock).toHaveBeenCalledTimes(1);
+    expect(streamGuideAnswerMock.mock.calls[0]?.[0]).toBe('first');
+    expect(result.current.queuedRequestCount).toBe(1);
+
+    await act(async () => {
+      handlersByMessage.get('first')?.onResult({
+        answer: 'first answer',
+        cards: [],
+        source: 'local-fallback',
+        speechTimeline: createSpeechTimeline('first answer'),
+        retrievedKnowledge: []
+      });
+      await Promise.resolve();
+    });
+
+    expect(streamGuideAnswerMock).toHaveBeenCalledTimes(2);
+    expect(streamGuideAnswerMock.mock.calls[1]?.[0]).toBe('second');
+    expect(result.current.queuedRequestCount).toBe(0);
+    expect(result.current.loading).toBe(true);
+
+    await act(async () => {
+      handlersByMessage.get('second')?.onResult({
+        answer: 'second answer',
+        cards: [],
+        source: 'local-fallback',
+        speechTimeline: createSpeechTimeline('second answer'),
+        retrievedKnowledge: []
+      });
+      await Promise.resolve();
+    });
+
+    expect(result.current.loading).toBe(false);
+    expect(result.current.messages.filter((message) => message.role === 'user')).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ content: 'first' }),
+        expect.objectContaining({ content: 'second' })
+      ])
+    );
+  });
+
+  it('drains ten rapid submissions without concurrent streams or lost questions', async () => {
+    const handlersByMessage = new Map<string, GuideChatStreamHandlers>();
+    const questions = Array.from({ length: 10 }, (_, index) => `question-${index + 1}`);
+    streamGuideAnswerMock.mockImplementation(
+      (message: string, _attachment: unknown, handlers: GuideChatStreamHandlers) => {
+        handlersByMessage.set(message, handlers);
+        return { close: vi.fn() };
+      }
+    );
+    const { result } = renderHook(() => useGuideChat());
+
+    act(() => {
+      questions.forEach((question) => result.current.ask(question));
+    });
+
+    expect(streamGuideAnswerMock).toHaveBeenCalledTimes(1);
+    expect(result.current.queuedRequestCount).toBe(9);
+
+    for (const [index, question] of questions.entries()) {
+      await act(async () => {
+        handlersByMessage.get(question)?.onResult({
+          answer: `answer-${index + 1}`,
+          cards: [],
+          source: 'local-fallback',
+          speechTimeline: createSpeechTimeline(`answer-${index + 1}`),
+          retrievedKnowledge: []
+        });
+        await Promise.resolve();
+      });
+
+      expect(streamGuideAnswerMock).toHaveBeenCalledTimes(Math.min(index + 2, questions.length));
+      expect(streamGuideAnswerMock.mock.calls[index]?.[0]).toBe(question);
+    }
+
+    expect(result.current.loading).toBe(false);
+    expect(result.current.queuedRequestCount).toBe(0);
+    expect(result.current.messages.filter((message) => message.role === 'user')).toHaveLength(10);
+  });
+
   it('buffers fast stream deltas instead of rendering the whole answer at network speed', async () => {
     streamGuideAnswerMock.mockImplementationOnce(
       (_message: string, _image: unknown, handlers: GuideChatStreamHandlers) => {
@@ -330,7 +424,8 @@ describe('useGuideChat', () => {
                 keywords: ['上海迪士尼度假区'],
                 score: 100
               }
-            ]
+            ],
+            avatarDirective: { emotion: 'warm', action: 'A_RLH_welcome_O' }
           });
           handlers.onDone?.();
         }, 0);
@@ -353,6 +448,10 @@ describe('useGuideChat', () => {
     expect(result.current.messages[1]?.retrievedKnowledge?.[0]).toMatchObject({
       title: '上海迪士尼度假区',
       source: 'destination-knowledge'
+    });
+    expect(result.current.avatarDirective).toEqual({
+      emotion: 'warm',
+      action: 'A_RLH_welcome_O'
     });
   });
 

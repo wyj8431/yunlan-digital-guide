@@ -1,0 +1,19 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:yunlan;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+  flyway:
+    enabled: true
+
+app:
+  dev-seed-enabled: false
+  auth:
+    jwt-secret: test-secret-with-at-least-24-chars

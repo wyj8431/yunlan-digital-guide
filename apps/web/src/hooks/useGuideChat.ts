@@ -6,6 +6,7 @@ import {
   type GuideConversationMessage
 } from '../api/guideApi';
 import {
+  dispatchCozeAgentEvent,
   GUIDE_SPEECH_DURATION_EVENT,
   GUIDE_SPEECH_PLAYBACK_EVENT,
   isGuideSpeechDurationEvent,
@@ -20,6 +21,7 @@ import {
 import type {
   ChatMessage,
   GuideAttachment,
+  GuideAvatarDirective,
   GuideChatSession,
   GuideSpeechTimeline,
   RouteCard
@@ -48,6 +50,11 @@ type ActiveTypewriter = {
   speechStartedAt: number | null;
   speechStartVisibleCount: number;
   durationMs: number;
+};
+
+type PendingGuideRequest = {
+  message: string;
+  attachment?: GuideAttachment | null;
 };
 
 function getSpeechVisibleLimit(typewriter: ActiveTypewriter): number {
@@ -94,6 +101,12 @@ export function useGuideChat() {
   const activeSessionIdRef = useRef<string>(crypto.randomUUID());
   const sessionCreatedAtRef = useRef(new Date().toISOString());
   const suppressNextHistorySaveRef = useRef(false);
+  const messagesRef = useRef<ChatMessage[]>([]);
+  const pendingGuideRequestsRef = useRef<PendingGuideRequest[]>([]);
+  const processingGuideQueueRef = useRef(false);
+  const runGuideRequestRef = useRef<(request: PendingGuideRequest) => Promise<void>>(
+    async () => undefined
+  );
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [historySessions, setHistorySessions] = useState<GuideChatSession[]>(() =>
     loadGuideChatHistory()
@@ -102,8 +115,14 @@ export function useGuideChat() {
   const [routeCards, setRouteCards] = useState<RouteCard[]>([]);
   const [latestAnswer, setLatestAnswer] = useState('');
   const [speechTimeline, setSpeechTimeline] = useState<GuideSpeechTimeline | null>(null);
+  const [avatarDirective, setAvatarDirective] = useState<GuideAvatarDirective | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [queuedRequestCount, setQueuedRequestCount] = useState(0);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   const clearTypingTimer = useCallback(() => {
     if (typingTimerRef.current !== null) {
@@ -121,24 +140,28 @@ export function useGuideChat() {
 
   const updateAssistantMessage = useCallback(
     (messageId: string, content: string, streaming: boolean) => {
-      setMessages((current) =>
-        current.map((message) =>
+      setMessages((current) => {
+        const next = current.map((message) =>
           message.id === messageId ? { ...message, content, streaming } : message
-        )
-      );
+        );
+        messagesRef.current = next;
+        return next;
+      });
     },
     []
   );
 
   const updateAssistantKnowledge = useCallback(
     (messageId: string, response: { retrievedKnowledge?: ChatMessage['retrievedKnowledge'] }) => {
-      setMessages((current) =>
-        current.map((message) =>
+      setMessages((current) => {
+        const next = current.map((message) =>
           message.id === messageId
             ? { ...message, retrievedKnowledge: response.retrievedKnowledge ?? [] }
             : message
-        )
-      );
+        );
+        messagesRef.current = next;
+        return next;
+      });
     },
     []
   );
@@ -361,15 +384,10 @@ export function useGuideChat() {
     return () => window.clearTimeout(timer);
   }, [activeSessionId, messages]);
 
-  const ask = useCallback(
-    async (message: string, attachment?: GuideAttachment | null) => {
+  const runGuideRequest = useCallback(
+    async ({ message, attachment }: PendingGuideRequest) => {
       const trimmed = message.trim();
-
-      if ((!trimmed && !attachment) || loading) {
-        return;
-      }
-
-      const history = buildConversationHistory(messages);
+      const history = buildConversationHistory(messagesRef.current);
       const assistantMessageId = crypto.randomUUID();
       const attachmentIsImage = Boolean(
         attachment &&
@@ -378,38 +396,47 @@ export function useGuideChat() {
       let streamedAnswer = '';
       let receivedResult = false;
 
-      activeStreamRef.current?.close();
       const previousTypewriter = activeTypewriterRef.current;
       if (previousTypewriter) {
         finishTypewriter(previousTypewriter);
       }
-      setLoading(true);
       setError(null);
       setLatestAnswer('');
       setSpeechTimeline(null);
-      setMessages((current) => [
-        ...current,
-        {
-          id: crypto.randomUUID(),
-          role: 'user',
-          content: trimmed || (attachmentIsImage ? '请分析这张图片' : '请分析这个附件'),
-          attachmentName: attachment?.name,
-          attachmentKind: attachmentIsImage ? 'image' : attachment?.kind,
-          attachmentPreviewUrl: attachmentIsImage ? attachment?.dataUrl : undefined,
-          imagePreviewUrl: attachmentIsImage ? attachment?.dataUrl : undefined,
-          imageName: attachmentIsImage ? attachment?.name : undefined
-        },
-        {
-          id: assistantMessageId,
-          role: 'assistant',
-          content: attachment
-            ? attachmentIsImage
-              ? IMAGE_ANALYSIS_STATUS
-              : DOCUMENT_ANALYSIS_STATUS
-            : '',
-          streaming: true
-        }
-      ]);
+      setAvatarDirective(null);
+      dispatchCozeAgentEvent({
+        role: 'user',
+        content: trimmed || (attachment ? '[attachment]' : ''),
+        type: 'text',
+        timestamp: Date.now()
+      });
+      setMessages((current) => {
+        const next = [
+          ...current,
+          {
+            id: crypto.randomUUID(),
+            role: 'user' as const,
+            content: trimmed || (attachmentIsImage ? '请分析这张图片' : '请分析这个附件'),
+            attachmentName: attachment?.name,
+            attachmentKind: attachmentIsImage ? 'image' : attachment?.kind,
+            attachmentPreviewUrl: attachmentIsImage ? attachment?.dataUrl : undefined,
+            imagePreviewUrl: attachmentIsImage ? attachment?.dataUrl : undefined,
+            imageName: attachmentIsImage ? attachment?.name : undefined
+          },
+          {
+            id: assistantMessageId,
+            role: 'assistant' as const,
+            content: attachment
+              ? attachmentIsImage
+                ? IMAGE_ANALYSIS_STATUS
+                : DOCUMENT_ANALYSIS_STATUS
+              : '',
+            streaming: true
+          }
+        ];
+        messagesRef.current = next;
+        return next;
+      });
 
       try {
         await new Promise<void>((resolve, reject) => {
@@ -433,7 +460,22 @@ export function useGuideChat() {
               setLatestAnswer(response.answer);
               setRouteCards(response.cards);
               setSpeechTimeline(response.speechTimeline);
+              setAvatarDirective(response.avatarDirective ?? null);
               updateAssistantKnowledge(assistantMessageId, response);
+              dispatchCozeAgentEvent({
+                role: 'assistant',
+                content: response.answer,
+                type: 'text',
+                timestamp: Date.now()
+              });
+              if (response.avatarDirective) {
+                dispatchCozeAgentEvent({
+                  role: 'assistant',
+                  content: JSON.stringify(response.avatarDirective),
+                  type: 'command',
+                  timestamp: Date.now()
+                });
+              }
               resolve();
             },
             onError: reject,
@@ -451,24 +493,65 @@ export function useGuideChat() {
         });
       } catch (caught) {
         discardTypewriter();
-        setMessages((current) => current.filter((message) => message.id !== assistantMessageId));
+        setMessages((current) => {
+          const next = current.filter((message) => message.id !== assistantMessageId);
+          messagesRef.current = next;
+          return next;
+        });
         setError(caught instanceof Error ? caught.message : '数字导游暂时没有回答成功');
       } finally {
         activeStreamRef.current = null;
-        setLoading(false);
       }
     },
     [
-      loading,
-      messages,
       discardTypewriter,
       finishTypewriter,
       paceAssistantAnswer,
       scheduleSpeechStartFallback,
       syncSpeechDuration,
-      updateAssistantKnowledge,
-      updateAssistantMessage
+      updateAssistantKnowledge
     ]
+  );
+
+  useEffect(() => {
+    runGuideRequestRef.current = runGuideRequest;
+  }, [runGuideRequest]);
+
+  const drainGuideRequestQueue = useCallback(async () => {
+    if (processingGuideQueueRef.current) {
+      return;
+    }
+
+    processingGuideQueueRef.current = true;
+
+    try {
+      while (pendingGuideRequestsRef.current.length > 0) {
+        const request = pendingGuideRequestsRef.current.shift();
+        setQueuedRequestCount(pendingGuideRequestsRef.current.length);
+
+        if (request) {
+          await runGuideRequestRef.current(request);
+        }
+      }
+    } finally {
+      processingGuideQueueRef.current = false;
+      setQueuedRequestCount(0);
+      setLoading(false);
+    }
+  }, []);
+
+  const ask = useCallback(
+    (message: string, attachment?: GuideAttachment | null) => {
+      if (!message.trim() && !attachment) {
+        return;
+      }
+
+      pendingGuideRequestsRef.current.push({ message, attachment });
+      setQueuedRequestCount(pendingGuideRequestsRef.current.length);
+      setLoading(true);
+      void drainGuideRequestQueue();
+    },
+    [drainGuideRequestQueue]
   );
 
   const beginExternalQuestion = useCallback(
@@ -485,6 +568,13 @@ export function useGuideChat() {
       setError(null);
       setLatestAnswer('');
       setSpeechTimeline(null);
+      setAvatarDirective(null);
+      dispatchCozeAgentEvent({
+        role: 'user',
+        content: trimmed,
+        type: 'voice',
+        timestamp: Date.now()
+      });
       setMessages((current) => [
         ...current,
         {
@@ -507,6 +597,7 @@ export function useGuideChat() {
         cards: RouteCard[];
         speechTimeline: GuideSpeechTimeline;
         retrievedKnowledge?: ChatMessage['retrievedKnowledge'];
+        avatarDirective?: GuideAvatarDirective;
       }
     ) => {
       if (
@@ -526,6 +617,21 @@ export function useGuideChat() {
       setLatestAnswer(response.answer);
       setRouteCards(response.cards);
       setSpeechTimeline(response.speechTimeline);
+      setAvatarDirective(response.avatarDirective ?? null);
+      dispatchCozeAgentEvent({
+        role: 'assistant',
+        content: response.answer,
+        type: 'text',
+        timestamp: Date.now()
+      });
+      if (response.avatarDirective) {
+        dispatchCozeAgentEvent({
+          role: 'assistant',
+          content: JSON.stringify(response.avatarDirective),
+          type: 'command',
+          timestamp: Date.now()
+        });
+      }
       setMessages((current) => [
         ...current,
         {
@@ -557,6 +663,7 @@ export function useGuideChat() {
     activeStreamRef.current?.close();
     activeStreamRef.current = null;
     activeExternalSessionRef.current = null;
+    pendingGuideRequestsRef.current = [];
     discardTypewriter();
     const nextSessionId = crypto.randomUUID();
     activeSessionIdRef.current = nextSessionId;
@@ -566,7 +673,9 @@ export function useGuideChat() {
     setRouteCards([]);
     setLatestAnswer('');
     setSpeechTimeline(null);
+    setAvatarDirective(null);
     setLoading(false);
+    setQueuedRequestCount(0);
     setError(null);
   }, [discardTypewriter]);
 
@@ -586,6 +695,7 @@ export function useGuideChat() {
       activeStreamRef.current?.close();
       activeStreamRef.current = null;
       activeExternalSessionRef.current = null;
+      pendingGuideRequestsRef.current = [];
       discardTypewriter();
       suppressNextHistorySaveRef.current = true;
       activeSessionIdRef.current = session.id;
@@ -599,6 +709,7 @@ export function useGuideChat() {
       );
       setSpeechTimeline(null);
       setLoading(false);
+      setQueuedRequestCount(0);
       setError(null);
       return true;
     },
@@ -628,7 +739,9 @@ export function useGuideChat() {
     routeCards,
     latestAnswer,
     speechTimeline,
+    avatarDirective,
     loading,
+    queuedRequestCount,
     error,
     ask,
     startNewConversation,
