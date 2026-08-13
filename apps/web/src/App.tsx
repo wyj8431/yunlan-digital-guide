@@ -159,6 +159,9 @@ export function App({
         loading={chat.loading}
         error={chat.error}
         onAsk={chat.ask}
+        onStopGenerating={chat.stopGenerating}
+        onResend={chat.resendLastQuestion}
+        canResend={chat.canResend}
         voice={voice}
         onNewConversation={chat.startNewConversation}
         onOpenHistory={() => onNavigate('history')}
