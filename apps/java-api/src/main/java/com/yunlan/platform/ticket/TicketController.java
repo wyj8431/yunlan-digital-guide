@@ -19,6 +19,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/tickets")
 public class TicketController {
+    // WO-1: ticket collaboration API boundary and idempotent write headers.
     private final TicketService ticketService;
 
     public TicketController(TicketService ticketService) {
@@ -107,10 +108,11 @@ public class TicketController {
 
     @PostMapping
     public TicketDtos.TicketResponse create(
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @Valid @RequestBody TicketDtos.CreateRequest request,
             Authentication authentication
     ) {
-        return ticketService.create(request, CurrentUser.require(authentication));
+        return ticketService.create(request, idempotencyKey, CurrentUser.require(authentication));
     }
 
     @PostMapping("/{id}/status")

@@ -15,11 +15,14 @@ import java.util.UUID;
 import java.util.Comparator;
 import java.util.Locale;
 import java.util.Objects;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
 public class TicketService {
+    // WO-1: membership, version, idempotency, audit, and notification rules live here.
     private final TicketRepository tickets;
     private final TicketEventRepository events;
     private final TicketAssignmentEventRepository assignmentEvents;
@@ -28,6 +31,7 @@ public class TicketService {
     private final UserAccountRepository users;
     private final TicketCommentRepository comments;
     private final TicketNotificationRepository notifications;
+    private final TicketCreationRequestRepository creationRequests;
 
     public TicketService(
             TicketRepository tickets,
@@ -37,7 +41,8 @@ public class TicketService {
             ProjectMemberRepository members,
             UserAccountRepository users,
             TicketCommentRepository comments,
-            TicketNotificationRepository notifications
+            TicketNotificationRepository notifications,
+            TicketCreationRequestRepository creationRequests
     ) {
         this.tickets = tickets;
         this.events = events;
@@ -47,6 +52,7 @@ public class TicketService {
         this.users = users;
         this.comments = comments;
         this.notifications = notifications;
+        this.creationRequests = creationRequests;
     }
 
     @Transactional(readOnly = true)
@@ -74,19 +80,44 @@ public class TicketService {
     }
 
     @Transactional
-    public TicketDtos.TicketResponse create(TicketDtos.CreateRequest request, AuthPrincipal principal) {
+    public TicketDtos.TicketResponse create(
+            TicketDtos.CreateRequest request,
+            String idempotencyKey,
+            AuthPrincipal principal
+    ) {
+        requireIdempotencyKey(idempotencyKey);
         requireProject(request.projectId());
         requireAccess(request.projectId(), principal);
         if (request.assigneeId() != null && !members.existsByProjectIdAndUserId(request.projectId(), request.assigneeId())) {
             throw new ApiException("INVALID_ASSIGNEE", HttpStatus.BAD_REQUEST, "Assignee is not a member of the project.");
         }
+        var title = request.title().trim();
+        var description = request.description().trim();
+        var fingerprint = createRequestFingerprint(request.projectId(), title, description, request.assigneeId());
+
+        // Serializing creates per actor turns the unique key into a replay record rather than a race.
+        users.findByIdForUpdate(principal.userId()).orElseThrow(() -> new ApiException(
+                "UNAUTHORIZED", HttpStatus.UNAUTHORIZED, "Authenticated user does not exist."
+        ));
+        var previousRequest = creationRequests.findByActorIdAndIdempotencyKey(principal.userId(), idempotencyKey);
+        if (previousRequest.isPresent()) {
+            if (!previousRequest.get().getRequestFingerprint().equals(fingerprint)) {
+                throw new ApiException(
+                        "IDEMPOTENCY_KEY_REUSED",
+                        HttpStatus.CONFLICT,
+                        "Idempotency-Key was already used for a different ticket creation."
+                );
+            }
+            return TicketDtos.TicketResponse.from(findTicket(previousRequest.get().getTicketId()));
+        }
         var ticket = tickets.save(new Ticket(
                 request.projectId(),
-                request.title().trim(),
-                request.description().trim(),
+                title,
+                description,
                 principal.userId(),
                 request.assigneeId()
         ));
+        creationRequests.save(new TicketCreationRequest(principal.userId(), idempotencyKey, fingerprint, ticket.getId()));
         if (request.assigneeId() != null && !request.assigneeId().equals(principal.userId())) {
             notifications.save(new TicketNotification(
                     request.assigneeId(),
@@ -376,6 +407,21 @@ public class TicketService {
     private void requireIdempotencyKey(String idempotencyKey) {
         if (idempotencyKey == null || idempotencyKey.isBlank() || idempotencyKey.length() > 120) {
             throw new ApiException("IDEMPOTENCY_KEY_REQUIRED", HttpStatus.BAD_REQUEST, "Idempotency-Key is required.");
+        }
+    }
+
+    private String createRequestFingerprint(UUID projectId, String title, String description, UUID assigneeId) {
+        var canonical = "%s|%d:%s|%d:%s|%s".formatted(
+                projectId,
+                title.length(), title,
+                description.length(), description,
+                assigneeId == null ? "" : assigneeId
+        );
+        try {
+            var digest = MessageDigest.getInstance("SHA-256");
+            return java.util.HexFormat.of().formatHex(digest.digest(canonical.getBytes(StandardCharsets.UTF_8)));
+        } catch (java.security.NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable.", exception);
         }
     }
 
