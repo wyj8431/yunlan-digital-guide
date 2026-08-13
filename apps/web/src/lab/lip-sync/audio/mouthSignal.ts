@@ -6,12 +6,14 @@ function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
 }
 
+/** Calculates normalised RMS energy for one analyser frame. */
 export function calculateRms(samples: Float32Array): number {
   if (samples.length === 0) return 0;
   const sum = samples.reduce((total, sample) => total + sample * sample, 0);
   return Math.sqrt(sum / samples.length);
 }
 
+/** Applies thresholding and asymmetric attack/release smoothing to mouth openness. */
 export function nextMouthSignal(
   current: number,
   rms: number,

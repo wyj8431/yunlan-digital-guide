@@ -1,6 +1,9 @@
 import { calculateRms } from './mouthSignal';
 import type { LabAudioSource } from '../types';
 
+// WO-6: audio-source lifecycle, microphone capture, and analyser cleanup.
+
+/** A single analyser sample used by the renderer and performance monitor. */
 export type AudioAnalysisFrame = {
   rms: number;
   currentTime: number;
@@ -8,6 +11,10 @@ export type AudioAnalysisFrame = {
   playing: boolean;
 };
 
+/**
+ * Lifecycle contract for a local audio source. Call `dispose` when changing source
+ * or unmounting the lab so capture tracks, nodes, and owned contexts are released.
+ */
 export type AudioAnalysisSession = {
   play(): Promise<void>;
   pause(): void;
@@ -19,6 +26,7 @@ export type AudioAnalysisSession = {
 type AudioSourceOptions = {
   context?: AudioContext;
   fetcher?: typeof fetch;
+  mediaDevices?: Pick<MediaDevices, 'getUserMedia'>;
 };
 
 type BrowserWindowWithAudio = Window & {
@@ -34,8 +42,9 @@ const PRESET_WINDOWS = [
   [4.75, 5.55]
 ] as const;
 
+/** Reads a file or URL source into bytes before Web Audio decoding. */
 export async function readAudioSource(
-  source: Exclude<LabAudioSource, { kind: 'preset' }>,
+  source: Exclude<LabAudioSource, { kind: 'preset' } | { kind: 'microphone' }>,
   fetcher: typeof fetch = fetch
 ): Promise<ArrayBuffer> {
   if (source.kind === 'file') {
@@ -94,7 +103,7 @@ function createPresetAudioBuffer(context: AudioContext) {
 }
 
 async function decodeAudioSource(
-  source: LabAudioSource,
+  source: Exclude<LabAudioSource, { kind: 'microphone' }>,
   context: AudioContext,
   fetcher: typeof fetch
 ) {
@@ -106,12 +115,76 @@ async function decodeAudioSource(
   return context.decodeAudioData(bytes.slice(0));
 }
 
+async function createMicrophoneAnalysisSession(
+  context: AudioContext,
+  ownsContext: boolean,
+  mediaDevices: Pick<MediaDevices, 'getUserMedia'>
+): Promise<AudioAnalysisSession> {
+  const stream = await mediaDevices.getUserMedia({ audio: true });
+  const analyser = context.createAnalyser();
+  analyser.fftSize = 2048;
+  const sourceNode = context.createMediaStreamSource(stream);
+  sourceNode.connect(analyser);
+  const samples = new Float32Array(analyser.fftSize);
+  let active = false;
+  let disposed = false;
+  let startedAt = 0;
+
+  return {
+    async play() {
+      if (disposed) return;
+      if (context.state === 'suspended') await context.resume();
+      if (!active) startedAt = context.currentTime;
+      active = true;
+    },
+    pause() {
+      active = false;
+    },
+    stop() {
+      active = false;
+    },
+    sample() {
+      if (active) analyser.getFloatTimeDomainData(samples);
+      else samples.fill(0);
+      return {
+        rms: calculateRms(samples),
+        currentTime: active ? context.currentTime - startedAt : 0,
+        duration: 0,
+        playing: active
+      };
+    },
+    async dispose() {
+      disposed = true;
+      active = false;
+      stream.getTracks().forEach((track) => track.stop());
+      sourceNode.disconnect();
+      analyser.disconnect();
+      if (ownsContext) await context.close();
+    }
+  };
+}
+
+/**
+ * Creates a sampled Web Audio session for preset, file, URL, or microphone input.
+ * Microphone sessions analyse input only and never route capture audio to speakers.
+ */
 export async function createAudioAnalysisSession(
   source: LabAudioSource,
   options: AudioSourceOptions = {}
 ): Promise<AudioAnalysisSession> {
   const context = options.context ?? createOwnedAudioContext();
   const ownsContext = !options.context;
+  if (source.kind === 'microphone') {
+    if (!options.mediaDevices && !navigator.mediaDevices) {
+      if (ownsContext) await context.close();
+      throw new Error('Microphone access is unavailable.');
+    }
+    return createMicrophoneAnalysisSession(
+      context,
+      ownsContext,
+      options.mediaDevices ?? navigator.mediaDevices
+    );
+  }
   const buffer = await decodeAudioSource(source, context, options.fetcher ?? fetch);
   const analyser = context.createAnalyser();
   analyser.fftSize = 2048;
