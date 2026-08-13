@@ -3,6 +3,8 @@ name: code-review
 description: Review changed frontend and full-stack files in the Yunlan digital guide with project-aware correctness, security, performance, and lifecycle checks.
 ---
 
+<!-- WO-7: Cursor/Trae review commands and output contract. -->
+
 # Yunlan Code Review
 
 Use this skill for a read-only review unless the user explicitly asks for fixes. Inspect the current diff first, then read the relevant callers, types, tests, and configuration before reporting a finding.
