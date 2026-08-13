@@ -42,4 +42,36 @@ describe('GuidePanel', () => {
 
     expect(onAsk).toHaveBeenCalledWith(QUICK_QUESTION);
   });
+
+  it('shows stop and resend controls for an active or cancelled answer', () => {
+    const onStopGenerating = vi.fn();
+    const onResend = vi.fn();
+    const { rerender } = render(
+      <GuidePanel
+        scenicArea={scenicArea}
+        messages={[]}
+        loading
+        error={null}
+        onAsk={vi.fn()}
+        onStopGenerating={onStopGenerating}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '停止生成' }));
+    expect(onStopGenerating).toHaveBeenCalledOnce();
+
+    rerender(
+      <GuidePanel
+        scenicArea={scenicArea}
+        messages={[]}
+        loading={false}
+        error={null}
+        onAsk={vi.fn()}
+        onResend={onResend}
+        canResend
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: '重新生成' }));
+    expect(onResend).toHaveBeenCalledOnce();
+  });
 });

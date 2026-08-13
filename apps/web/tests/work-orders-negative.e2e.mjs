@@ -54,6 +54,7 @@ async function firstProjectId(page) {
 async function createTicket(page, projectId, title) {
   const response = await apiRequest(page, '/api/tickets', {
     method: 'POST',
+    headers: { 'Idempotency-Key': nextIdempotencyKey() },
     body: JSON.stringify({
       projectId,
       title,

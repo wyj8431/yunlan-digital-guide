@@ -74,7 +74,7 @@ describe('home destination entry browser acceptance', () => {
         assert.equal(await links.count(), 2);
         assert.equal(
           await links.first().evaluate((element) => getComputedStyle(element).opacity),
-          '0.14'
+          '1'
         );
 
         await links.first().hover();

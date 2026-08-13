@@ -48,6 +48,27 @@ describe('ChatMessages', () => {
     expect(screen.getByText('目的地知识库')).toBeInTheDocument();
   });
 
+  it('labels a completed local fallback answer without presenting it as a model response', () => {
+    render(
+      <ChatMessages
+        messages={[
+          {
+            id: 'fallback-answer',
+            role: 'assistant',
+            content: '\u4e4c\u9547\u672c\u5730\u8d44\u6599\u56de\u7b54',
+            source: 'local-fallback'
+          }
+        ]}
+      />
+    );
+
+    expect(
+      screen.getByText(
+        '\u6a21\u578b\u54cd\u5e94\u8d85\u65f6\uff0c\u5df2\u5207\u6362\u4e3a\u672c\u5730\u8d44\u6599\u56de\u7b54\u3002'
+      )
+    ).toBeInTheDocument();
+  });
+
   it('renders a document attachment as a file row instead of an image', () => {
     render(
       <ChatMessages
@@ -83,6 +104,25 @@ describe('ChatMessages', () => {
     expect(screen.getByRole('heading', { level: 3, name: '核心结论' })).toBeInTheDocument();
     expect(screen.getByText('这是归纳后的结论。').tagName).toBe('P');
     expect(screen.getAllByRole('listitem')).toHaveLength(2);
+  });
+
+  it('highlights fenced code blocks while preserving their text', () => {
+    render(
+      <ChatMessages
+        messages={[
+          {
+            id: 'code-answer',
+            role: 'assistant',
+            content: '```ts\nconst route = "xizha";\n```'
+          }
+        ]}
+      />
+    );
+
+    const code = document.querySelector('pre code');
+    expect(code).toBeInTheDocument();
+    expect(code?.textContent).toContain('const route = "xizha";');
+    expect(code?.className).toContain('hljs');
   });
 
   it('does not jump to the end when automatic scrolling is disabled for history', () => {

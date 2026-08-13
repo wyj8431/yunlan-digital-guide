@@ -71,6 +71,12 @@ class FakeAudioContext {
   closed = false;
   readonly sources: FakeAudioBufferSourceNode[] = [];
   readonly analysers: FakeAnalyserNode[] = [];
+  readonly mediaSources: Array<{
+    disconnected: boolean;
+    connect(target: unknown): void;
+    disconnect(): void;
+  }> = [];
+  state: 'running' | 'suspended' = 'running';
 
   constructor(public readonly sampleRate = 16_000) {}
 
@@ -88,6 +94,22 @@ class FakeAudioContext {
     const source = new FakeAudioBufferSourceNode();
     this.sources.push(source);
     return source;
+  }
+
+  createMediaStreamSource() {
+    const source = {
+      disconnected: false,
+      connect: () => undefined,
+      disconnect() {
+        this.disconnected = true;
+      }
+    };
+    this.mediaSources.push(source);
+    return source;
+  }
+
+  async resume() {
+    this.state = 'running';
   }
 
   async decodeAudioData() {
@@ -153,5 +175,22 @@ describe('createAudioAnalysisSession', () => {
     await session.dispose();
     expect(context.sources.every((source) => source.disconnected)).toBe(true);
     expect(context.analysers.every((analyser) => analyser.disconnected)).toBe(true);
+  });
+
+  it('samples a microphone stream and closes its tracks on dispose', async () => {
+    const context = new FakeAudioContext();
+    const track = { stop: vi.fn() };
+    const mediaDevices = { getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [track] }) };
+    const session = await createAudioAnalysisSession(
+      { kind: 'microphone' },
+      { context: context as unknown as AudioContext, mediaDevices }
+    );
+
+    await session.play();
+    expect(session.sample().playing).toBe(true);
+    await session.dispose();
+
+    expect(track.stop).toHaveBeenCalledOnce();
+    expect(context.mediaSources.every((source) => source.disconnected)).toBe(true);
   });
 });

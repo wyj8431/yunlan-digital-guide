@@ -82,6 +82,7 @@ describe('useGuideChat', () => {
     expect(result.current.messages[1]?.content).not.toBe('abcdef');
     expect(result.current.latestAnswer).toBe('abcdef');
     expect(result.current.speechTimeline?.text).toBe('abcdef');
+    expect(result.current.messages[1]?.source).toBe('local-fallback');
     expect(result.current.loading).toBe(false);
 
     act(() => {
@@ -153,6 +154,78 @@ describe('useGuideChat', () => {
         expect.objectContaining({ content: 'second' })
       ])
     );
+  });
+
+  it('keeps the queue alive when the conversation is reset mid-stream', async () => {
+    const handlersByMessage = new Map<string, GuideChatStreamHandlers>();
+    streamGuideAnswerMock.mockImplementation(
+      (message: string, _attachment: unknown, handlers: GuideChatStreamHandlers) => {
+        handlersByMessage.set(message, handlers);
+        // 模拟真实实现：close() 会触发 onDone 让等待方结束
+        return { close: vi.fn(() => handlers.onDone?.()) };
+      }
+    );
+    const { result } = renderHook(() => useGuideChat());
+
+    act(() => {
+      result.current.ask('first');
+    });
+    expect(streamGuideAnswerMock).toHaveBeenCalledTimes(1);
+
+    // 请求仍在途中就切换会话：队列不应卡死，也不应报错
+    await act(async () => {
+      result.current.startNewConversation();
+      await Promise.resolve();
+    });
+    expect(result.current.error).toBeNull();
+
+    // 切换后继续提问，应能正常进入新的流
+    act(() => {
+      result.current.ask('second');
+    });
+    expect(streamGuideAnswerMock).toHaveBeenCalledTimes(2);
+    expect(streamGuideAnswerMock.mock.calls[1]?.[0]).toBe('second');
+
+    await act(async () => {
+      handlersByMessage.get('second')?.onResult({
+        answer: 'second answer',
+        cards: [],
+        source: 'local-fallback',
+        speechTimeline: createSpeechTimeline('second answer'),
+        retrievedKnowledge: []
+      });
+      await Promise.resolve();
+    });
+
+    expect(result.current.loading).toBe(false);
+    expect(result.current.messages.filter((message) => message.role === 'user')).toEqual([
+      expect.objectContaining({ content: 'second' })
+    ]);
+  });
+
+  it('stops the active stream and resends exactly the cancelled question', async () => {
+    const close = vi.fn();
+    streamGuideAnswerMock.mockImplementation(() => ({ close }));
+    const { result } = renderHook(() => useGuideChat());
+
+    act(() => {
+      result.current.ask('retry me');
+      result.current.stopGenerating();
+    });
+
+    expect(close).toHaveBeenCalledOnce();
+    expect(result.current.loading).toBe(false);
+    expect(result.current.canResend).toBe(true);
+    expect(result.current.messages).toHaveLength(1);
+
+    await act(async () => {
+      await Promise.resolve();
+      result.current.resendLastQuestion();
+    });
+
+    expect(streamGuideAnswerMock).toHaveBeenCalledTimes(2);
+    expect(streamGuideAnswerMock.mock.calls[1]?.[0]).toBe('retry me');
+    expect(result.current.canResend).toBe(false);
   });
 
   it('drains ten rapid submissions without concurrent streams or lost questions', async () => {
