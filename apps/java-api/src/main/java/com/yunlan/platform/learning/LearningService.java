@@ -13,6 +13,7 @@ import java.util.UUID;
 
 @Service
 public class LearningService {
+    // WO-2: deterministic grading and staff-gated diagnosis publication boundary.
     private final QuestionRepository questions;
     private final AttemptRepository attempts;
     private final DiagnosisRepository diagnoses;
