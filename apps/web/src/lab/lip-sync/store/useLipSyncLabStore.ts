@@ -7,7 +7,7 @@ import {
   type RenderQualityTier
 } from '../types';
 
-type SourceMode = 'preset' | 'file' | 'url';
+type SourceMode = 'preset' | 'file' | 'url' | 'microphone';
 type PlaybackState = 'idle' | 'loading' | 'playing' | 'paused' | 'error';
 
 export type LipSyncLabSnapshot = {
