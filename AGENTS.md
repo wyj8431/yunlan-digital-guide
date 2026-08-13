@@ -53,6 +53,40 @@ The E2E command requires the local Vite and Java services to be running. On a ma
 the static harness equivalent is `make check`. The harness runs root lint, work-order UI type checking,
 and the Java Maven verification suite.
 
+## Development Commands
+
+```bash
+npm run dev                          # server + web 并行启动
+npm run typecheck                    # 全部 workspace 类型检查
+npm test                             # 全部 workspace 单测
+npm run lint                         # ESLint
+npm run check:work-orders            # 工单静态 harness（lint + UI 类型检查 + Java Maven 验证）
+npm run check:work-orders:e2e        # 工单 e2e（需 Vite + Java 已启动）
+npm run check:work-orders:e2e:negative
+npm run load:work-orders             # 压测
+npm run evaluate:learning-golden     # learning 黄金样例评测
+```
+
+Java（git-bash 下 mvn 不在 PATH，用 `~/maven-dist/mvn-here.sh`；原生 cmd 用 `apps/java-api/mvnw.cmd`）：
+
+```bash
+~/maven-dist/mvn-here.sh -f apps/java-api/pom.xml test
+```
+
+## AI Collaboration Protocol (Loop & Evidence)
+
+AI 协作开发必须遵循「生成 → 检查 → 修改 → 验证」循环，证据留存在 `artifacts/loop-N/`：
+
+1. **生成**: 先读本文件与受影响代码，列出最小改动计划。
+2. **检查**: 跑 typecheck / lint / compile，失败输出存 `artifacts/loop-N/test-fail.log`。
+3. **修改**: 修复后重跑检查，直到全绿。
+4. **验证**: 单测 + harness（`npm run check:work-orders`）+ **实测冒烟**（启动 server/web/java-api，浏览器打开页面走关键流程）。通过输出存 `artifacts/loop-N/test-pass.log` 与 `harness.log`。
+5. **证据**: 每个 loop 目录至少含 `test-fail.log` / `test-pass.log` / `harness.log` / `review-round-N.md` / `README.md`，且独立 commit 可追溯。
+
+**技能加载（Hermes）**: 在本仓库工作时必须加载 `dev-loop` 技能；改动 `apps/web` 的 React 代码时同时加载 `react-expert`（React 官方技能）。其他 Agent（Cursor / Claude Code / Codex）按本协议等效执行。
+
+**React 开发注意**: 以 React 官方文档与源码行为为准，不依赖模型记忆中的旧模式；本仓库为 React 19 + Vite 7 + TypeScript 5.8。
+
 ## Out Of Scope Without Approval
 
 - Changing the Java/Node service boundary or the Vite proxy contract.
