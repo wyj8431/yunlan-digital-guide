@@ -1,6 +1,6 @@
 // 音频工具栏统一管理麦克风、文件、演示信号和播放状态。
 import type { MutableRefObject } from 'react';
-import { ArrowLeft, Link, Pause, Play, RotateCcw, Upload } from 'lucide-react';
+import { ArrowLeft, Link, Mic, Pause, Play, RotateCcw, Upload } from 'lucide-react';
 import { createAudioAnalysisSession, type AudioAnalysisSession } from '../audio/audioSource';
 import type { LabAudioSource } from '../types';
 import { useLipSyncLabStore } from '../store/useLipSyncLabStore';
@@ -28,6 +28,10 @@ function createSourceFromState(): LabAudioSource {
     }
 
     return { kind: 'url', url: url.href };
+  }
+
+  if (state.sourceMode === 'microphone') {
+    return { kind: 'microphone' };
   }
 
   return { kind: 'preset' };
@@ -127,6 +131,13 @@ export function AudioSourceToolbar({ audioSessionRef }: AudioSourceToolbarProps)
           onClick={() => selectSourceMode('url')}
         >
           音频 URL
+        </button>
+        <button
+          type="button"
+          aria-pressed={sourceMode === 'microphone'}
+          onClick={() => selectSourceMode('microphone')}
+        >
+          <Mic aria-hidden="true" size={16} /> 实时麦克风
         </button>
       </div>
 
