@@ -15,7 +15,13 @@ const paceMs = readNonNegativeInteger('WORK_ORDERS_LOAD_PACE_MS', 0);
 const outputPath = process.env.LOAD_OUTPUT;
 const runId = `${new Date().toISOString().replace(/[:.]/g, '-')}-${process.pid}`;
 
-const supportedScenarios = new Set(['ticket-list', 'ticket-status', 'alert-submit', 'alert-list']);
+const supportedScenarios = new Set([
+  'ticket-list',
+  'ticket-status',
+  'learning-submit',
+  'alert-submit',
+  'alert-list'
+]);
 
 if (!supportedScenarios.has(scenario)) {
   throw new Error(
@@ -206,7 +212,11 @@ async function createStatusWorkers(token, projectId) {
   for (let index = 0; index < concurrency; index += 1) {
     const response = await request('/api/tickets', {
       method: 'POST',
-      headers: { ...bearerHeaders(token), 'Content-Type': 'application/json' },
+      headers: {
+        ...bearerHeaders(token),
+        'Content-Type': 'application/json',
+        'Idempotency-Key': `${runId}-create-status-${index + 1}`
+      },
       body: JSON.stringify({
         projectId,
         title: `Load test status ${runId}-${index + 1}`,
@@ -229,6 +239,29 @@ async function createStatusWorkers(token, projectId) {
     });
   }
   return workers;
+}
+
+async function selectLearningQuestion(token) {
+  const response = await request('/api/learning/questions', { headers: bearerHeaders(token) });
+  if (response.status !== 200 || !Array.isArray(response.body?.questions) || !response.body.questions[0]?.id) {
+    throw new Error(
+      `Unable to load learning questions (status ${response.status ?? 'network error'}).`
+    );
+  }
+  return response.body.questions[0];
+}
+
+function createLearningSubmitOperation(token, questionId) {
+  return () =>
+    request('/api/learning/attempts', {
+      method: 'POST',
+      headers: { ...bearerHeaders(token), 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        questionId,
+        selectedAnswer: 'A',
+        reasoning: 'Synthetic load-test submission.'
+      })
+    });
 }
 
 function createTicketStatusOperation(token, worker) {
@@ -362,6 +395,7 @@ async function main() {
   const startedAt = new Date().toISOString();
   const token = await login();
   const project = scenario.startsWith('ticket-') ? await selectProject(token) : null;
+  const learningQuestion = scenario === 'learning-submit' ? await selectLearningQuestion(token) : null;
   const statusWorkers =
     scenario === 'ticket-status' ? await createStatusWorkers(token, project.id) : [];
   const alertDeviceId = scenario === 'alert-submit' ? `load-device-${runId}` : null;
@@ -371,6 +405,10 @@ async function main() {
       ? Array.from({ length: concurrency }, () => createTicketListOperation(token, project.id))
       : scenario === 'ticket-status'
         ? statusWorkers.map((worker) => createTicketStatusOperation(token, worker))
+        : scenario === 'learning-submit'
+          ? Array.from({ length: concurrency }, () =>
+              createLearningSubmitOperation(token, learningQuestion.id)
+            )
         : scenario === 'alert-submit'
           ? Array.from({ length: concurrency }, () =>
               createAlertSubmitOperation(token, alertDeviceId)
@@ -401,7 +439,7 @@ async function main() {
     },
     setup:
       project === null
-        ? { createdStatusTickets: 0 }
+        ? { createdStatusTickets: 0, learningQuestionId: learningQuestion?.id ?? null }
         : {
             projectId: project.id,
             projectName: project.name,
