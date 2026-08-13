@@ -16,9 +16,12 @@ import {
 import type { GuideSpeechTimeline } from './speech-timeline.js';
 
 const GUIDE_CHAT_STREAM_PATH = '/api/guide/chat/stream';
+// A 10 MiB attachment grows to about 13.34 MiB after Base64 encoding and JSON framing.
+const MAX_GUIDE_STREAM_PAYLOAD = 14 * 1024 * 1024;
 
 export type GuideWebSocketDependencies = {
   scenicLiveService?: ScenicLiveService;
+  createGuideStreamResponse?: typeof createGuideStreamResponse;
 };
 
 function requestPath(req: IncomingMessage): string {
@@ -61,7 +64,8 @@ export function attachGuideWebSocketServer(
   server: HttpServer,
   dependencies: GuideWebSocketDependencies = {}
 ): WebSocketServer {
-  const wss = new WebSocketServer({ noServer: true });
+  const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_GUIDE_STREAM_PAYLOAD });
+  const streamGuideResponse = dependencies.createGuideStreamResponse ?? createGuideStreamResponse;
 
   server.on('upgrade', (req: IncomingMessage, socket: Duplex, head: Buffer) => {
     if (requestPath(req) !== GUIDE_CHAT_STREAM_PATH) {
@@ -75,6 +79,9 @@ export function attachGuideWebSocketServer(
 
   wss.on('connection', (socket) => {
     let activeController: AbortController | null = null;
+
+    // ws emits an error before closing malformed or oversized frames.
+    socket.on('error', () => undefined);
 
     socket.on('message', async (raw) => {
       activeController?.abort();
@@ -103,7 +110,7 @@ export function attachGuideWebSocketServer(
             )
           : undefined;
 
-        const response = await createGuideStreamResponse({
+        const response = await streamGuideResponse({
           message: request.message,
           attachment:
             request.attachment !== undefined
@@ -115,6 +122,10 @@ export function attachGuideWebSocketServer(
           onDelta: (delta) => sendEvent(socket, { type: 'delta', delta }),
           signal: controller.signal
         });
+
+        if (controller.signal.aborted || activeController !== controller) {
+          return;
+        }
 
         sendEvent(socket, { type: 'speech-timeline', timeline: response.speechTimeline });
         sendEvent(socket, { type: 'result', response });

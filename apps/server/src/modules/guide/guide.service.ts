@@ -103,6 +103,8 @@ type ImageResponseCacheEntry = {
 
 const LLM_FIRST_DELTA_TIMEOUT_MS = 2_000;
 const COZE_FIRST_DELTA_TIMEOUT_MS = 8_000;
+// WO-4/WO-5: hybrid waits for Coze's 15s failover window, then permits Ark's first delta.
+const HYBRID_FIRST_DELTA_TIMEOUT_MS = 17_000;
 const LLM_IMAGE_FIRST_DELTA_TIMEOUT_MS = 190_000;
 const LLM_DOCUMENT_FIRST_DELTA_TIMEOUT_MS = 8_000;
 const LONG_DOCUMENT_FAST_SUMMARY_MIN_CHARACTERS = 5_000;
@@ -1273,9 +1275,11 @@ function getFirstDeltaTimeoutMs(
     return LLM_DOCUMENT_FIRST_DELTA_TIMEOUT_MS;
   }
 
-  return env.llmProvider === 'coze' || env.llmProvider === 'hybrid'
-    ? COZE_FIRST_DELTA_TIMEOUT_MS
-    : LLM_FIRST_DELTA_TIMEOUT_MS;
+  if (env.llmProvider === 'hybrid') {
+    return HYBRID_FIRST_DELTA_TIMEOUT_MS;
+  }
+
+  return env.llmProvider === 'coze' ? COZE_FIRST_DELTA_TIMEOUT_MS : LLM_FIRST_DELTA_TIMEOUT_MS;
 }
 
 function hasConfiguredGuideModel(env: ServerEnv): boolean {

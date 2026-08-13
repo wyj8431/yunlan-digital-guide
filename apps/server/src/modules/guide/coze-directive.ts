@@ -76,16 +76,27 @@ function parseDirectivePayload(value: unknown): GuideAvatarDirective | undefined
  */
 export function parseGuideDirective(rawAnswer: string): ParsedGuideDirective {
   const match = TRAILING_DIRECTIVE.exec(rawAnswer);
-  if (!match) {
-    return { answer: rawAnswer };
+  if (match) {
+    const answer = rawAnswer.slice(0, match.index).trimEnd();
+    try {
+      return { answer, avatarDirective: parseDirectivePayload(JSON.parse(match[1])) };
+    } catch {
+      return { answer };
+    }
   }
 
-  const answer = rawAnswer.slice(0, match.index).trimEnd();
-  try {
-    return { answer, avatarDirective: parseDirectivePayload(JSON.parse(match[1])) };
-  } catch {
-    return { answer };
+  // 流式输出被截断时标签可能未闭合：剥离尾部残缺标签，防止其泄漏进答案文本与语音时间线。
+  // 仅当最后一个 <guide-directive 之后没有闭合标签时才剥离，避免误伤正文。
+  const openTagMatches = Array.from(rawAnswer.matchAll(/<guide-directive/gi));
+  if (openTagMatches.length > 0) {
+    const lastOpen = openTagMatches[openTagMatches.length - 1];
+    const afterLastOpen = rawAnswer.slice(lastOpen.index);
+    if (!/<\/guide-directive>/i.test(afterLastOpen)) {
+      return { answer: rawAnswer.slice(0, lastOpen.index).trimEnd() };
+    }
   }
+
+  return { answer: rawAnswer };
 }
 
 /** Buffers a possible directive suffix so it is never emitted as a stream delta. */
