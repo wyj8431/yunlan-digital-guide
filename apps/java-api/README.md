@@ -2,7 +2,7 @@
 
 This service owns the Java implementations of the three work-order domains:
 
-- `/api/tickets`: visible projects and project members, ticket status transitions, optimistic version checks, and idempotent operation records.
+- `/api/tickets`: visible projects and project members, ticket status transitions, optimistic version checks, and idempotent operation records. `POST /api/tickets` requires an `Idempotency-Key` (1-120 characters); replaying the same actor/key/body returns the original ticket, while a changed body returns `409 IDEMPOTENCY_KEY_REUSED`.
 - `/api/learning`: deterministic question grading, mock diagnosis provider, controlled catalog validation, pending teacher review, and confirmed diagnosis publication.
 - `/api/alerts`: bounded in-process queue, fixed consumers, five-minute aggregation, graceful shutdown,
   and the versioned `/api/alerts/compat/v1` snake_case migration intake.
