@@ -21,6 +21,7 @@ import { createPanoramaRouter } from './modules/panorama/panorama.routes.js';
 
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_VIDEO_DATABASE_PATH = path.resolve(currentDirectory, '../data/videos.sqlite');
+const MAX_GUIDE_CHAT_REQUEST_BYTES = 14 * 1024 * 1024;
 
 export type CreateAppOptions = {
   videoDatabasePath?: string;
@@ -45,6 +46,25 @@ function isMalformedJsonError(caught: unknown): boolean {
 
 function isVideoDanmakuSubmission(ctx: Koa.Context): boolean {
   return ctx.method === 'POST' && /^\/api\/videos\/[^/]+\/danmaku\/?$/.test(ctx.path);
+}
+
+function isGuideChatSubmission(ctx: Koa.Context): boolean {
+  return ctx.method === 'POST' && ctx.path === '/api/guide/chat';
+}
+
+function isPayloadTooLargeError(caught: unknown): boolean {
+  return (
+    typeof caught === 'object' && caught !== null && 'status' in caught && caught.status === 413
+  );
+}
+
+function exceedsGuideChatRequestLimit(ctx: Koa.Context): boolean {
+  const rawBody = ctx.request.rawBody;
+  return (
+    isGuideChatSubmission(ctx) &&
+    typeof rawBody === 'string' &&
+    Buffer.byteLength(rawBody, 'utf8') > MAX_GUIDE_CHAT_REQUEST_BYTES
+  );
 }
 
 export function createApp(options: CreateAppOptions = {}): ServerApp {
@@ -93,6 +113,16 @@ export function createApp(options: CreateAppOptions = {}): ServerApp {
     try {
       await next();
     } catch (caught) {
+      if (isPayloadTooLargeError(caught) && isGuideChatSubmission(ctx)) {
+        ctx.status = 413;
+        ctx.body = {
+          code: 'PAYLOAD_TOO_LARGE',
+          message:
+            '\u8bf7\u6c42\u5185\u5bb9\u8fc7\u5927\uff0c\u8bf7\u538b\u7f29\u540e\u518d\u53d1\u9001\u3002'
+        };
+        return;
+      }
+
       if (isMalformedJsonError(caught) && isVideoDanmakuSubmission(ctx)) {
         ctx.status = 400;
         ctx.body = { code: 'INVALID_JSON', message: '请求 JSON 格式无效。' };
@@ -103,6 +133,18 @@ export function createApp(options: CreateAppOptions = {}): ServerApp {
     }
   });
   app.use(bodyParser({ jsonLimit: '15mb' }));
+  app.use(async (ctx, next) => {
+    if (exceedsGuideChatRequestLimit(ctx)) {
+      ctx.status = 413;
+      ctx.body = {
+        code: 'PAYLOAD_TOO_LARGE',
+        message:
+          '\u8bf7\u6c42\u5185\u5bb9\u8fc7\u5927\uff0c\u8bf7\u538b\u7f29\u540e\u518d\u53d1\u9001\u3002'
+      };
+      return;
+    }
+    await next();
+  });
   app.use(router.routes());
   app.use(router.allowedMethods());
   app.use(docsRouter.routes());
