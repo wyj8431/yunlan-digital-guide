@@ -14,12 +14,13 @@ token or password into the report.
 
 ## Scenarios
 
-| Scenario        | Endpoint mix                     | Authentication | State change                       |
-| --------------- | -------------------------------- | -------------- | ---------------------------------- |
-| `ticket-list`   | `GET /api/tickets?projectId=...` | Required       | No                                 |
-| `ticket-status` | `POST /api/tickets/{id}/status`  | Required       | Creates isolated load-test tickets |
-| `alert-submit`  | `POST /api/alerts`               | Required       | Creates alert aggregate group(s)   |
-| `alert-list`    | `GET /api/alerts`                | Required       | No                                 |
+| Scenario          | Endpoint mix                     | Authentication | State change                             |
+| ----------------- | -------------------------------- | -------------- | ---------------------------------------- |
+| `ticket-list`     | `GET /api/tickets?projectId=...` | Required       | No                                       |
+| `ticket-status`   | `POST /api/tickets/{id}/status`  | Required       | Creates isolated load-test tickets       |
+| `learning-submit` | `POST /api/learning/attempts`    | Required       | Submits deterministic incorrect attempts |
+| `alert-submit`    | `POST /api/alerts`               | Required       | Creates alert aggregate group(s)         |
+| `alert-list`      | `GET /api/alerts`                | Required       | No                                       |
 
 The status scenario gives each virtual user an independent ticket and refreshes that ticket after an
 unsuccessful status request. This prevents an uncertain timeout outcome from inflating subsequent
@@ -53,6 +54,23 @@ $env:LOAD_OUTPUT = 'artifacts/work-orders/ticket-status-smoke.json'
 npm run load:work-orders
 ```
 
+For the learning diagnosis path, use the seeded local learner account. This measures API throughput and
+provider degradation behavior; it does not constitute the golden-case quality gate or teacher scoring:
+
+```powershell
+$env:WORK_ORDERS_LOAD_SCENARIO = 'learning-submit'
+$env:WORK_ORDERS_LOAD_WARMUP_SECONDS = '1'
+$env:WORK_ORDERS_LOAD_DURATION_SECONDS = '3'
+$env:WORK_ORDERS_LOAD_CONCURRENCY = '2'
+$env:LOAD_OUTPUT = 'artifacts/work-orders/learning-submit-smoke.json'
+npm run load:work-orders
+```
+
+Recorded local smoke: `artifacts/work-orders/learning-submit-smoke-2026-08-12.json` used two workers,
+one-second warmup, three-second measurement, and 50ms pacing. The measurement phase completed 98/98
+requests with HTTP 200, 0% errors, approximately 32 QPS, and 14.74ms P95 latency. This is local H2 API
+stability evidence only; it does not prove real-model quality or staff scoring.
+
 ## Five-Minute Acceptance Run
 
 Run each required scenario against an isolated environment after a 30-second warmup. Retain the JSON
@@ -68,7 +86,7 @@ $env:LOAD_OUTPUT = 'artifacts/work-orders/ticket-list-acceptance.json'
 npm run load:work-orders
 ```
 
-Repeat after changing `WORK_ORDERS_LOAD_SCENARIO` to `ticket-status`, `alert-submit`, and
+Repeat after changing `WORK_ORDERS_LOAD_SCENARIO` to `ticket-status`, `learning-submit`, `alert-submit`, and
 `alert-list`. Set `WORK_ORDERS_API_URL`, `WORK_ORDERS_LOAD_EMAIL`, and
 `WORK_ORDERS_LOAD_PASSWORD` only for an approved non-local environment. `alert-submit` additionally
 reports whether the asynchronous aggregate repeat total reached every accepted submission before the

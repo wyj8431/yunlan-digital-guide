@@ -46,8 +46,10 @@ The repository has Java API tests for ticket collaboration, learning validation,
 and local alert persistence. The work-order harness runs root lint, work-order UI type checking, and
 the Java verification suite. The Playwright smoke test covers ticket creation/reassignment/status,
 incorrect-answer submission and teacher confirmation, and alert submission/group rendering through the
-Vite proxy. Docker business-flow verification, load-test results, and legacy alert compatibility
-evidence remain open rather than being claimed as complete.
+Vite proxy. Isolated Compose business-flow verification and local load-test records are retained in
+`docs/work-orders/verification-2026-08-10.md` and `docs/work-orders/load-testing.md`; they do not
+establish a production capacity commitment. Legacy alert compatibility evidence remains open until the
+historical Koa contract and fixtures are supplied.
 
 ## Known Blocker
 
