@@ -90,6 +90,7 @@ function buildSessionTitle(messages: ChatMessage[]) {
   return Array.from(title).slice(0, 32).join('');
 }
 
+// WO-4/WO-5: streaming cancellation, retry, and duplicate-response protection.
 export function useGuideChat() {
   // 请求与动画会并行更新状态，关键值通过 ref 在异步回调间保持最新。
   const typingTimerRef = useRef<number | null>(null);
@@ -103,7 +104,12 @@ export function useGuideChat() {
   const suppressNextHistorySaveRef = useRef(false);
   const messagesRef = useRef<ChatMessage[]>([]);
   const pendingGuideRequestsRef = useRef<PendingGuideRequest[]>([]);
+  const activeGuideRequestRef = useRef<PendingGuideRequest | null>(null);
+  const activeGuideRequestCompleteRef = useRef<(() => void) | null>(null);
+  const lastCancelledRequestRef = useRef<PendingGuideRequest | null>(null);
   const processingGuideQueueRef = useRef(false);
+  // 会话代际：切换/重置会话时递增，用于区分“主动取消”与“服务端异常”结束的流
+  const conversationEpochRef = useRef(0);
   const runGuideRequestRef = useRef<(request: PendingGuideRequest) => Promise<void>>(
     async () => undefined
   );
@@ -152,11 +158,21 @@ export function useGuideChat() {
   );
 
   const updateAssistantKnowledge = useCallback(
-    (messageId: string, response: { retrievedKnowledge?: ChatMessage['retrievedKnowledge'] }) => {
+    (
+      messageId: string,
+      response: {
+        retrievedKnowledge?: ChatMessage['retrievedKnowledge'];
+        source?: ChatMessage['source'];
+      }
+    ) => {
       setMessages((current) => {
         const next = current.map((message) =>
           message.id === messageId
-            ? { ...message, retrievedKnowledge: response.retrievedKnowledge ?? [] }
+            ? {
+                ...message,
+                source: response.source,
+                retrievedKnowledge: response.retrievedKnowledge ?? []
+              }
             : message
         );
         messagesRef.current = next;
@@ -386,7 +402,9 @@ export function useGuideChat() {
 
   const runGuideRequest = useCallback(
     async ({ message, attachment }: PendingGuideRequest) => {
+      activeGuideRequestRef.current = { message, attachment };
       const trimmed = message.trim();
+      const epochAtStart = conversationEpochRef.current;
       const history = buildConversationHistory(messagesRef.current);
       const assistantMessageId = crypto.randomUUID();
       const attachmentIsImage = Boolean(
@@ -440,6 +458,7 @@ export function useGuideChat() {
 
       try {
         await new Promise<void>((resolve, reject) => {
+          activeGuideRequestCompleteRef.current = resolve;
           const handlers: GuideChatStreamHandlers = {
             onDelta: (delta) => {
               streamedAnswer += delta;
@@ -481,7 +500,12 @@ export function useGuideChat() {
             onError: reject,
             onDone: () => {
               if (!receivedResult) {
-                reject(new Error('Guide stream ended before the answer was ready.'));
+                if (conversationEpochRef.current !== epochAtStart) {
+                  // 会话已切换/重置（主动关闭）：静默结束，避免队列卡死与误报错误
+                  resolve();
+                } else {
+                  reject(new Error('Guide stream ended before the answer was ready.'));
+                }
               }
             }
           };
@@ -501,6 +525,8 @@ export function useGuideChat() {
         setError(caught instanceof Error ? caught.message : '数字导游暂时没有回答成功');
       } finally {
         activeStreamRef.current = null;
+        activeGuideRequestRef.current = null;
+        activeGuideRequestCompleteRef.current = null;
       }
     },
     [
@@ -553,6 +579,42 @@ export function useGuideChat() {
     },
     [drainGuideRequestQueue]
   );
+
+  const stopGenerating = useCallback(() => {
+    const activeRequest = activeGuideRequestRef.current;
+    lastCancelledRequestRef.current = activeRequest ?? null;
+    conversationEpochRef.current += 1;
+    activeStreamRef.current?.close();
+    activeStreamRef.current = null;
+    activeGuideRequestRef.current = null;
+    activeGuideRequestCompleteRef.current?.();
+    activeGuideRequestCompleteRef.current = null;
+    pendingGuideRequestsRef.current = [];
+    discardTypewriter();
+    setMessages((current) => {
+      const next = current.filter((message) => !message.streaming);
+      messagesRef.current = next;
+      return next;
+    });
+    setLatestAnswer('');
+    setSpeechTimeline(null);
+    setAvatarDirective(null);
+    setQueuedRequestCount(0);
+    setLoading(false);
+    setError(null);
+  }, [discardTypewriter]);
+
+  const resendLastQuestion = useCallback(() => {
+    const request = lastCancelledRequestRef.current;
+    if (!request || loading) {
+      return;
+    }
+    lastCancelledRequestRef.current = null;
+    pendingGuideRequestsRef.current.push(request);
+    setQueuedRequestCount(pendingGuideRequestsRef.current.length);
+    setLoading(true);
+    void drainGuideRequestQueue();
+  }, [drainGuideRequestQueue, loading]);
 
   const beginExternalQuestion = useCallback(
     (sessionId: string, message: string): boolean => {
@@ -660,8 +722,12 @@ export function useGuideChat() {
   }, []);
 
   const resetConversation = useCallback(() => {
+    conversationEpochRef.current += 1;
     activeStreamRef.current?.close();
     activeStreamRef.current = null;
+    activeGuideRequestRef.current = null;
+    activeGuideRequestCompleteRef.current?.();
+    activeGuideRequestCompleteRef.current = null;
     activeExternalSessionRef.current = null;
     pendingGuideRequestsRef.current = [];
     discardTypewriter();
@@ -692,8 +758,12 @@ export function useGuideChat() {
         return false;
       }
 
+      conversationEpochRef.current += 1;
       activeStreamRef.current?.close();
       activeStreamRef.current = null;
+      activeGuideRequestRef.current = null;
+      activeGuideRequestCompleteRef.current?.();
+      activeGuideRequestCompleteRef.current = null;
       activeExternalSessionRef.current = null;
       pendingGuideRequestsRef.current = [];
       discardTypewriter();
@@ -744,6 +814,9 @@ export function useGuideChat() {
     queuedRequestCount,
     error,
     ask,
+    stopGenerating,
+    resendLastQuestion,
+    canResend: lastCancelledRequestRef.current !== null,
     startNewConversation,
     openConversation,
     deleteConversation,
