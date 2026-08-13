@@ -8,7 +8,10 @@ export type MouthSignalConfig = {
 };
 
 export type LabAudioSource =
-  { kind: 'preset' } | { kind: 'file'; file: File } | { kind: 'url'; url: string };
+  | { kind: 'preset' }
+  | { kind: 'file'; file: File }
+  | { kind: 'url'; url: string }
+  | { kind: 'microphone' };
 
 export type RenderQualityTier = 'low' | 'medium' | 'high';
 
