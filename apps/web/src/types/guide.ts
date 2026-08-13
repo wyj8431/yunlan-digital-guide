@@ -39,6 +39,7 @@ export type ChatMessage = {
   imagePreviewUrl?: string;
   imageName?: string;
   streaming?: boolean;
+  source?: 'llm' | 'local-fallback';
   retrievedKnowledge?: GuideKnowledgeResult[];
 };
 
