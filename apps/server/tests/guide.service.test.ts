@@ -874,6 +874,48 @@ describe('guide service', () => {
     }
   });
 
+  it('keeps the hybrid request alive through the Coze-to-Ark failover window', async () => {
+    vi.useFakeTimers();
+    const deltas: string[] = [];
+    const streamChat = vi.fn(
+      (_messages, _env, onDelta: (delta: string) => void, signal?: AbortSignal) =>
+        new Promise<string>((resolve, reject) => {
+          const timer = setTimeout(() => {
+            onDelta('Ark fallback answer');
+            resolve('Ark fallback answer');
+          }, 15_100);
+          signal?.addEventListener(
+            'abort',
+            () => {
+              clearTimeout(timer);
+              reject(new Error('aborted'));
+            },
+            { once: true }
+          );
+        })
+    );
+
+    try {
+      const pending = createGuideStreamResponse({
+        message: 'route',
+        env: { ...llmEnv, llmProvider: 'hybrid' },
+        streamChat,
+        onDelta: (delta) => deltas.push(delta)
+      });
+
+      await vi.advanceTimersByTimeAsync(15_000);
+      expect(deltas).toEqual([]);
+
+      await vi.advanceTimersByTimeAsync(100);
+      const response = await pending;
+
+      expect(response).toMatchObject({ answer: 'Ark fallback answer', source: 'llm' });
+      expect(deltas).toEqual(['Ark fallback answer']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('uses concrete province knowledge when a province stream falls back locally', async () => {
     vi.useFakeTimers();
     const deltas: string[] = [];

@@ -39,4 +39,31 @@ describe('Coze avatar directive protocol', () => {
     expect(deltas.join('')).toBe('回答。');
     expect(deltas.join('')).not.toContain('guide-directive');
   });
+
+  it('strips an unclosed trailing directive left by a truncated stream', () => {
+    const parsed = parseGuideDirective(
+      '推荐西栅景区。<guide-directive>{"emotion":"warm","action":"A_RLH_welcome_O"'
+    );
+
+    expect(parsed).toEqual({
+      answer: '推荐西栅景区。',
+      avatarDirective: undefined
+    });
+  });
+
+  it('keeps body text untouched when a closed directive is not at the end', () => {
+    const parsed = parseGuideDirective(
+      '介绍 <guide-directive>{"action":"A_RH_hello_O"}</guide-directive> 这个词。'
+    );
+
+    expect(parsed.answer).toBe(
+      '介绍 <guide-directive>{"action":"A_RH_hello_O"}</guide-directive> 这个词。'
+    );
+  });
+
+  it('strips a case-variant unclosed trailing directive', () => {
+    const parsed = parseGuideDirective('好的。<Guide-Directive>{"action":"A_RH_hello_O"}');
+
+    expect(parsed).toEqual({ answer: '好的。', avatarDirective: undefined });
+  });
 });

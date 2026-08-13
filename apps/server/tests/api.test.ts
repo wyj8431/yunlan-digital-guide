@@ -175,6 +175,22 @@ describe('server api', () => {
       });
   });
 
+  it('returns a stable error when guide chat JSON exceeds the request limit', async () => {
+    const app = createApp();
+
+    await request(app.callback())
+      .post('/api/guide/chat')
+      .send({ message: 'large request', padding: 'x'.repeat(14 * 1024 * 1024) })
+      .expect(413)
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          code: 'PAYLOAD_TOO_LARGE',
+          message:
+            '\u8bf7\u6c42\u5185\u5bb9\u8fc7\u5927\uff0c\u8bf7\u538b\u7f29\u540e\u518d\u53d1\u9001\u3002'
+        });
+      });
+  });
+
   it('downloads guide answers as Markdown and Excel files', async () => {
     const app = createApp();
 
