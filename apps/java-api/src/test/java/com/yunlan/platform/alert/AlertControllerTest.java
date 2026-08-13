@@ -1,6 +1,9 @@
 package com.yunlan.platform.alert;
 
+import com.yunlan.platform.common.api.ApiException;
+import com.yunlan.platform.common.api.GlobalExceptionHandler;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -66,5 +69,30 @@ class AlertControllerTest {
         assertEquals("temperature", request.getValue().alertType());
         assertEquals("WARNING", request.getValue().level());
         assertEquals("2026-08-10T01:07:42Z", request.getValue().occurredAt().toString());
+    }
+
+    @Test
+    void exposesQueueSaturationAsAStableServiceUnavailableResponse() throws Exception {
+        var service = mock(AlertService.class);
+        when(service.submit(any(AlertDtos.SubmitRequest.class))).thenThrow(new ApiException(
+                "ALERT_QUEUE_FULL", HttpStatus.SERVICE_UNAVAILABLE, "Alert queue is full."
+        ));
+        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(new AlertController(service))
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .build();
+
+        mockMvc.perform(post("/api/alerts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "deviceId": "device-1",
+                                  "alertType": "temperature",
+                                  "level": "WARNING",
+                                  "message": "temperature is high",
+                                  "occurredAt": "2026-08-10T01:07:42Z"
+                                }
+                                """))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("ALERT_QUEUE_FULL"));
     }
 }

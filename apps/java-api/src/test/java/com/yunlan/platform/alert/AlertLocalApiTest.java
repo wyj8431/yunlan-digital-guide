@@ -1,5 +1,7 @@
 package com.yunlan.platform.alert;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yunlan.platform.common.security.AuthPrincipal;
 import com.yunlan.platform.common.security.JwtService;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,6 +15,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
+import java.io.InputStream;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -33,6 +36,9 @@ class AlertLocalApiTest {
 
     @Autowired
     private AlertGroupRepository groups;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     private String token;
 
@@ -127,15 +133,51 @@ class AlertLocalApiTest {
                 .andExpect(jsonPath("$.code").value("INVALID_ALERT_LEVEL"));
     }
 
+    @Test
+    void appliesTheSyntheticCompatibilityFixtureToTheVersionedJavaContract() throws Exception {
+        var fixture = readFixture();
+        for (var testCase : fixture.path("cases")) {
+            var expected = testCase.path("expected");
+            var result = mockMvc.perform(post("/api/alerts/compat/v1")
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(testCase.path("request"))))
+                    .andExpect(status().is(expected.path("httpStatus").asInt()))
+                    .andReturn();
+
+            var response = objectMapper.readTree(result.getResponse().getContentAsString());
+            if (expected.has("status")) {
+                assertEquals(expected.path("status").asText(), response.path("status").asText(), testCase.path("name").asText());
+            }
+            if (expected.has("errorCode")) {
+                assertEquals(expected.path("errorCode").asText(), response.path("code").asText(), testCase.path("name").asText());
+            }
+            if (expected.has("canonicalLevel")) {
+                var request = testCase.path("request");
+                var group = waitForGroup(
+                        request.path("device_id").asText(),
+                        request.path("alert_type").asText(),
+                        Instant.parse(request.path("occurred_at").asText()).minusSeconds(
+                                Instant.parse(request.path("occurred_at").asText()).getEpochSecond() % 300
+                        )
+                );
+                assertEquals(expected.path("canonicalLevel").asText(), group.getLevel(), testCase.path("name").asText());
+            }
+        }
+    }
+
     private AlertGroup waitForGroup() throws InterruptedException {
         return waitForGroup("local-api-device");
     }
 
     private AlertGroup waitForGroup(String deviceId) throws InterruptedException {
-        var bucketStart = Instant.parse("2026-08-10T01:05:00Z");
+        return waitForGroup(deviceId, "temperature", Instant.parse("2026-08-10T01:05:00Z"));
+    }
+
+    private AlertGroup waitForGroup(String deviceId, String alertType, Instant bucketStart) throws InterruptedException {
         for (var attempt = 0; attempt < 80; attempt++) {
             var group = groups.findByDeviceIdAndAlertTypeAndBucketStart(
-                    deviceId, "temperature", bucketStart
+                    deviceId, alertType, bucketStart
             );
             if (group.isPresent()) {
                 return group.get();
@@ -143,5 +185,14 @@ class AlertLocalApiTest {
             Thread.sleep(25);
         }
         throw new AssertionError("Alert group was not persisted by the local queue consumer.");
+    }
+
+    private JsonNode readFixture() throws Exception {
+        try (InputStream input = getClass().getResourceAsStream("/fixtures/legacy-alert-synthetic-v1.json")) {
+            if (input == null) {
+                throw new AssertionError("Synthetic alert compatibility fixture is missing.");
+            }
+            return objectMapper.readTree(input);
+        }
     }
 }

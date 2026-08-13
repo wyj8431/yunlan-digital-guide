@@ -56,4 +56,25 @@ class LocalAlertGroupWriterTest {
         assertEquals(64, matches.getFirst().getRepeatCount());
         assertEquals("CRITICAL", matches.getFirst().getLevel());
     }
+
+    @Test
+    void keepsEventsInAdjacentFiveMinuteUtcBucketsSeparate() {
+        var deviceId = "cross-bucket-test-" + UUID.randomUUID();
+        processor.process(
+                new AlertEvent(deviceId, "temperature", "WARNING", "before boundary", Instant.parse("2026-08-10T01:04:59Z")),
+                Instant.parse("2026-08-10T01:00:00Z")
+        );
+        processor.process(
+                new AlertEvent(deviceId, "temperature", "WARNING", "after boundary", Instant.parse("2026-08-10T01:05:00Z")),
+                Instant.parse("2026-08-10T01:05:00Z")
+        );
+
+        var buckets = groups.findAllByOrderByLastSeenAtDesc().stream()
+                .filter(group -> group.getDeviceId().equals(deviceId))
+                .map(AlertGroup::getBucketStart)
+                .sorted()
+                .toList();
+
+        assertEquals(List.of(Instant.parse("2026-08-10T01:00:00Z"), Instant.parse("2026-08-10T01:05:00Z")), buckets);
+    }
 }
