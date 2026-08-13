@@ -10,7 +10,7 @@ import {
   Send,
   ShieldCheck
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   changeTicketStatus,
   changeTicketAssignee,
@@ -63,6 +63,23 @@ function formatDiagnosis(candidateJson: string): string {
     return JSON.stringify(JSON.parse(candidateJson), null, 2);
   } catch {
     return candidateJson;
+  }
+}
+
+type DiagnosisPlanDay = { day: number; task: string; resourceId: string };
+type DiagnosisView = {
+  knowledgePointId?: string;
+  errorTypeId?: string;
+  evidence?: string;
+  plan?: DiagnosisPlanDay[];
+};
+
+function parseDiagnosis(candidateJson: string): DiagnosisView | null {
+  try {
+    const candidate = JSON.parse(candidateJson) as DiagnosisView;
+    return Array.isArray(candidate.plan) ? candidate : null;
+  } catch {
+    return null;
   }
 }
 
@@ -131,6 +148,7 @@ export function JavaWorkOrdersPage() {
   const [ticketTitle, setTicketTitle] = useState('');
   const [ticketDescription, setTicketDescription] = useState('');
   const [assigneeId, setAssigneeId] = useState('');
+  const createTicketKey = useRef<string | null>(null);
   const [assignmentDraft, setAssignmentDraft] = useState('');
   const [answer, setAnswer] = useState('');
   const [reasoning, setReasoning] = useState('');
@@ -151,6 +169,7 @@ export function JavaWorkOrdersPage() {
   const isStaff = role === 'TEACHER' || role === 'ADMIN';
   const canChangeAssignee =
     selectedTicket !== null && (role === 'ADMIN' || selectedTicket.reporterId === currentUserId);
+  const diagnosis = attempt?.diagnosisJson ? parseDiagnosis(attempt.diagnosisJson) : null;
 
   async function loadData(activeToken: string, requestedProjectId = selectedProjectId) {
     setBusy(true);
@@ -320,15 +339,20 @@ export function JavaWorkOrdersPage() {
     setBusy(true);
     setError('');
     try {
-      await createTicket(token, {
-        projectId: selectedProjectId,
-        title: ticketTitle,
-        description: ticketDescription,
-        ...(assigneeId ? { assigneeId } : {})
-      });
+      await createTicket(
+        token,
+        {
+          projectId: selectedProjectId,
+          title: ticketTitle,
+          description: ticketDescription,
+          ...(assigneeId ? { assigneeId } : {})
+        },
+        createTicketKey.current ?? (createTicketKey.current = crypto.randomUUID())
+      );
       setTicketTitle('');
       setTicketDescription('');
       setAssigneeId('');
+      createTicketKey.current = null;
       await loadData(token, selectedProjectId);
       setNotice('Ticket created.');
     } catch (caught) {
@@ -833,10 +857,31 @@ export function JavaWorkOrdersPage() {
                     ? 'Correct. No model diagnosis was requested.'
                     : attempt.reviewStatus === 'CONFIRMED'
                       ? 'The teacher confirmed this diagnosis.'
-                      : 'Incorrect. The candidate diagnosis is held for teacher review.'}
+                      : attempt.reviewStatus === 'REJECTED'
+                        ? 'The teacher rejected this diagnosis. Please retry the question for a new diagnosis.'
+                        : 'Incorrect. The candidate diagnosis is held for teacher review.'}
                 </p>
                 {attempt.diagnosisJson ? (
-                  <pre>{formatDiagnosis(attempt.diagnosisJson)}</pre>
+                  diagnosis ? (
+                    <div
+                      className="java-work-orders-diagnosis-plan"
+                      aria-label="Seven-day learning plan"
+                    >
+                      <p>{diagnosis.evidence}</p>
+                      <ol>
+                        {diagnosis.plan?.map((day) => (
+                          <li key={day.day}>
+                            <strong>Day {day.day}</strong>
+                            <span>{day.task}</span>
+                            <small>{day.resourceId}</small>
+                          </li>
+                        ))}
+                      </ol>
+                      {isStaff ? <pre>{formatDiagnosis(attempt.diagnosisJson)}</pre> : null}
+                    </div>
+                  ) : (
+                    <pre>{formatDiagnosis(attempt.diagnosisJson)}</pre>
+                  )
                 ) : (
                   <p>No diagnosis is available yet.</p>
                 )}

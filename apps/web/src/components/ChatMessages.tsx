@@ -3,12 +3,15 @@ import { useEffect, useRef, useState } from 'react';
 import { Download, FileCode2, FileSpreadsheet, FileText, FileType2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeHighlight from 'rehype-highlight';
 import type { ChatMessage, GuideKnowledgeSource } from '../types/guide';
 import { downloadGuideAnswer, type GuideExportFormat } from '../api/guideApi';
 
 const CHAT_LOG_LABEL = '\u804a\u5929\u8bb0\u5f55';
 const WELCOME_MESSAGE =
   '\u4f60\u597d\uff0c\u6211\u662f\u4e4c\u9547\u6570\u5b57\u5bfc\u6e38\u3002\u53ef\u4ee5\u95ee\u6211\u8def\u7ebf\u3001\u62cd\u7167\u70b9\u3001\u5f00\u653e\u65f6\u95f4\u6216\u4eb2\u5b50\u6e38\u5b89\u6392\u3002';
+const LOCAL_FALLBACK_LABEL =
+  '\u6a21\u578b\u54cd\u5e94\u8d85\u65f6\uff0c\u5df2\u5207\u6362\u4e3a\u672c\u5730\u8d44\u6599\u56de\u7b54\u3002';
 
 type ChatMessagesProps = {
   messages: ChatMessage[];
@@ -172,7 +175,9 @@ export function ChatMessages({ messages, autoScroll = true }: ChatMessagesProps)
           ) : null}
           {message.role === 'assistant' && !message.streaming ? (
             <div className="message-markdown">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
+                {message.content}
+              </ReactMarkdown>
             </div>
           ) : (
             <p aria-live={message.streaming ? 'polite' : undefined}>
@@ -182,6 +187,11 @@ export function ChatMessages({ messages, autoScroll = true }: ChatMessagesProps)
           )}
           {message.role === 'assistant' && !message.streaming && message.content ? (
             <GuideAnswerExport content={message.content} />
+          ) : null}
+          {message.role === 'assistant' && message.source === 'local-fallback' ? (
+            <p className="message-source-notice" role="status">
+              {LOCAL_FALLBACK_LABEL}
+            </p>
           ) : null}
           {message.role === 'assistant' && message.retrievedKnowledge?.length ? (
             <div className="message-sources" aria-label="参考资料">

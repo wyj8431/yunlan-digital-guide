@@ -144,7 +144,13 @@ export function DigitalHumanStage({
   }, [effectiveSpeaking]);
 
   useEffect(() => {
-    if (!avatarDirective || !virtualHuman.active || virtualHuman.acting) {
+    // 新问题开始时 avatarDirective 会被置空：同时清空已应用标记，允许相同指令再次触发
+    if (!avatarDirective) {
+      appliedDirectiveRef.current = null;
+      return;
+    }
+
+    if (!virtualHuman.active || virtualHuman.acting) {
       return;
     }
 
