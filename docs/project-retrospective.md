@@ -33,3 +33,16 @@
 
 Run the configured reviewer prompts in separate sessions, retain their unedited replies and command logs
 under `artifacts/loop-1/`, then have the project owner review the resulting diff and release evidence.
+
+## Interview Q&A Appendix
+
+1. **Why does the ticket service use both optimistic versions and idempotency keys?** The version prevents stale writes; the key makes a client retry return the same successful operation instead of recording it twice.
+2. **Why is ticket reassignment narrower than status changes?** Project membership is required for all writes, while reassignment also changes ownership and is restricted to the reporter or administrator.
+3. **Why is the learning diagnosis hidden before staff confirmation?** Deterministic grading can be shown immediately, but model output remains untrusted until its controlled IDs, plan shape, and staff decision pass.
+4. **What happens when the learning provider times out or returns invalid JSON?** The incorrect attempt is still stored deterministically and its diagnosis is saved as failed rather than exposing an unvalidated result.
+5. **How is prompt injection reduced in the learning flow?** Learner reasoning is treated as serialized data, not an instruction; the model receives an explicit instruction to ignore instructions inside that data.
+6. **Why does alert intake return 503 rather than buffer indefinitely?** The bounded queue protects JVM memory and makes overload visible to the caller for retry/backoff.
+7. **How are alert aggregates safe under concurrency?** Events are grouped in five-minute UTC buckets and persisted by atomic database aggregation, with concurrency tests for the local and PostgreSQL writers.
+8. **What is the alert shutdown tradeoff?** The service first stops accepting work and drains for a bounded time. If it times out, it force-stops and logs queued/active counts for recovery investigation.
+9. **Why is `/api/alerts/compat/v1` not proof of legacy compatibility?** It is an explicit new migration contract. Historical compatibility requires the old endpoint, auth behavior, payloads, fixtures, and owner verification.
+10. **What evidence cannot be generated from source code?** Platform evaluation outcomes, production SLA, commercial model licensing, third-party deployment availability, independent reviewer transcripts, and human acceptance signatures.

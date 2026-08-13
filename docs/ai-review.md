@@ -43,3 +43,17 @@ reply in `artifacts/loop-1/review-round-N.md`; do not replace it with a summary.
 
 No P0 or P1 finding may remain unresolved. A reviewer result or human decision must be linked to the exact
 diff and verification command before declaring the process loop complete.
+
+## Code Issue Cases Found During Local Review
+
+These are repository findings, not substituted raw replies from an independent agent. They are included so
+the next independent reviewer can verify the exact remediation rather than rediscover the same classes of issue.
+
+| Case                          | Observed risk                                                                                                                                                       | Local remediation                                                                                                                                                     | Verification                                                                                          |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Learning prompt injection     | Learner reasoning was concatenated into a natural-language model prompt, allowing text such as `ignore previous instructions` to compete with the task instruction. | `OpenAiCompatibleDiagnosisProvider` now serializes untrusted learner reasoning inside a structured data object with an explicit system instruction not to execute it. | `OpenAiCompatibleDiagnosisProviderTest.sendsLearnerReasoningAsEscapedDataInsteadOfPromptInstructions` |
+| Invalid seven-day plans       | A model candidate can look plausible while omitting or duplicating a day.                                                                                           | `DiagnosisValidator` requires days 1 through 7 exactly once before persistence or staff confirmation.                                                                 | `DiagnosisValidatorTest` and the controlled local mutation record                                     |
+| Shutdown data loss visibility | The queue interrupted workers on timeout without reporting the accepted work still queued or in progress.                                                           | `AlertQueue` now attempts a bounded graceful drain, then logs queued and active counts before forced termination.                                                     | `AlertQueueTest.drainsAcceptedEventsBeforeCompletingShutdown`                                         |
+
+Independent review and human sign-off remain open. Preserve raw reviewer output verbatim under
+`artifacts/loop-1/review-round-N.md`; do not replace it with this summary.

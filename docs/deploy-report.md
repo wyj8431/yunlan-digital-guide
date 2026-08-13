@@ -32,6 +32,23 @@ and negative browser flows passed through Nginx, and the PostgreSQL atomic alert
 concurrent events into one aggregate group. The reproducible commands, limits, and load artifacts are in
 `docs/work-orders/verification-2026-08-10.md` and `docs/work-orders/load-testing.md`.
 
+## Negative Database-Address Drill
+
+On 2026-08-12 (Asia/Shanghai), the Java API was started with an intentionally unreachable local
+PostgreSQL address (`127.0.0.1:1`), a non-production username/password, and a non-conflicting API port.
+Spring Boot failed during datasource initialization before exposing an HTTP listener; the expected
+connection-refused error was retained in `artifacts/loop-1/database-address-failure.log`. No migration,
+seed record, remote connection, or production credential was involved. The command used the normal default
+profile rather than the H2 `local` profile, so it exercises the Compose/production database configuration path.
+
+This is an isolated failure-detection drill only. Recovery is to restore the approved database URL and
+credentials, start the isolated stack again, and run `npm run check:work-orders`; it is not permission to
+modify an applied Flyway migration or a production database.
+
+The alert-domain controlled mutation and the focused restored test are recorded in
+`artifacts/loop-1/alert-mutation-test.log`; the alert bucket test includes pre-epoch timestamps so UTC
+flooring cannot regress to truncating division.
+
 ## Production Gate
 
 Production deployment approval, production credentials, external traffic targets, and a production backup
