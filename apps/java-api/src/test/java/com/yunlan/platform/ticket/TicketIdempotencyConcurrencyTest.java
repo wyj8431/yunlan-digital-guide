@@ -105,4 +105,31 @@ class TicketIdempotencyConcurrencyTest {
             assertEquals(1, tickets.findById(ticket.getId()).orElseThrow().getVersion());
         }
     }
+
+    @Test
+    void createsOnlyOneTicketForConcurrentRetriesWithOneIdempotencyKey() throws Exception {
+        var userId = UUID.randomUUID();
+        var projectId = UUID.randomUUID();
+        users.save(new UserAccount(userId, userId + "@example.com", passwordEncoder.encode("secret"), "MEMBER"));
+        projects.save(new Project(projectId, "Concurrent creation project"));
+        members.save(new ProjectMember(projectId, userId));
+        var principal = new AuthPrincipal(userId, userId + "@example.com", "MEMBER");
+        var request = new TicketDtos.CreateRequest(projectId, "Concurrent create", "Retry safely.", null);
+        var start = new CountDownLatch(1);
+        Callable<TicketDtos.TicketResponse> operation = () -> {
+            start.await();
+            return service.create(request, "same-create-key", principal);
+        };
+
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var first = executor.submit(operation);
+            var second = executor.submit(operation);
+            start.countDown();
+            var firstResponse = first.get();
+            var secondResponse = second.get();
+
+            assertEquals(firstResponse.id(), secondResponse.id());
+            assertEquals(1, tickets.findAllByProjectIdInOrderByUpdatedAtDesc(java.util.List.of(projectId)).size());
+        }
+    }
 }

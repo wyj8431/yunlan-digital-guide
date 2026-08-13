@@ -80,6 +80,7 @@ class TicketApiTest {
         ));
         var created = mockMvc.perform(post("/api/tickets")
                         .header("Authorization", "Bearer " + reporterToken)
+                        .header("Idempotency-Key", "api-test-create-1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createBody))
                 .andExpect(status().isOk())
@@ -125,6 +126,47 @@ class TicketApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.unreadCount").value(1))
                 .andExpect(jsonPath("$.notifications[0].type").value("TICKET_COMMENT_ADDED"));
+    }
+
+    @Test
+    void createsTicketsIdempotentlyAndRejectsReusedKeysForDifferentBodies() throws Exception {
+        var request = objectMapper.writeValueAsString(new TicketDtos.CreateRequest(
+                projectId, "Idempotent ticket", "Create this only once.", assigneeId
+        ));
+
+        var created = mockMvc.perform(post("/api/tickets")
+                        .header("Authorization", "Bearer " + reporterToken)
+                        .header("Idempotency-Key", "api-test-create-replay")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isOk())
+                .andReturn();
+        var ticketId = objectMapper.readTree(created.getResponse().getContentAsString()).path("id").asText();
+
+        mockMvc.perform(post("/api/tickets")
+                        .header("Authorization", "Bearer " + reporterToken)
+                        .header("Idempotency-Key", "api-test-create-replay")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(ticketId));
+
+        mockMvc.perform(post("/api/tickets")
+                        .header("Authorization", "Bearer " + reporterToken)
+                        .header("Idempotency-Key", "api-test-create-replay")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new TicketDtos.CreateRequest(
+                                projectId, "Changed ticket", "This must conflict.", assigneeId
+                        ))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("IDEMPOTENCY_KEY_REUSED"));
+
+        mockMvc.perform(post("/api/tickets")
+                        .header("Authorization", "Bearer " + reporterToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("IDEMPOTENCY_KEY_REQUIRED"));
     }
 
     @Test
