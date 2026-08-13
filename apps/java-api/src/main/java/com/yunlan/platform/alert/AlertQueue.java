@@ -19,9 +19,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Component
 public class AlertQueue {
+    // WO-3: bounded intake, fixed consumers, and observable graceful drain.
     private static final Logger LOGGER = LoggerFactory.getLogger(AlertQueue.class);
 
     private final AlertProcessor processor;
@@ -30,6 +32,7 @@ public class AlertQueue {
     private final int bucketMinutes;
     private final long shutdownTimeoutSeconds;
     private final AtomicBoolean accepting = new AtomicBoolean(false);
+    private final AtomicInteger processingCount = new AtomicInteger();
     private final List<Future<?>> workers = new ArrayList<>();
     private ExecutorService executor;
 
@@ -83,9 +86,12 @@ public class AlertQueue {
                     continue;
                 }
                 try {
+                    processingCount.incrementAndGet();
                     processor.process(event, bucketStart(event.occurredAt()));
                 } catch (Exception exception) {
                     LOGGER.error("Alert processing failed for device={} type={}", event.deviceId(), event.alertType(), exception);
+                } finally {
+                    processingCount.decrementAndGet();
                 }
             }
         } catch (InterruptedException exception) {
@@ -105,19 +111,25 @@ public class AlertQueue {
         if (!accepting.compareAndSet(true, false)) {
             return;
         }
-        var deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(shutdownTimeoutSeconds);
-        for (var worker : workers) {
-            var remaining = deadline - System.nanoTime();
-            if (remaining <= 0) {
-                break;
+        executor.shutdown();
+        try {
+            if (!executor.awaitTermination(shutdownTimeoutSeconds, TimeUnit.SECONDS)) {
+                LOGGER.warn(
+                        "Alert shutdown timed out with queuedEvents={} processingEvents={}",
+                        queue.size(),
+                        processingCount.get()
+                );
+                executor.shutdownNow();
             }
-            try {
-                worker.get(remaining, TimeUnit.NANOSECONDS);
-            } catch (Exception exception) {
-                worker.cancel(true);
-                LOGGER.warn("Alert consumer did not finish before shutdown timeout", exception);
-            }
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            LOGGER.warn(
+                    "Alert shutdown interrupted with queuedEvents={} processingEvents={}",
+                    queue.size(),
+                    processingCount.get(),
+                    exception
+            );
+            executor.shutdownNow();
         }
-        executor.shutdownNow();
     }
 }

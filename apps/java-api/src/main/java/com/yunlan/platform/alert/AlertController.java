@@ -14,6 +14,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/alerts")
 public class AlertController {
+    // WO-3: alert intake and compatibility contract remain explicitly versioned.
     private final AlertService alertService;
 
     public AlertController(AlertService alertService) {
