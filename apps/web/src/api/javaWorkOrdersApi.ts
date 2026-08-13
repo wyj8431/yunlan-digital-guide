@@ -134,10 +134,12 @@ export async function listTickets(token: string, projectId?: string) {
 
 export async function createTicket(
   token: string,
-  input: { projectId: string; title: string; description: string; assigneeId?: string }
+  input: { projectId: string; title: string; description: string; assigneeId?: string },
+  idempotencyKey: string
 ) {
   return request<JavaTicket>('/api/tickets', token, {
     method: 'POST',
+    headers: { 'Idempotency-Key': idempotencyKey },
     body: JSON.stringify(input)
   });
 }

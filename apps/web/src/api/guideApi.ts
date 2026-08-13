@@ -39,12 +39,14 @@ export async function fetchScenicArea(): Promise<ScenicAreaSummary> {
 export async function askGuide(
   message: string,
   attachment?: GuideAttachment | null,
-  history?: GuideConversationMessage[]
+  history?: GuideConversationMessage[],
+  signal?: AbortSignal
 ): Promise<GuideChatResponse> {
   const response = await fetch('/api/guide/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, attachment, history })
+    body: JSON.stringify({ message, attachment, history }),
+    signal
   });
 
   return readJson<GuideChatResponse>(response);
@@ -125,6 +127,7 @@ function createGuideStreamUrl(): string {
 
 const GUIDE_STREAM_RECONNECT_DELAY_MS = 250;
 const GUIDE_STREAM_MAX_RECONNECTS = 1;
+const GUIDE_STREAM_IDLE_TIMEOUT_MS = 20_000;
 
 function parseGuideStreamEvent(raw: string): GuideChatStreamEvent {
   const parsed = JSON.parse(raw) as GuideChatStreamEvent;
@@ -144,8 +147,10 @@ export function streamGuideAnswer(
 ): GuideChatStreamController {
   if (typeof WebSocket === 'undefined') {
     let closed = false;
+    const abortController = new AbortController();
+    const timeout = window.setTimeout(() => abortController.abort(), GUIDE_STREAM_IDLE_TIMEOUT_MS);
 
-    void askGuide(message, attachment, history)
+    void askGuide(message, attachment, history, abortController.signal)
       .then((response) => {
         if (closed) {
           return;
@@ -156,13 +161,24 @@ export function streamGuideAnswer(
       })
       .catch((caught) => {
         if (!closed) {
-          handlers.onError(caught instanceof Error ? caught : new Error('Guide request failed.'));
+          handlers.onError(
+            caught instanceof DOMException && caught.name === 'AbortError'
+              ? new Error('Guide request timed out.')
+              : caught instanceof Error
+                ? caught
+                : new Error('Guide request failed.')
+          );
         }
+      })
+      .finally(() => {
+        window.clearTimeout(timeout);
       });
 
     return {
       close: () => {
         closed = true;
+        window.clearTimeout(timeout);
+        abortController.abort();
       }
     };
   }
@@ -171,8 +187,36 @@ export function streamGuideAnswer(
   let closedByClient = false;
   let completed = false;
   let receivedDelta = false;
+  let receivedResult = false;
   let reconnectCount = 0;
   let reconnectTimer: number | null = null;
+  let idleTimer: number | null = null;
+
+  const clearIdleTimer = () => {
+    if (idleTimer !== null) {
+      window.clearTimeout(idleTimer);
+      idleTimer = null;
+    }
+  };
+
+  const armIdleTimer = () => {
+    clearIdleTimer();
+    idleTimer = window.setTimeout(() => {
+      if (completed || closedByClient) return;
+      failStream(new Error('Guide stream timed out.'));
+    }, GUIDE_STREAM_IDLE_TIMEOUT_MS);
+  };
+
+  const failStream = (error: Error) => {
+    if (completed || closedByClient) {
+      return;
+    }
+
+    completed = true;
+    clearIdleTimer();
+    handlers.onError(error);
+    socket?.close();
+  };
 
   const reportConnectionFailure = (message: string) => {
     if (completed || closedByClient || reconnectTimer !== null) {
@@ -185,16 +229,19 @@ export function streamGuideAnswer(
       return;
     }
 
-    handlers.onError(new Error(message));
+    failStream(new Error(message));
   };
 
   const connect = () => {
     if (closedByClient || completed) {
       return;
     }
+    // 计时器已触发，清除引用，避免后续失败被 reconnectTimer !== null 误判为“重连中”而静默吞掉
+    reconnectTimer = null;
 
     const nextSocket = new WebSocket(createGuideStreamUrl());
     socket = nextSocket;
+    armIdleTimer();
     let connectionFailureReported = false;
     const reportCurrentConnectionFailure = (message: string) => {
       if (connectionFailureReported) {
@@ -205,10 +252,15 @@ export function streamGuideAnswer(
     };
 
     nextSocket.addEventListener('open', () => {
+      armIdleTimer();
       nextSocket.send(JSON.stringify({ type: 'ask', message, attachment, history }));
     });
 
     nextSocket.addEventListener('message', (event) => {
+      if (completed || closedByClient) {
+        return;
+      }
+      armIdleTimer();
       try {
         const streamEvent = parseGuideStreamEvent(String(event.data));
 
@@ -220,19 +272,20 @@ export function streamGuideAnswer(
         } else if (streamEvent.type === 'speech-timeline') {
           handlers.onSpeechTimeline?.(streamEvent.timeline);
         } else if (streamEvent.type === 'result') {
-          handlers.onResult(streamEvent.response);
+          if (!receivedResult) {
+            receivedResult = true;
+            handlers.onResult(streamEvent.response);
+          }
         } else if (streamEvent.type === 'error') {
-          handlers.onError(new Error(streamEvent.message));
+          failStream(new Error(streamEvent.message));
         } else if (streamEvent.type === 'done') {
           completed = true;
+          clearIdleTimer();
           handlers.onDone?.();
           nextSocket.close();
         }
       } catch (caught) {
-        handlers.onError(
-          caught instanceof Error ? caught : new Error('Guide stream parse failed.')
-        );
-        nextSocket.close();
+        failStream(caught instanceof Error ? caught : new Error('Guide stream parse failed.'));
       }
     });
 
@@ -250,11 +303,16 @@ export function streamGuideAnswer(
   return {
     close: () => {
       closedByClient = true;
+      clearIdleTimer();
       if (reconnectTimer !== null) {
         window.clearTimeout(reconnectTimer);
         reconnectTimer = null;
       }
       socket?.close();
+      // 流未完成时主动通知上层结束等待，避免调用方（如会话切换）的 Promise 永久悬挂
+      if (!completed) {
+        handlers.onDone?.();
+      }
     }
   };
 }
